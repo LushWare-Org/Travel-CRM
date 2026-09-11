@@ -6,6 +6,13 @@ import { SALES_REP } from '../constants/roles.js';
 import { CREATED, BAD_REQUEST, NOT_FOUND } from '../constants/httpStatus.js';
 import { BOOKING_NOT_FOUND, BOOKING_ALREADY_CANCELLED } from '../constants/errorMessages.js';
 
+// Every booking read returns its segments in journey order: sequence is the
+// provider's own ordering key, and route/departure rendering depends on it.
+const BOOKING_INCLUDE = {
+  segments: { orderBy: { sequence: 'asc' } },
+  travelers: true,
+};
+
 // ── helpers ──────────────────────────────────────────────────────────────
 
 async function findOrCreateCustomer({ name, email, phone }) {
@@ -98,7 +105,7 @@ export const bookForLead = asyncHandler(async (req, res) => {
         })),
       },
     },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
   });
 
   req.log.info({ bookingId: booking.id, pnr: booking.pnr, leadId, dayNumber, flightType }, 'Flight booked for lead');
@@ -111,7 +118,7 @@ export const getByLead = asyncHandler(async (req, res) => {
 
   const bookings = await prisma.flightBooking.findMany({
     where: { leadId, ...(isScopedToOwn && { createdById: req.user.id }) },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
     orderBy: { createdAt: 'desc' },
   });
 
@@ -124,7 +131,7 @@ export const getItineraryFlights = asyncHandler(async (req, res) => {
 
   const bookings = await prisma.flightBooking.findMany({
     where: { leadId, flightType: 'itinerary', ...(isScopedToOwn && { createdById: req.user.id }) },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
     orderBy: { dayNumber: 'asc' },
   });
 
@@ -137,7 +144,7 @@ export const getOptionalFlights = asyncHandler(async (req, res) => {
 
   const bookings = await prisma.flightBooking.findMany({
     where: { leadId, flightType: 'optional', ...(isScopedToOwn && { createdById: req.user.id }) },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
     orderBy: { createdAt: 'desc' },
   });
 
@@ -161,7 +168,7 @@ export const linkToDay = asyncHandler(async (req, res) => {
       ...(dayNumber !== undefined && { dayNumber: parseInt(dayNumber, 10) }),
       ...(flightType && { flightType }),
     },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
   });
 
   res.json({ success: true, data: updated });

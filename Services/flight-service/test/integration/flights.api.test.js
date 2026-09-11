@@ -246,6 +246,20 @@ describe('Flight API — Booking Management', () => {
       expect(res.body.data).toHaveLength(2);
     });
 
+    it('should return segments in sequence order', async () => {
+      prisma.flightBooking.findMany.mockResolvedValue([]);
+
+      await request(app)
+        .get('/api/v1/flights/bookings')
+        .set(authHeaders());
+
+      expect(prisma.flightBooking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: { segments: { orderBy: { sequence: 'asc' } }, travelers: true },
+        }),
+      );
+    });
+
     it('should filter by status', async () => {
       prisma.flightBooking.findMany.mockResolvedValue([]);
 
@@ -281,6 +295,22 @@ describe('Flight API — Booking Management', () => {
         .set(authHeaders());
 
       expect(res.status).toBe(404);
+    });
+
+    it('should read segments in sequence order', async () => {
+      prisma.flightBooking.findFirst.mockResolvedValue({
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', segments: [], travelers: [],
+      });
+
+      await request(app)
+        .get('/api/v1/flights/bookings/a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+        .set(authHeaders());
+
+      expect(prisma.flightBooking.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: { segments: { orderBy: { sequence: 'asc' } }, travelers: true },
+        }),
+      );
     });
   });
 
@@ -319,6 +349,27 @@ describe('Flight API — Booking Management', () => {
 
       expect(res.status).toBe(200);
     });
+  });
+});
+
+describe('Flight API — lead-scoped bookings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should read segments in sequence order', async () => {
+    prisma.flightBooking.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/v1/flights/bookings/by-lead/a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+      .set(authHeaders());
+
+    expect(res.status).toBe(200);
+    expect(prisma.flightBooking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { segments: { orderBy: { sequence: 'asc' } }, travelers: true },
+      }),
+    );
   });
 });
 
