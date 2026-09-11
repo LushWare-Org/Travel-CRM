@@ -8,7 +8,7 @@ const baseProps: PackageCardProps = {
   href: '/package/pkg-1',
   image: '/cover.jpg',
   title: 'Bali Paradise',
-  price: '₹ 75,000',
+  price: '$ 75,000',
 };
 
 const renderCard = (overrides: Partial<PackageCardProps> = {}) =>
@@ -23,7 +23,7 @@ describe('PackageCard', () => {
     renderCard();
 
     expect(screen.getByRole('heading', { level: 3, name: 'Bali Paradise' })).toBeInTheDocument();
-    expect(screen.getByText('₹ 75,000')).toBeInTheDocument();
+    expect(screen.getByText('$ 75,000')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Bali Paradise' })).toHaveAttribute('src', '/cover.jpg');
     // The funnel CTA every package surface shares.
     expect(screen.getByText('View Details')).toBeInTheDocument();

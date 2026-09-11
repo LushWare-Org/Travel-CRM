@@ -62,7 +62,7 @@ const mockPackage = {
   },
   duration_days: 7,
   price_from: 1200,
-  currency: 'INR',
+  currency: 'USD',
   termsAndConditions: '',
   category: 'Adventure',
   difficulty: 'Moderate',

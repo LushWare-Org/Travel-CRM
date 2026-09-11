@@ -37,7 +37,7 @@ const mockPackage = (overrides: Partial<NormalizedPackage> = {}): NormalizedPack
   },
   duration_days: 5,
   price_from: 50000,
-  currency: 'INR',
+  currency: 'USD',
   termsAndConditions: '',
   category: 'beach',
   difficulty: null,
