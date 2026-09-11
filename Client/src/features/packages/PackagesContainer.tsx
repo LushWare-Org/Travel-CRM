@@ -14,6 +14,7 @@ import Pagination from './components/Pagination';
 import { Button } from '../../components/ui/button';
 import { formatCurrency } from '../../lib/currency';
 import { pluralize } from '../../lib/pluralize';
+import { categoryImage } from '../../config/media';
 
 export type SortOption = 'popularity' | 'price-low' | 'price-high' | 'duration';
 export type ViewMode = 'grid' | 'list';
@@ -258,6 +259,7 @@ export default function PackagesContainer() {
                       key={pkg.id}
                       href={`/package/${pkg.id}`}
                       image={pkg.images?.[0] || pkg.image_url}
+                      fallbackImage={categoryImage(pkg.category)}
                       title={pkg.title}
                       price={formatCurrency(pkg.price_from)}
                       description={pkg.description}

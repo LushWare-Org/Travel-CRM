@@ -9,6 +9,7 @@ import { submitCustomizationRequest } from '../../services/api/customization';
 import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import { formatCurrency } from '../../lib/currency';
 import { pluralize } from '../../lib/pluralize';
+import { categoryImage } from '../../config/media';
 import { useAuth } from '../../contexts/AuthContext';
 import BRANDING, { getWhatsAppUrl } from '../../config/branding';
 import { FLOATING_ACTIONS_CONFIG } from '../../config/floatingActions';
@@ -169,7 +170,7 @@ export default function CustomizePackageContainer() {
   }, [id]);
 
   const heroImage = useMemo(
-    () => pkg?.image_url || pkg?.images?.[0] || 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way',
+    () => pkg?.image_url || pkg?.images?.[0] || categoryImage(pkg?.category),
     [pkg],
   );
 

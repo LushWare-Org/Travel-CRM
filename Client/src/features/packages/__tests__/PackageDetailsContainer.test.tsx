@@ -64,7 +64,7 @@ const mockPackage = {
   price_from: 1200,
   currency: 'USD',
   termsAndConditions: '',
-  category: 'Adventure',
+  category: 'HONEYMOON',
   difficulty: 'Moderate',
   rating: 4.9,
   reviews_count: 250,
@@ -129,18 +129,18 @@ describe('PackageDetailsContainer', () => {
     expect(screen.queryByTestId('package-gallery-loading')).not.toBeInTheDocument();
   });
 
-  it('swaps a broken gallery image for the shared fallback image', async () => {
+  it('swaps a broken gallery image for the curated category image', async () => {
     renderContainer();
     await screen.findByText('Bali, Indonesia');
 
     const heroImage = screen.getByAltText('Bali Bliss - 1') as HTMLImageElement;
     fireEvent.error(heroImage);
 
-    expect(heroImage.src).toContain('/lush/fallback.jpg');
+    expect(heroImage.src).toContain('/lush/categories/honeymoon.jpg');
     expect(screen.queryByTestId('package-gallery-loading')).not.toBeInTheDocument();
   });
 
-  it('renders the shared fallback image when the package has no gallery images', async () => {
+  it('renders the curated category image when the package has no gallery images', async () => {
     fetchPackageByIdMock.mockResolvedValueOnce({
       ...mockPackage,
       image_url: '',
@@ -150,7 +150,7 @@ describe('PackageDetailsContainer', () => {
     await screen.findByText('Bali, Indonesia');
 
     const heroImage = screen.getByAltText('Bali Bliss - 1') as HTMLImageElement;
-    expect(heroImage.src).toContain('/lush/fallback.jpg');
+    expect(heroImage.src).toContain('/lush/categories/honeymoon.jpg');
   });
 
   it('opens the booking modal and submits the exact booking payload', async () => {

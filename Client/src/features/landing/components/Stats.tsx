@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchPackages } from '../../../services/api/packages';
 import type { NormalizedPackage } from '../../../services/api/packages.transform';
 import { formatCurrency } from '../../../lib/currency';
-import { FALLBACK_IMAGE } from '../../../config/media';
+import { FALLBACK_IMAGE, categoryImage } from '../../../config/media';
 import { Card } from '@/components/ui/card';
 
 /** A category-derived card shown in the stats section carousel. */
@@ -93,7 +93,7 @@ export default function RecommendedPackagesSection() {
             id: lowestPricePackage.id,
             title: `${category} Packages`,
             categoryName: category,
-            image: lowestPricePackage.image_url || lowestPricePackage.images?.[0] || FALLBACK_IMAGE,
+            image: categoryImage(category),
             price: lowestPricePackage.price_from,
             slug: lowestPricePackage.slug,
             description: getShortDescription(lowestPricePackage.description),

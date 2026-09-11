@@ -14,7 +14,7 @@ import { generateAndDownloadPDF as generateManagementPDF } from './pdf/pdfServic
 import { useAuth } from '../../contexts/AuthContext';
 import { submitBookingRequest } from '../../services/api/booking';
 import { apiErrorMessage } from '@/services/http/apiErrorMessage';
-import { FALLBACK_IMAGE } from '../../config/media';
+import { categoryImage } from '../../config/media';
 import BRANDING from '../../config/branding';
 import BookingModal from './components/BookingModal';
 import ReviewModal from './components/ReviewModal';
@@ -381,7 +381,8 @@ export default function PackageDetailsContainer() {
 
   // A package with no gallery images still gets the shared brand fallback so the
   // hero never renders a blank media area.
-  const images = heroImages.length > 0 ? heroImages : [FALLBACK_IMAGE];
+  const galleryFallback = categoryImage(pkg?.category);
+  const images = heroImages.length > 0 ? heroImages : [galleryFallback];
   const galleryReady = images.every((imgUrl) => galleryLoadedUrls.includes(imgUrl));
 
   return (
@@ -637,7 +638,7 @@ export default function PackageDetailsContainer() {
                     className="w-full h-full object-cover"
                     onLoad={() => markGalleryImageLoaded(img)}
                     onError={(e) => {
-                      e.currentTarget.src = FALLBACK_IMAGE;
+                      e.currentTarget.src = galleryFallback;
                       markGalleryImageLoaded(img);
                     }}
                   />

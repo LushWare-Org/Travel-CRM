@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Clock, ArrowRight, Compass } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
 import { pluralize } from '../../../lib/pluralize';
+import { categoryImage } from '../../../config/media';
 import type { NormalizedPackage } from '../../../services/api/packages.transform';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -73,6 +74,7 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
                 <PackageCard
                   href={`/package/${pkg.id}`}
                   image={pkg.image_url || pkg.images?.[0]}
+                  fallbackImage={categoryImage(pkg.category)}
                   title={pkg.name}
                   price={formatCurrency(pkg.price_from)}
                   description={pkg.description}
