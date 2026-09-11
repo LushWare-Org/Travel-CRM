@@ -232,8 +232,20 @@ describe('computeDurationDays', () => {
     expect(computeDurationDays('2026-01-01', '')).toBe(0);
   });
 
-  it('returns the correct day count for a real range', () => {
-    expect(computeDurationDays('2026-01-01', '2026-01-06')).toBe(5);
+  it('counts both endpoints — a 2026-01-01..2026-01-06 range is 6 days', () => {
+    expect(computeDurationDays('2026-01-01', '2026-01-06')).toBe(6);
+  });
+
+  it('treats adjacent dates as a 2-day/1-night trip (the reported case)', () => {
+    expect(computeDurationDays('2026-01-01', '2026-01-02')).toBe(2);
+  });
+
+  it('counts a single-day range as 1 day', () => {
+    expect(computeDurationDays('2026-01-01', '2026-01-01')).toBe(1);
+  });
+
+  it('returns 0 when the end precedes the start', () => {
+    expect(computeDurationDays('2026-01-06', '2026-01-01')).toBe(0);
   });
 });
 

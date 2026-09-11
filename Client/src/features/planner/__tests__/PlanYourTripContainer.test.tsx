@@ -169,12 +169,12 @@ describe('PlanYourTripContainer', () => {
     const endDate = currentMonthDay(CURRENT_MONTH_DAY_B);
     expect(screen.getByPlaceholderText('Select start date')).toHaveValue(startDate);
     expect(screen.getByPlaceholderText('Select end date')).toHaveValue(endDate);
-    expect(screen.getByText('5 Days / 4 Nights')).toBeInTheDocument();
+    expect(screen.getByText('6 Days / 5 Nights')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Step 3: add a single itinerary day.
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
-    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+    expect(screen.getByText(/Day 1 of 6/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Step 4: provide the required email and submit.
@@ -270,7 +270,7 @@ describe('PlanYourTripContainer', () => {
 
     expect(generateItineraryPreviewMock).toHaveBeenCalledWith({
       destination: 'Bali, Indonesia',
-      duration: 5,
+      duration: 6,
       travelers: 2,
       preferences: undefined,
     });
@@ -318,14 +318,14 @@ describe('PlanYourTripContainer', () => {
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
-    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+    expect(screen.getByText(/Day 1 of 6/)).toBeInTheDocument();
 
     // Canceling leaves the existing day untouched.
     mocks.swalFire.mockResolvedValue({ isConfirmed: false });
     await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
     expect(mocks.swalFire).toHaveBeenCalledTimes(1);
     expect(generateItineraryPreviewMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+    expect(screen.getByText(/Day 1 of 6/)).toBeInTheDocument();
 
     // Confirming replaces the days with the AI-generated ones.
     mocks.swalFire.mockResolvedValue({ isConfirmed: true });
@@ -356,7 +356,7 @@ describe('PlanYourTripContainer', () => {
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
-    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+    expect(screen.getByText(/Day 1 of 6/)).toBeInTheDocument();
   });
 
   it('Step 1 still defaults to "Enter manually" active with the existing destination selector visible', () => {
@@ -415,7 +415,7 @@ describe('PlanYourTripContainer', () => {
 
     expect(generateItineraryPreviewMock).toHaveBeenCalledWith({
       destination: 'Bali',
-      duration: 5,
+      duration: 6,
       travelers: undefined,
       preferences: undefined,
     });
@@ -470,7 +470,7 @@ describe('PlanYourTripContainer', () => {
     expect(generateDayPreviewMock).toHaveBeenCalledWith({
       destination: 'Bali, Indonesia',
       dayNumber: 1,
-      totalDuration: 5,
+      totalDuration: 6,
       travelers: 2,
       preferences: undefined,
       existingDays: [
@@ -537,22 +537,23 @@ describe('PlanYourTripContainer', () => {
         { dayNumber: 2, title: 'Ubud', locations: [], activities: [] },
         { dayNumber: 3, title: 'Waterfalls', locations: [], activities: [] },
         { dayNumber: 4, title: 'Beach', locations: [], activities: [] },
-        { dayNumber: 5, title: 'Departure', locations: [], activities: [] },
+        { dayNumber: 5, title: 'Local Markets', locations: [], activities: [] },
+        { dayNumber: 6, title: 'Departure', locations: [], activities: [] },
       ],
     });
 
-    await user.click(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ }));
+    await user.click(screen.getByRole('button', { name: /Generate remaining 5 days with AI/ }));
 
     expect(generateDaysRangePreviewMock).toHaveBeenCalledWith({
       destination: 'Bali, Indonesia',
-      dayNumbers: [2, 3, 4, 5],
-      totalDuration: 5,
+      dayNumbers: [2, 3, 4, 5, 6],
+      totalDuration: 6,
       travelers: 2,
       preferences: undefined,
       existingDays: [{ dayNumber: 1, title: 'Day 1', locations: [], activities: [] }],
     });
 
-    expect(await screen.findByText('✓ All 5 days have been added to your itinerary')).toBeInTheDocument();
+    expect(await screen.findByText('✓ All 6 days have been added to your itinerary')).toBeInTheDocument();
   });
 
   it('after a bulk-fill, clicking Undo in the toast removes exactly the newly-generated days', async () => {
@@ -575,17 +576,18 @@ describe('PlanYourTripContainer', () => {
         { dayNumber: 2, title: 'Ubud', locations: [], activities: [] },
         { dayNumber: 3, title: 'Waterfalls', locations: [], activities: [] },
         { dayNumber: 4, title: 'Beach', locations: [], activities: [] },
-        { dayNumber: 5, title: 'Departure', locations: [], activities: [] },
+        { dayNumber: 5, title: 'Local Markets', locations: [], activities: [] },
+        { dayNumber: 6, title: 'Departure', locations: [], activities: [] },
       ],
     });
-    await user.click(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ }));
-    await screen.findByText('✓ All 5 days have been added to your itinerary');
+    await user.click(screen.getByRole('button', { name: /Generate remaining 5 days with AI/ }));
+    await screen.findByText('✓ All 6 days have been added to your itinerary');
 
-    expect(screen.getByText('4 days generated')).toBeInTheDocument();
+    expect(screen.getByText('5 days generated')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Undo' }));
 
-    expect(screen.queryByText('✓ All 5 days have been added to your itinerary')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ })).toBeInTheDocument();
+    expect(screen.queryByText('✓ All 6 days have been added to your itinerary')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 5 days with AI/ })).toBeInTheDocument();
   });
 
   it('removing a pre-existing manual day during the toast window never leaves AI content mislabeled — Undo fully restores the pre-fill snapshot', async () => {
@@ -616,11 +618,12 @@ describe('PlanYourTripContainer', () => {
       days: [
         { dayNumber: 3, title: 'Waterfalls', locations: [], activities: [] },
         { dayNumber: 4, title: 'Beach', locations: [], activities: [] },
-        { dayNumber: 5, title: 'Departure', locations: [], activities: [] },
+        { dayNumber: 5, title: 'Local Markets', locations: [], activities: [] },
+        { dayNumber: 6, title: 'Departure', locations: [], activities: [] },
       ],
     });
-    await user.click(screen.getByRole('button', { name: /Generate remaining 3 days with AI/ }));
-    await screen.findByText('✓ All 5 days have been added to your itinerary');
+    await user.click(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ }));
+    await screen.findByText('✓ All 6 days have been added to your itinerary');
 
     // Remove day 2 (the second manual day) inside the still-open 6s toast
     // window — this renumbers days 3,4,5 down to 2,3,4, shifting the
@@ -633,7 +636,7 @@ describe('PlanYourTripContainer', () => {
     // survives mislabeled, and the bulk CTA re-offers the same 3 days.
     expect(screen.getByDisplayValue('Day 2')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Waterfalls')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Generate remaining 3 days with AI/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ })).toBeInTheDocument();
   });
 
   it('a rejected per-day regeneration shows the per-day error banner and leaves the day content untouched', async () => {
@@ -675,10 +678,10 @@ describe('PlanYourTripContainer', () => {
     generateDaysRangePreviewMock.mockResolvedValue({
       days: [{ dayNumber: 2, title: 'Ubud', locations: [], activities: [] }],
     });
-    await user.click(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ }));
+    await user.click(screen.getByRole('button', { name: /Generate remaining 5 days with AI/ }));
 
-    expect(await screen.findByText('1 of 4 days generated. Click again to fill the rest.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Generate remaining 3 days with AI/ })).toBeInTheDocument();
+    expect(await screen.findByText('1 of 5 days generated. Click again to fill the rest.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ })).toBeInTheDocument();
   });
 
   it('while a per-day regeneration is in flight, the whole-trip regenerate and Add Day buttons are disabled', async () => {
@@ -831,7 +834,7 @@ describe('PlanYourTripContainer', () => {
     await user.click(screen.getByRole('button', { name: /Next/ }));
     expect(screen.getByPlaceholderText('Select start date')).toHaveValue(isoDaysFromToday(30));
     expect(screen.getByPlaceholderText('Select end date')).toHaveValue(isoDaysFromToday(35));
-    expect(screen.getByText('5 Days / 4 Nights')).toBeInTheDocument();
+    expect(screen.getByText('6 Days / 5 Nights')).toBeInTheDocument();
     expect(screen.queryByText(/cannot be in the past/i)).not.toBeInTheDocument();
     expect(fetchUserBookingsMock).toHaveBeenCalledTimes(1);
   });
@@ -933,7 +936,7 @@ describe('PlanYourTripContainer', () => {
     // this same step — no progress reset, no AI retry required.
     await user.click(screen.getByRole('button', { name: /Continue with manual entry/ }));
     expect(screen.getByRole('heading', { name: 'Plan Your Itinerary' })).toBeInTheDocument();
-    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+    expect(screen.getByText(/Day 1 of 6/)).toBeInTheDocument();
   });
 
   it('keeps the manual "Add Day 1" path usable next to the new failure affordance', async () => {
@@ -954,6 +957,6 @@ describe('PlanYourTripContainer', () => {
     await screen.findByText('Something went wrong. Please try again.');
 
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
-    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+    expect(screen.getByText(/Day 1 of 6/)).toBeInTheDocument();
   });
 });
