@@ -86,6 +86,7 @@
  * @property {string} offerId
  * @property {string} airline
  * @property {string} airlineCode
+ * @property {number} legCount - journey legs (Duffel slices); 1 for a one-way
  * @property {string} cabinClass
  * @property {string} currency
  * @property {number} baseFare

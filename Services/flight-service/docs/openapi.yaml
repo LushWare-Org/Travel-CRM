@@ -210,6 +210,10 @@ components:
             type: string
           description: "Passenger IDs from the offer request (required for booking via Duffel)"
           example: ["pas_0000B8gLbxm7jv6uGDEhIE"]
+        legCount:
+          type: integer
+          description: "Number of journey legs (Duffel slices) — 2 for a round trip"
+          example: 2
         segments:
           type: array
           items:
