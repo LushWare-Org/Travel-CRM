@@ -238,7 +238,7 @@ Most of this plan's substrate ships and is reused rather than rebuilt:
 | Sub-problem | Already exists | Plan's move |
 |---|---|---|
 | Panel scrolling | `CopilotDock.tsx:29` and `CopilotDrawer.tsx:86` each own a scroller | Collapse to one `CopilotSurface` (net −1 component) |
-| Desktop affordance | `CopilotDrawer.tsx:53` renders the exact labeled pill wanted; `CopilotRail.tsx:21` is a second, weaker one | Delete the rail, reuse the pill (net −1 component) |
+| Desktop affordance | `CopilotDrawer.tsx:53` renders the exact labeled pill wanted; `CopilotRail.tsx:21` is a second, weaker one | Keep the rail as the layout edge and add the shared pill beside it, with the rail's control renamed (see §2 and DL5 — the review reversed the original "delete the rail" call) |
 | Chat transport | `LeadConversation`, `mode='ask'`, the 4-step loop, `groundingValidator`, `historyToEvidence` | Change the mount point only; no new transport |
 | Ask response contract | `answerBlocks` already exists (`shared/contracts/src/managementCopilot.js:192`) and the client already reads it (`useCopilotSession.ts:436`) | Stop the ask path from ignoring it |
 | Tool execution | `executeTool`, Zod arg validation, identity forwarding, `403/404 → notAuthorized` | Two tools plus a page-scoped list |
