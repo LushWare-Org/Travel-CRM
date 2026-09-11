@@ -193,6 +193,13 @@ jobs:
           VITE_COMPANY_NAME: 'LUSH Ware'
           VITE_META_DESCRIPTION: 'LUSH Ware — sustainable, expertly curated journeys around the world.'
           VITE_LOGO_PATH: '/logo.png'
+          # The catalog is stored in USD (package-service defaults
+          # currency: 'USD'), and Client/.env is gitignored, so a CI build with
+          # these unset fell back to lib/currency.ts's defaults and rendered ₹
+          # for USD prices. Set them explicitly per environment.
+          VITE_CURRENCY_CODE: 'USD'
+          VITE_CURRENCY_SYMBOL: '$'
+          VITE_CURRENCY_LOCALE: 'en-US'
         run: npm ci --legacy-peer-deps && npm run build
 
       - name: Install and build Management
