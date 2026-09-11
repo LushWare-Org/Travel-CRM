@@ -26,6 +26,7 @@ vi.mock('@/lib/toast', () => ({
 }));
 
 import FlightSelectionModal from '../FlightSelectionModal.tsx';
+import { toast } from '@/lib/toast';
 
 function renderModal(props = {}) {
   return render(
@@ -130,5 +131,118 @@ describe('FlightSelectionModal — template mode estimated cost', () => {
   it('mentions travelers-multiplication in the field hint', () => {
     renderModal();
     expect(screen.getByText(/multiplied by the number of travelers/i)).toBeInTheDocument();
+  });
+});
+
+describe('FlightSelectionModal — template mode trip type', () => {
+  it('renders no trip-type control unless the consumer opts in', () => {
+    renderModal();
+
+    expect(screen.queryByRole('tab', { name: 'Round Trip' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Return leg')).not.toBeInTheDocument();
+  });
+
+  it('offers One Way and Round Trip when allowRoundTrip is set', () => {
+    renderModal({ allowRoundTrip: true });
+
+    expect(screen.getByRole('tab', { name: 'One Way' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Round Trip' })).toBeInTheDocument();
+  });
+
+  it('emits tripType oneWay for a plain save', async () => {
+    const onSelectTemplate = vi.fn();
+    const user = userEvent.setup();
+    renderModal({ allowRoundTrip: true, initialData: { origin: 'CMB', destination: 'DXB' }, onSelectTemplate });
+
+    await user.click(screen.getByRole('button', { name: /save flight preferences/i }));
+
+    expect(onSelectTemplate).toHaveBeenCalledWith(expect.objectContaining({ tripType: 'oneWay' }));
+  });
+
+  it('emits tripType oneWay even when the consumer has no control for it', async () => {
+    const onSelectTemplate = vi.fn();
+    const user = userEvent.setup();
+    renderModal({ initialData: { origin: 'CMB', destination: 'DXB' }, onSelectTemplate });
+
+    await user.click(screen.getByRole('button', { name: /save flight preferences/i }));
+
+    expect(onSelectTemplate).toHaveBeenCalledWith(expect.objectContaining({ tripType: 'oneWay' }));
+  });
+
+  it('emits tripType roundTrip when Round Trip is selected', async () => {
+    const onSelectTemplate = vi.fn();
+    const user = userEvent.setup();
+    renderModal({ allowRoundTrip: true, initialData: { origin: 'CMB', destination: 'DXB' }, onSelectTemplate });
+
+    await user.click(screen.getByRole('tab', { name: 'Round Trip' }));
+    await user.click(screen.getByRole('button', { name: /save flight preferences/i }));
+
+    expect(onSelectTemplate).toHaveBeenCalledWith(expect.objectContaining({ tripType: 'roundTrip' }));
+  });
+
+  it('previews the return leg as the swapped route', async () => {
+    const user = userEvent.setup();
+    renderModal({ allowRoundTrip: true, initialData: { origin: 'CMB', destination: 'DXB' } });
+
+    await user.click(screen.getByRole('tab', { name: 'Round Trip' }));
+
+    expect(screen.getByText('Return leg')).toBeInTheDocument();
+    expect(screen.getByText('DXB → CMB')).toBeInTheDocument();
+  });
+
+  it('keeps the return-leg preview in step with the swap button', async () => {
+    const user = userEvent.setup();
+    renderModal({ allowRoundTrip: true, initialData: { origin: 'CMB', destination: 'DXB' } });
+
+    await user.click(screen.getByRole('tab', { name: 'Round Trip' }));
+    expect(screen.getByText('DXB → CMB')).toBeInTheDocument();
+
+    await user.click(screen.getByTitle('Swap origin and destination'));
+
+    expect(screen.getByText('CMB → DXB')).toBeInTheDocument();
+  });
+
+  it('refuses to save a round trip with a blank airport', async () => {
+    const onSelectTemplate = vi.fn();
+    const user = userEvent.setup();
+    renderModal({ allowRoundTrip: true, initialData: { origin: 'CMB', destination: '' }, onSelectTemplate });
+
+    await user.click(screen.getByRole('tab', { name: 'Round Trip' }));
+    await user.click(screen.getByRole('button', { name: /save flight preferences/i }));
+
+    expect(onSelectTemplate).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Origin and destination are required for a round trip');
+  });
+
+  it('re-seeds every field from initialData the next time it opens', () => {
+    const { rerender } = renderModal({
+      isOpen: false,
+      initialData: { origin: 'CMB', destination: 'DXB', cabinClass: 'Business', airlinePreference: 'EK', departureTime: 'morning', estimatedUnitPrice: 180 },
+    });
+
+    rerender(
+      <FlightSelectionModal
+        isOpen
+        onClose={vi.fn()}
+        mode="template"
+        onSelectTemplate={vi.fn()}
+        allowRoundTrip
+        initialData={{
+          origin: 'DXB',
+          destination: 'CMB',
+          cabinClass: 'Economy',
+          airlinePreference: 'QR',
+          departureTime: 'evening',
+          estimatedUnitPrice: 40,
+          tripType: 'roundTrip',
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText('Departure airport')).toHaveValue('DXB');
+    expect(screen.getByLabelText('Arrival airport')).toHaveValue('CMB');
+    expect(screen.getByLabelText('Estimated Cost (per person)')).toHaveValue(40);
+    expect(screen.getByDisplayValue('QR')).toBeInTheDocument();
+    expect(screen.getByText('CMB → DXB')).toBeInTheDocument();
   });
 });

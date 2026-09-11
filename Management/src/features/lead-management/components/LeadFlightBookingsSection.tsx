@@ -5,7 +5,7 @@ import { OPTIONAL_FLIGHT_TYPE } from '@travel-crm/constants';
 import { flightAPI } from '../../../services/flight.service';
 import { leadAPI } from '../../../services/api';
 import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
-import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
+import { getOutboundModalDefaults, oppositeLeg, type FlightLegPrefs, type TripType } from '../../shared/utils/flightLegDefaults';
 import { routeChain } from '../../shared/utils/flightSegments';
 import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';
 import { Button } from '@/components/ui/button';
@@ -102,6 +102,7 @@ export default function LeadFlightBookingsSection({
   };
 
   const handleFlightTemplate = async (prefs: any) => {
+    const { tripType, ...leg } = prefs as FlightLegPrefs & { tripType?: TripType };
     const dayNumber = flightModalDay;
     if (dayNumber && onUpdateDay) {
       // Itinerary day flight — save preferences into the day's flights[].
@@ -110,12 +111,12 @@ export default function LeadFlightBookingsSection({
       const day = itineraryDays.find((d) => d.dayNumber === dayNumber);
       const flights = Array.isArray(day?.flights) ? day.flights : [];
       const prefsPatch = {
-        origin: prefs.origin,
-        destination: prefs.destination,
-        cabinClass: prefs.cabinClass,
-        departureTime: prefs.departureTime,
-        airlinePreference: prefs.airlinePreference,
-        totalAmount: Number(prefs.estimatedUnitPrice) || 0,
+        origin: leg.origin,
+        destination: leg.destination,
+        cabinClass: leg.cabinClass,
+        departureTime: leg.departureTime,
+        airlinePreference: leg.airlinePreference,
+        totalAmount: Number(leg.estimatedUnitPrice) || 0,
       };
       onUpdateDay(dayNumber, {
         flights: flights.length > 0
@@ -145,13 +146,31 @@ export default function LeadFlightBookingsSection({
       }
       await leadAPI.addSelectionFlight(leadId, selectionId, {
         flightType,
-        origin: prefs.origin || undefined,
-        destination: prefs.destination || undefined,
-        cabinClass: prefs.cabinClass || undefined,
-        departureTime: prefs.departureTime || undefined,
-        airlinePreference: prefs.airlinePreference || undefined,
-        estimatedUnitPrice: Number(prefs.estimatedUnitPrice) || 0,
+        origin: leg.origin || undefined,
+        destination: leg.destination || undefined,
+        cabinClass: leg.cabinClass || undefined,
+        departureTime: leg.departureTime || undefined,
+        airlinePreference: leg.airlinePreference || undefined,
+        estimatedUnitPrice: Number(leg.estimatedUnitPrice) || 0,
       });
+      const partnerType = flightType === OPTIONAL_FLIGHT_TYPE.TO_START
+        ? OPTIONAL_FLIGHT_TYPE.RETURN_HOME
+        : OPTIONAL_FLIGHT_TYPE.TO_START;
+      const partnerExists = optionalFlights.some((f) => f.flightType === partnerType);
+      if (tripType === 'roundTrip' && !partnerExists) {
+        const partner = oppositeLeg(leg);
+        if (partner) {
+          await leadAPI.addSelectionFlight(leadId, selectionId, {
+            flightType: partnerType,
+            origin: partner.origin || undefined,
+            destination: partner.destination || undefined,
+            cabinClass: partner.cabinClass || undefined,
+            departureTime: partner.departureTime || undefined,
+            airlinePreference: partner.airlinePreference || undefined,
+            estimatedUnitPrice: 0,
+          });
+        }
+      }
       toast.success('Flight preferences saved');
       await fetchOptionalFlights();
       onFlightsChanged?.();
@@ -419,7 +438,11 @@ export default function LeadFlightBookingsSection({
         isOpen={showFlightModal}
         onClose={() => { setShowFlightModal(false); setFlightModalDay(null); }}
         mode="template"
-        initialData={flightModalPrefill}
+        allowRoundTrip={flightModalDay == null}
+        initialData={{
+          ...flightModalPrefill,
+          tripType: (flightModalType === 'to-start' ? returnHomeFlight : toStartFlight) ? 'roundTrip' : 'oneWay',
+        }}
         onSelectTemplate={handleFlightTemplate}
       />
     </div>

@@ -15,7 +15,7 @@ import LocationAutocomplete from './LocationAutocomplete';
 import CountrySelect from '../../../components/CountrySelect';
 import PhoneCountrySelect from '../../../components/PhoneCountrySelect';
 import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
-import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
+import { getOutboundModalDefaults, oppositeLeg } from '../../shared/utils/flightLegDefaults';
 import PricingSection from './PricingSection';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import { createDefaultDay } from '../../itinerary/types/index.js';
@@ -678,15 +678,31 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }: NewLeadDialogP
           isOpen={showTransferFlightModal}
           onClose={() => setShowTransferFlightModal(false)}
           mode="template"
-          initialData={transferFlightType === 'inbound'
-            ? (formData.inboundFlightPrefs || {})
-            : getOutboundModalDefaults(formData.inboundFlightPrefs, formData.outboundFlightPrefs)}
+          initialData={{
+            ...(transferFlightType === 'inbound'
+              ? (formData.inboundFlightPrefs || {})
+              : getOutboundModalDefaults(formData.inboundFlightPrefs, formData.outboundFlightPrefs)),
+            tripType: (transferFlightType === 'inbound' ? formData.outboundFlightPrefs : formData.inboundFlightPrefs) ? 'roundTrip' : 'oneWay',
+          }}
+          allowRoundTrip
           onSelectTemplate={(prefs: any) => {
-            if (transferFlightType === 'inbound') {
-              setFormData({ ...formData, inboundFlightPrefs: prefs });
-            } else {
-              setFormData({ ...formData, outboundFlightPrefs: prefs });
-            }
+            const { tripType, ...leg } = prefs;
+            setFormData({
+              ...formData,
+              ...(transferFlightType === 'inbound'
+                ? {
+                  inboundFlightPrefs: leg,
+                  outboundFlightPrefs: tripType === 'roundTrip' && !formData.outboundFlightPrefs
+                    ? oppositeLeg(leg)
+                    : formData.outboundFlightPrefs,
+                }
+                : {
+                  outboundFlightPrefs: leg,
+                  inboundFlightPrefs: tripType === 'roundTrip' && !formData.inboundFlightPrefs
+                    ? oppositeLeg(leg)
+                    : formData.inboundFlightPrefs,
+                }),
+            });
             setShowTransferFlightModal(false);
           }}
         />

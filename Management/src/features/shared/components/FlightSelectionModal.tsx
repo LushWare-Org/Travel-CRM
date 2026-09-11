@@ -14,13 +14,12 @@ import { Input } from '../../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Card } from '../../../components/ui/card';
-import type { FlightLegPrefs } from '../utils/flightLegDefaults';
+import type { TripType, FlightLegSubmission } from '../utils/flightLegDefaults';
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // ═══════════════════════════════════════════════════════════════════
 //  Types
 // ═══════════════════════════════════════════════════════════════════
-type TripType = 'oneWay' | 'roundTrip';
 type BookingStep = 'form' | 'results' | 'travelers' | 'review' | 'confirmed';
 type TravelerType = 'adult' | 'child' | 'infant';
 
@@ -67,8 +66,10 @@ interface FlightSelectionModalProps {
   mode?: 'template' | 'booking';
 
   // Template mode
-  onSelectTemplate?: (template: FlightLegPrefs) => void;
-  initialData?: FlightLegPrefs;
+  onSelectTemplate?: (template: FlightLegSubmission) => void;
+  initialData?: Partial<FlightLegSubmission>;
+  /** Offer the One Way / Round Trip control — only consumers with a directional row pair pass this. */
+  allowRoundTrip?: boolean;
 
   // Booking mode
   onBookFlight?: (booking: any) => void;
@@ -201,6 +202,7 @@ export default function FlightSelectionModal({
   // Template mode
   onSelectTemplate,
   initialData = {},
+  allowRoundTrip = false,
 
   // Booking mode
   onBookFlight,
@@ -218,6 +220,7 @@ export default function FlightSelectionModal({
     departureTime: initialData?.departureTime || '',
     airlinePreference: initialData?.airlinePreference || '',
     estimatedUnitPrice: initialData?.estimatedUnitPrice ?? '',
+    tripType: (initialData?.tripType || 'oneWay') as TripType,
   });
 
   // ── Booking mode state ──────────────────────────────────────────
@@ -254,7 +257,18 @@ export default function FlightSelectionModal({
       setSelectedOffer(null);
       setConfirmedBooking(null);
       setSearchError(null);
+    } else if (mode === 'template') {
+      setTemplate({
+        origin: initialData?.origin || '',
+        destination: initialData?.destination || '',
+        cabinClass: initialData?.cabinClass || 'Economy',
+        departureTime: initialData?.departureTime || '',
+        airlinePreference: initialData?.airlinePreference || '',
+        estimatedUnitPrice: initialData?.estimatedUnitPrice ?? '',
+        tripType: (initialData?.tripType || 'oneWay') as TripType,
+      });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mode]);
 
   const selectOffer = useCallback((offer: FlightOffer) => {
@@ -272,6 +286,10 @@ export default function FlightSelectionModal({
   //  Template mode handlers
   // ═══════════════════════════════════════════════════════════════
   const handleTemplateSubmit = () => {
+    if (allowRoundTrip && template.tripType === 'roundTrip' && (!template.origin || !template.destination)) {
+      toast.error('Origin and destination are required for a round trip');
+      return;
+    }
     onSelectTemplate?.({
       origin: template.origin,
       destination: template.destination,
@@ -279,6 +297,7 @@ export default function FlightSelectionModal({
       departureTime: template.departureTime,
       airlinePreference: template.airlinePreference,
       estimatedUnitPrice: Number(template.estimatedUnitPrice) || 0,
+      tripType: template.tripType,
     });
     onClose();
   };
@@ -402,6 +421,15 @@ export default function FlightSelectionModal({
             </DialogHeader>
 
             <div className="space-y-4">
+              {allowRoundTrip && (
+                <Tabs value={template.tripType} onValueChange={(value) => value && setTemplate({ ...template, tripType: value as TripType })}>
+                  <TabsList>
+                    {TRIP_TYPES.map(tt => (
+                      <TabsTrigger key={tt.id} value={tt.id}>{tt.label}</TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Origin</label>
                 <AirportAutocomplete
@@ -430,6 +458,17 @@ export default function FlightSelectionModal({
                   excludeCode={template.origin}
                 />
               </div>
+              {allowRoundTrip && template.tripType === 'roundTrip' && (
+                <div className="rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Return leg</div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {template.destination || '?'} → {template.origin || '?'}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Same cabin and airline. Return date, preferred time and cost are set on the return row.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Cabin Class</label>

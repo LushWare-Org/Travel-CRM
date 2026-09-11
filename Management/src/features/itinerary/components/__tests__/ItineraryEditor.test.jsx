@@ -10,7 +10,24 @@ vi.mock('../ActivitySelector', () => ({ default: () => <div data-testid="activit
 vi.mock('../LocationSelector', () => ({ default: () => <div data-testid="location-selector" /> }));
 vi.mock('../form/TransportRowEditor', () => ({ default: () => <div data-testid="transport-row-editor" /> }));
 vi.mock('../../../shared', () => ({
-  FlightSelectionModal: () => null,
+  FlightSelectionModal: ({ onSelectTemplate }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onSelectTemplate({
+          origin: 'AAA',
+          destination: 'BBB',
+          cabinClass: 'Economy',
+          departureTime: 'morning',
+          airlinePreference: 'QR',
+          estimatedUnitPrice: 99,
+          tripType: 'roundTrip',
+        })
+      }
+    >
+      Submit Flight Leg
+    </button>
+  ),
   HotelSelectionModal: () => null,
 }));
 
@@ -156,5 +173,29 @@ describe('ItineraryEditor — Day Images visibility', () => {
         { url: 'https://res.cloudinary.com/x/new.jpg', publicId: 'day1/new' },
       ],
     }));
+  });
+});
+
+describe('ItineraryEditor — day flights stay single-leg', () => {
+  it('never writes a submitted tripType into the day flight', async () => {
+    const onDayChange = vi.fn();
+    render(
+      <ItineraryEditor
+        days={[{ ...baseDay, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB' }] }]}
+        onDayChange={onDayChange}
+        onAddDay={noop}
+        onRemoveDay={noop}
+        hideTitleAndDescription
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /edit flight/i }));
+    await userEvent.click(screen.getByRole('button', { name: /submit flight leg/i }));
+
+    expect(onDayChange).toHaveBeenCalledTimes(1);
+    const [dayNumber, patch] = onDayChange.mock.calls[0];
+    expect(dayNumber).toBe(1);
+    expect(patch.flights[0]).not.toHaveProperty('tripType');
+    expect(patch.flights[0].origin).toBe('AAA');
   });
 });
