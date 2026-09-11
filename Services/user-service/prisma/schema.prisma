@@ -144,7 +144,7 @@ model OrganizationSettings {
   id String @id @default(uuid())
 
   // Company identity
-  companyName      String  @default("Travel CRM")
+  companyName      String  @default("Lush Travel Cloud")
   companyShortName String?
   companyLegalName String?
   companyAddress   String? @db.Text
