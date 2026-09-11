@@ -318,7 +318,43 @@ export function useCopilotSession(
         }));
       })
       .catch((err) => {
-        if (isCopilotAbort(err) || activeKeyRef.current !== capturedKey) return;
+        if (activeKeyRef.current !== capturedKey) return;
+
+        if (isCopilotAbort(err)) {
+          // An abort for the scope we are STILL showing. This effect's own
+          // cleanup aborts whenever its dependencies change (a benign re-render,
+          // not a scope change), and returning silently here is what left
+          // `briefing.status === "pending"` forever: the start effect refuses to
+          // restart a run it already started (`briefingStartedRef`), and the
+          // regenerate effect returns early on "pending" because that status
+          // means a request is legitimately in flight. Nothing retried, nothing
+          // errored, so the panel sat on "AI briefing in progress — showing what
+          // is already verified" indefinitely, with no error and no Retry. The
+          // window is wide whenever the model is slow: measured 8-18s per call,
+          // so an interruption mid-flight is common rather than rare.
+          //
+          // Surface it as the recoverable failure it is, exactly as a timeout
+          // already is. Guarded on `runId` so a superseding run that has already
+          // committed its own "pending" is never trampled — a superseding run
+          // commits a new runId, so this one no longer matches.
+          commit((current) =>
+            current.briefing.runId === runId && current.briefing.status === "pending"
+              ? {
+                  ...current,
+                  briefing: {
+                    ...current.briefing,
+                    status: "error",
+                    runId,
+                    error: "The briefing was interrupted. Try again.",
+                    receivedAt: Date.now(),
+                    settledWhileOpen: openRef.current,
+                  },
+                }
+              : current
+          );
+          return;
+        }
+
         // Only the model phase failed: the deterministic list stays on screen.
         commit((current) => ({
           ...current,
