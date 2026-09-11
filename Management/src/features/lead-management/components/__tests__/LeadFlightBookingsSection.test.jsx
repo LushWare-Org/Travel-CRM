@@ -388,6 +388,33 @@ describe('LeadFlightBookingsSection — itinerary-day flights are unaffected', (
     expect(screen.getByTestId('modal-initial-price')).toHaveTextContent('320');
   });
 
+  // The day row used to read first origin -> last destination, which collapses a
+  // return leg to "CMB -> CMB" and hides the turn-around city.
+  it('describes a booked day by its whole route, not its two ends', async () => {
+    mockGetByLead.mockResolvedValue({
+      data: [
+        {
+          id: 'booking-1',
+          dayNumber: 1,
+          flightType: 'itinerary',
+          status: 'confirmed',
+          pnr: 'ABC123',
+          segments: [
+            { sequence: 1, origin: 'CMB', destination: 'DXB', departureAt: '2026-01-01T08:00:00Z' },
+            { sequence: 101, origin: 'DXB', destination: 'CMB', departureAt: '2026-01-08T08:00:00Z' },
+          ],
+        },
+      ],
+    });
+
+    renderSection({
+      itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB' }] }],
+      leadStatus: 'APPROVED',
+    });
+
+    expect(await screen.findByText('CMB → DXB → CMB')).toBeInTheDocument();
+  });
+
   it('shows a $0-pricing warning on the day card when no cost has been set', async () => {
     renderSection({
       itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB' }] }],
