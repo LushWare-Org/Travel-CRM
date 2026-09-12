@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createElement } from 'react';
 import { render, screen } from '@testing-library/react';
-import { claimsIn } from '../briefingShared';
-import LeadBriefing from '../LeadBriefing';
-import CollectionBriefing from '../CollectionBriefing';
+import { claimsIn } from '../insightShared';
+import LeadInsights from '../LeadInsights';
+import CollectionInsights from '../CollectionInsights';
 import { clearEvidenceReveal } from '../evidence';
 import { claim, makeSession, setViewport } from './copilotTestUtils';
 
@@ -47,10 +47,10 @@ describe('claimsIn (the one shared definition)', () => {
   });
 });
 
-describe('each briefing keeps its own heading text and section order', () => {
+describe('each panel keeps its own heading text and section order', () => {
   it('record: reads "Since you were here" first, then attention', () => {
     render(
-      createElement(LeadBriefing, {
+      createElement(LeadInsights, {
         session: makeSession({
           claims: [
             claim({ id: 'changed-1', section: 'changed', text: 'Changed claim' }),
@@ -74,7 +74,7 @@ describe('each briefing keeps its own heading text and section order', () => {
 
   it('collection: scans attention first, and calls the changed row "Changed"', () => {
     render(
-      createElement(CollectionBriefing, {
+      createElement(CollectionInsights, {
         session: makeSession({
           claims: [
             claim({ id: 'changed-1', section: 'changed', text: 'Changed claim' }),

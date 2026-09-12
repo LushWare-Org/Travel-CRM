@@ -20,7 +20,7 @@
 
 import { z } from 'zod';
 import { BriefingClaimSchema } from '@travel-crm/contracts';
-import { canonicalizeBriefingResponse } from '../ai/prompts/managementBriefing.v1.js';
+import { canonicalizeBriefingResponse } from '../ai/prompts/managementBriefing.v2.js';
 import { insightsToClaims, validateClaims } from '../ai/groundingValidator.js';
 
 export const ManagementBriefingCannedRowSchema = z

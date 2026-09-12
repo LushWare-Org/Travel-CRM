@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import LeadBriefing from '../LeadBriefing';
+import LeadInsights from '../LeadInsights';
 import { clearEvidenceReveal } from '../evidence';
 import { claim, evidenceTarget, makeSession, setViewport, source } from './copilotTestUtils';
 
@@ -25,7 +25,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('LeadBriefing — hierarchy', () => {
+describe('LeadInsights — hierarchy', () => {
   it('renders the changed row, current state, attention before the experienced view, and the suggested questions', () => {
     const session = makeSession({
       claims: [
@@ -37,9 +37,9 @@ describe('LeadBriefing — hierarchy', () => {
       suggestedQuestions: ['What is the deposit status?', 'When is the travel date?', 'Who is assigned?', 'A fourth question?'],
     });
 
-    render(<LeadBriefing session={session} scopeLabel="Alice Traveller" leadId="a" />);
+    render(<LeadInsights session={session} scopeLabel="Alice Traveller" leadId="a" />);
 
-    expect(screen.getByRole('heading', { name: /lead briefing/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /insights/i })).toBeInTheDocument();
     expect(screen.getByText('Since you were here')).toBeInTheDocument();
     expect(screen.getByText('Budget was updated yesterday.')).toBeInTheDocument();
     expect(screen.getByText('Current state')).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe('LeadBriefing — hierarchy', () => {
 
   it('omits the changed row when nothing changed', () => {
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [claim({ section: 'current_state' })] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -69,7 +69,7 @@ describe('LeadBriefing — hierarchy', () => {
 
   it('omits the changed row and shows the access explanation for a no-access session', () => {
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ noAccess: true, canAsk: false, claims: [] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -79,19 +79,19 @@ describe('LeadBriefing — hierarchy', () => {
   });
 });
 
-describe('LeadBriefing — heading focus target', () => {
+describe('LeadInsights — heading focus target', () => {
   it('marks the real heading as the programmatic focus target', () => {
-    render(<LeadBriefing session={makeSession({})} scopeLabel="Alice Traveller" leadId="a" />);
+    render(<LeadInsights session={makeSession({})} scopeLabel="Alice Traveller" leadId="a" />);
 
-    // ManagementContextCopilot moves focus to `#copilot-briefing-heading` when
+    // ManagementContextCopilot moves focus to `#copilot-insights-heading` when
     // the panel opens. That move silently no-ops if the real heading loses its
     // tabIndex; the shell test renders its own heading stub, so only an
-    // assertion against the real briefing can catch the regression.
-    expect(screen.getByRole('heading', { name: /lead briefing/i })).toHaveAttribute('tabindex', '-1');
+    // assertion against the real insights can catch the regression.
+    expect(screen.getByRole('heading', { name: /insights/i })).toHaveAttribute('tabindex', '-1');
   });
 });
 
-describe('LeadBriefing — briefing states', () => {
+describe('LeadInsights — insights states', () => {
   it('keeps the provisional list, labels it partial, and offers Retry when the model phase fails', async () => {
     const user = userEvent.setup();
     const session = makeSession({
@@ -100,20 +100,20 @@ describe('LeadBriefing — briefing states', () => {
       claims: [claim({ text: 'Verified deterministic insight.' })],
     });
 
-    render(<LeadBriefing session={session} scopeLabel="Alice Traveller" leadId="a" />);
+    render(<LeadInsights session={session} scopeLabel="Alice Traveller" leadId="a" />);
 
-    expect(screen.getByText('Partial briefing')).toBeInTheDocument();
+    expect(screen.getByText('Partial insights')).toBeInTheDocument();
     expect(screen.getByText('Verified deterministic insight.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(session.retryBriefing).toHaveBeenCalledTimes(1);
+    expect(session.retryInsights).toHaveBeenCalledTimes(1);
   });
 
-  it('renders a full briefing error with Retry and no claims when the deterministic phase fails', async () => {
+  it('renders a full insights error with Retry and no claims when the deterministic phase fails', async () => {
     const user = userEvent.setup();
     const session = makeSession({ error: 'Failed to load this lead', claims: [], ready: false, canAsk: false });
 
-    render(<LeadBriefing session={session} scopeLabel="Alice Traveller" leadId="a" />);
+    render(<LeadInsights session={session} scopeLabel="Alice Traveller" leadId="a" />);
 
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to load this lead');
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeNull();
@@ -131,7 +131,7 @@ describe('LeadBriefing — briefing states', () => {
       sources: [source()],
     });
 
-    const { rerender } = render(<LeadBriefing session={provisional} scopeLabel="Alice Traveller" leadId="a" />);
+    const { rerender } = render(<LeadInsights session={provisional} scopeLabel="Alice Traveller" leadId="a" />);
 
     const region = screen.getByText('Deterministic insight.').closest('div') as HTMLElement;
     const button = screen.getByRole('button', { name: /evidence: destination/i });
@@ -142,12 +142,12 @@ describe('LeadBriefing — briefing states', () => {
       claims: [claim({ id: 'model-1', text: 'Model insight.', evidenceIds: ['lead:a:destination'] })],
       sources: [source()],
     });
-    rerender(<LeadBriefing session={replaced} scopeLabel="Alice Traveller" leadId="a" />);
+    rerender(<LeadInsights session={replaced} scopeLabel="Alice Traveller" leadId="a" />);
 
     // The focused provisional control is never unmounted mid-interaction.
     expect(screen.getByText('Deterministic insight.')).toBeInTheDocument();
     expect(screen.queryByText('Model insight.')).not.toBeInTheDocument();
-    expect(screen.getByText('Updated briefing ready')).toBeInTheDocument();
+    expect(screen.getByText('Updated insights ready')).toBeInTheDocument();
 
     // Once focus leaves the region, the replacement lands atomically.
     const outside = document.createElement('button');
@@ -159,14 +159,14 @@ describe('LeadBriefing — briefing states', () => {
   });
 });
 
-describe('LeadBriefing — evidence lens', () => {
+describe('LeadInsights — evidence lens', () => {
   it('reveals, pins, focuses, and scrolls to a mapped field at xl and announces it', async () => {
     setViewport({ desktop: true });
     const target = evidenceTarget('lead:a:destination');
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -191,7 +191,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -208,7 +208,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -233,7 +233,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -253,7 +253,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -270,7 +270,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -291,7 +291,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -308,7 +308,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -327,7 +327,7 @@ describe('LeadBriefing — evidence lens', () => {
     const user = userEvent.setup();
 
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [citedClaim()], sources: [] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -346,7 +346,7 @@ describe('LeadBriefing — evidence lens', () => {
 
   it('shows source-unavailable text for a citation that names no resolvable source', () => {
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [claim({ id: 'claim-opaque', text: 'Something changed.', evidenceIds: ['bundle:1'] })], sources: [] })}
         scopeLabel="Alice Traveller"
         leadId="a"
@@ -359,7 +359,7 @@ describe('LeadBriefing — evidence lens', () => {
 
   it('renders no action for an uncited claim', () => {
     render(
-      <LeadBriefing
+      <LeadInsights
         session={makeSession({ claims: [claim({ text: 'Uncited claim.', evidenceIds: [] })], sources: [source()] })}
         scopeLabel="Alice Traveller"
         leadId="a"

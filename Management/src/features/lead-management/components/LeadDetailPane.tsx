@@ -44,7 +44,7 @@ function formatField(field: string, lead: Record<string, unknown>): string {
 /**
  * The persistent lead-detail surface. It renders the adapter's allowlisted
  * fields and publishes `data-copilot-evidence-id` for each, which is what the
- * briefing's Evidence Lens resolves against — the record is the source view.
+ * panel's Evidence Lens resolves against — the record is the source view.
  */
 export default function LeadDetailPane({ lead, onClose }: LeadDetailPaneProps) {
   const leadId = lead ? String(lead.id ?? lead._id ?? '') : '';

@@ -2,7 +2,7 @@ import { prefersReducedMotion } from "./useMediaQuery";
 
 // ─── Evidence Lens target resolution ──────────────────────────────────────
 // The record surface publishes `data-copilot-evidence-id={leadEvidenceId(id,
-// field)}`; the briefing resolves those attributes against the live document.
+// field)}`; the panel resolves those attributes against the live document.
 // Nothing here rebuilds an evidence id: the ids come from the wire result, which
 // the adapter produced with the same `leadEvidenceId` helper.
 export const EVIDENCE_TARGET_ATTR = "data-copilot-evidence-id";

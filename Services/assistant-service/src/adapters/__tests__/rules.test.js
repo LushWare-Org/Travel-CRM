@@ -161,7 +161,16 @@ describe('ratioBelow', () => {
     const bundle = makeBundle();
     const record = addRecord(bundle, { id: 'a', paidAmount: 20, totalAmount: 100 }, ['id', 'paidAmount', 'totalAmount']);
     const [insight] = run('ratioBelow', bundle, { rule: 'ratioBelow', numeratorField: 'paidAmount', denominatorField: 'totalAmount', threshold: 0.5 }, record);
-    expect(insight.fact).toEqual({ kind: 'percentage', value: '20', evidenceId: bundle.index.a.paidAmount });
+    // The primary fact IS a derivation here: the rounded percentage is not in
+    // the cited field, so it declares how it was computed or the claim's
+    // groundedness check would discard it.
+    expect(insight.fact).toEqual({
+      kind: 'percentage',
+      unit: 'percent',
+      derivation: 'ratio-of',
+      value: '20',
+      evidenceId: bundle.index.a.paidAmount,
+    });
   });
 
   it('does not fire at the threshold', () => {

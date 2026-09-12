@@ -47,6 +47,20 @@ export function source(overrides: Partial<CopilotSource> = {}): CopilotSource {
   };
 }
 
+/** A scored, ranked insight — the shape the deterministic ranked view renders. */
+export function rankedClaim(overrides: Partial<CopilotClaim> = {}): CopilotClaim {
+  return claim({
+    key: 'leads:rule:missingField:lead-1',
+    ruleId: 'missingField',
+    severity: 'warning',
+    score: 42.5,
+    origin: 'rule',
+    urgency: 0.8,
+    actionability: 0.5,
+    ...overrides,
+  });
+}
+
 /** A complete session surface so sections can be tested without the transport. */
 export function makeSession(overrides: Partial<CopilotSession> = {}): CopilotSession {
   return {
@@ -63,6 +77,9 @@ export function makeSession(overrides: Partial<CopilotSession> = {}): CopilotSes
       noAccess: false,
     },
     claims: [],
+    ranked: [],
+    suppressedCount: 0,
+    suppressedCriticals: [],
     provisional: false,
     modelPending: false,
     modelPartial: false,
@@ -79,7 +96,7 @@ export function makeSession(overrides: Partial<CopilotSession> = {}): CopilotSes
     setInput: vi.fn(),
     submit: vi.fn(),
     retryTurn: vi.fn(),
-    retryBriefing: vi.fn(),
+    retryInsights: vi.fn(),
     retryDeterministic: vi.fn(),
     ...overrides,
   };

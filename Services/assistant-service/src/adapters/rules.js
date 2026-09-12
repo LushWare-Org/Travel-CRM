@@ -23,6 +23,8 @@
 // Adding a predicate? Add it here, give it a role, and cover all three cases in
 // __tests__/rules.test.js: fires, boundary, and no-evidence (returns nothing).
 
+import { collectionEntityRef, groupEntityRef, recordEntityRef } from '../insights/keys.js';
+
 const DAY_MS = 86_400_000;
 
 // ─── Shared helpers ───────────────────────────────────────────────────────
@@ -54,14 +56,46 @@ export function aggregateEvidenceId(bundle, name) {
   return bundle.aggregateIndex?.[name] ?? null;
 }
 
-/** Build an insight, dropping it entirely when it cannot cite anything. */
-function makeInsight(bundle, { id, section, severity, text, fact, evidenceIds }) {
+// ─── Entity references ────────────────────────────────────────────────────
+// What an insight is ABOUT. Required for stable keys, dedupe and suppression,
+// and not every insight is about a record: the grouping rules are about a group
+// and the aggregate-only rules are about a whole collection, which their own
+// comments already say ("Cites a named aggregate rather than a record: the claim
+// is about the collection, so there is no single record to point at").
+const entityRefForRecord = (record) => recordEntityRef(record?.id);
+const entityRefForGroup = (decl, key) =>
+  groupEntityRef({ source: decl.source ?? 'page', groupBy: decl.byKey ?? decl.aggregate ?? 'key', key });
+const entityRefForCollection = (decl) =>
+  collectionEntityRef({ pageKey: decl.pageKey ?? 'page', source: decl.aggregate ?? decl.rule });
+
+/**
+ * Build an insight, dropping it entirely when it cannot cite anything.
+ *
+ * TWO FACT SHAPES ON PURPOSE. `fact` (singular) stays as the primary citation
+ * because the deterministic wire schema and the client both read it. `facts`
+ * (plural) is what the claim path uses, and it is what lets a rule carry both a
+ * date and a derived number — a duration, a count, a percentage — without
+ * pretending the derived number lives inside a record field.
+ *
+ * A derived number needs its own fact because prose is checked: any numeric
+ * token in an insight's text must resolve to a grounded fact or the claim is
+ * dropped. "Record has not been updated in 62 days" has no 62 anywhere in the
+ * data, so without a duration fact the validator would delete the sentence.
+ */
+function makeInsight(bundle, { id, entityRef, section, severity, text, fact, facts, evidenceIds }) {
   const cited = (evidenceIds ?? []).filter(Boolean);
   if (cited.length === 0) return null;
   const insight = { id, section, severity, text, evidenceIds: cited };
-  // A fact must cite evidence that is both present and already cited by the
-  // claim it belongs to, or the client cannot resolve it.
-  if (fact && fact.evidenceId && cited.includes(fact.evidenceId)) insight.fact = fact;
+  if (entityRef) insight.entityRef = entityRef;
+
+  const accepted = (facts ?? []).filter((f) => f && f.evidenceId && cited.includes(f.evidenceId));
+  if (fact && fact.evidenceId && cited.includes(fact.evidenceId)) {
+    insight.fact = fact;
+    if (!accepted.some((f) => f.kind === fact.kind && f.value === fact.value)) accepted.unshift(fact);
+  } else if (accepted.length > 0) {
+    insight.fact = accepted[0];
+  }
+  if (accepted.length > 0) insight.facts = accepted;
   return insight;
 }
 
@@ -81,10 +115,19 @@ const staleForDays = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'info',
         text: decl.text ?? `Record has not been updated in ${days} days.`,
         fact: evidenceId ? { kind: 'date', value: new Date(at).toISOString(), evidenceId } : undefined,
+        facts: evidenceId
+          ? [
+              { kind: 'date', value: new Date(at).toISOString(), evidenceId },
+              // The number in the prose, as data. Without it the sentence cannot
+              // survive a validator that checks every numeric token.
+              { kind: 'duration', value: String(days), unit: 'days', derivation: 'elapsed-since', evidenceId },
+            ]
+          : [],
         evidenceIds: [evidenceId],
       }),
     ].filter(Boolean);
@@ -103,10 +146,17 @@ const expiringWithin = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'warning',
         text: decl.text ?? `Expires within ${decl.days} days.`,
         fact: evidenceId ? { kind: 'date', value: new Date(at).toISOString(), evidenceId } : undefined,
+        facts: evidenceId
+          ? [
+              { kind: 'date', value: new Date(at).toISOString(), evidenceId },
+              { kind: 'duration', value: String(Math.ceil(msUntil / DAY_MS)), unit: 'days', derivation: 'elapsed-since', evidenceId },
+            ]
+          : [],
         evidenceIds: [evidenceId],
       }),
     ].filter(Boolean);
@@ -126,10 +176,17 @@ const overdueBy = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? (days >= (decl.criticalAfterDays ?? 60) ? 'critical' : 'warning'),
         text: decl.text ?? `Past ${decl.field} by ${days} day(s).`,
         fact: evidenceId ? { kind: 'date', value: new Date(at).toISOString(), evidenceId } : undefined,
+        facts: evidenceId
+          ? [
+              { kind: 'date', value: new Date(at).toISOString(), evidenceId },
+              { kind: 'duration', value: String(days), unit: 'days', derivation: 'elapsed-since', evidenceId },
+            ]
+          : [],
         evidenceIds: [evidenceId],
       }),
     ].filter(Boolean);
@@ -152,10 +209,17 @@ const stuckInStatus = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'warning',
         text: decl.text ?? `Unedited for ${days} day(s) while in ${record[decl.statusField]}.`,
         fact: evidenceId ? { kind: 'date', value: new Date(at).toISOString(), evidenceId } : undefined,
+        facts: evidenceId
+          ? [
+              { kind: 'date', value: new Date(at).toISOString(), evidenceId },
+              { kind: 'duration', value: String(days), unit: 'days', derivation: 'elapsed-since', evidenceId },
+            ]
+          : [],
         evidenceIds: [evidenceId],
       }),
     ].filter(Boolean);
@@ -173,6 +237,7 @@ const unassigned = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'warning',
         text: decl.text ?? `${decl.field} is not set.`,
@@ -190,6 +255,7 @@ const missingField = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'info',
         text: decl.text ?? `${decl.field} is missing.`,
@@ -213,10 +279,15 @@ const ratioBelow = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'info',
         text: decl.text ?? `${decl.numeratorField} is ${Math.round(ratio * 100)}% of ${decl.denominatorField}.`,
-        fact: evidenceId ? { kind: 'percentage', value: String(Math.round(ratio * 100)), evidenceId } : undefined,
+        // The rounded percentage is NOT in the cited field value, so it must
+        // declare itself a derivation or the groundedness check drops it.
+        fact: evidenceId
+          ? { kind: 'percentage', unit: 'percent', derivation: 'ratio-of', value: String(Math.round(ratio * 100)), evidenceId }
+          : undefined,
         evidenceIds: [evidenceId],
       }),
     ].filter(Boolean);
@@ -232,12 +303,21 @@ const thresholdExceeded = {
     return [
       makeInsight(bundle, {
         id: `${decl.id ?? `${decl.rule}:${record.id}`}`,
+        entityRef: entityRefForRecord(record),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'warning',
         text: decl.text ?? `${decl.field} is above ${decl.threshold}.`,
         fact: evidenceId
           ? { kind: decl.factKind ?? 'count', value: String(value), evidenceId }
           : undefined,
+        facts: evidenceId
+          ? [
+              { kind: decl.factKind ?? 'count', value: String(value), evidenceId },
+              // The prose names the threshold too, and that number is a property
+              // of the rule rather than of the record, so it is declared as such.
+              { kind: 'count', value: String(decl.threshold), derivation: 'descriptor-constant', evidenceId },
+            ]
+          : [],
         evidenceIds: [evidenceId],
       }),
     ].filter(Boolean);
@@ -255,10 +335,17 @@ const zeroOrLowCount = {
     return [
       makeInsight(bundle, {
         id: decl.id ?? `${decl.rule}:${decl.aggregate}`,
+        entityRef: entityRefForCollection(decl),
         section: decl.section ?? 'attention',
         severity: decl.severity ?? 'info',
         text: decl.text ?? `${decl.aggregate} is at or below ${decl.threshold}.`,
         fact: evidenceId ? { kind: 'count', value: String(aggregate), evidenceId } : undefined,
+        facts: evidenceId
+          ? [
+              { kind: 'count', value: String(aggregate), evidenceId },
+              { kind: 'count', value: String(decl.threshold), derivation: 'descriptor-constant', evidenceId },
+            ]
+          : [],
         evidenceIds: [evidenceId],
       }),
     ].filter(Boolean);
@@ -291,11 +378,17 @@ const groupedCount = {
       insights.push(
         makeInsight(bundle, {
           id: `${decl.rule}:${key}`,
+          entityRef: entityRefForGroup(decl, key),
           section: decl.section ?? 'attention',
           severity: decl.severity ?? 'warning',
           text: (decl.text ?? 'One {byKey} accounts for {count} matching records.')
             .replace('{byKey}', String(key))
             .replace('{count}', String(members.length)),
+          // The count is the whole point of this rule and it lives nowhere in
+          // the data, so it must be declared or the sentence dies in validation.
+          facts: evidenceId
+            ? [{ kind: 'count', value: String(members.length), derivation: 'grouped-by', evidenceId }]
+            : [],
           evidenceIds: [evidenceId],
         }),
       );
@@ -328,11 +421,15 @@ const groupedShare = {
       insights.push(
         makeInsight(bundle, {
           id: `${decl.rule}:${key}`,
+          entityRef: entityRefForGroup(decl, key),
           section: decl.section ?? 'changed',
           severity: decl.severity ?? 'info',
           text: (decl.text ?? '{byKey} accounts for {pct}% of the value in this view.')
             .replace('{byKey}', String(key))
             .replace('{pct}', String(Math.round(pct))),
+          facts: evidenceId
+            ? [{ kind: 'percentage', unit: 'percent', derivation: 'ratio-of', value: String(Math.round(pct)), evidenceId }]
+            : [],
           evidenceIds: [evidenceId],
         }),
       );

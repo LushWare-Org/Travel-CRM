@@ -2,18 +2,18 @@ import { Button } from "@/components/ui/button";
 import type { ClaimSection, CopilotClaim, CopilotSession } from "./types";
 
 /**
- * The pieces both briefings share, with exactly one definition each: the
+ * The pieces both panels share, with exactly one definition each: the
  * severity ordering of the attention section, and the suggested-questions
- * block. `LeadBriefing` and `CollectionBriefing` import these.
+ * block. `LeadInsights` and `CollectionInsights` import these.
  *
- * Deliberately NOT shared: each briefing's section ORDER and heading TEXT. They
+ * Deliberately NOT shared: each panel's section ORDER and heading TEXT. They
  * differ on purpose — a record is read with `changed` first ("Since you were
  * here"), a list is scanned with `attention` first ("Changed") — and one shared
  * order array would silently swap the record panel's shipped hierarchy.
  */
 export function claimsIn(claims: CopilotClaim[], section: ClaimSection): CopilotClaim[] {
   if (section === "attention") {
-    // Highest severity first: the attention job is the top of the briefing.
+    // Highest severity first: the attention job is the top of the panel.
     const rank = { critical: 0, warning: 1, info: 2 } as const;
     return claims
       .filter((claim) => claim.section === section)

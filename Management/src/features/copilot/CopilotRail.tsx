@@ -10,7 +10,7 @@ type CopilotRailProps = {
 
 /**
  * The collapsed desktop dock: a 40px rail with one labeled, keyboard-accessible
- * control and, only when the active briefing really carries a warning or
+ * control and, only when the active insights really carry a warning or
  * critical claim, one semantic attention marker.
  *
  * The rail is kept alongside the floating `CopilotTrigger` at `xl`+ collapsed:

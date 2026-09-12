@@ -87,13 +87,6 @@ export const leadsAdapter = {
     }
     return result.data;
   },
-  askTools() {
-    // A record scope answers about the lead on screen (getLead) and can still
-    // list the wider queue (listLeads). This is the record half of the
-    // `/leads` vocabulary; the collection half lives on the collection
-    // adapter.
-    return ['getLead', 'listLeads'];
-  },
 
   async loadEvidence(ctx, scope) {
     const asOf = new Date().toISOString();
@@ -149,6 +142,7 @@ export const leadsAdapter = {
     if (hasEvidence(statusId)) {
       insights.push({
         id: 'lead-status',
+        entityRef: { kind: 'record', id: String(lead.id) },
         section: 'current_state',
         severity: 'info',
         text: `Lead is in ${lead.lifecycleStatus} status.`,
@@ -164,6 +158,7 @@ export const leadsAdapter = {
     if (hasEvidence(updatedAtId) && !Number.isNaN(boundaryMs) && !Number.isNaN(updatedMs) && updatedMs >= boundaryMs) {
       insights.push({
         id: 'lead-changed',
+        entityRef: { kind: 'record', id: String(lead.id) },
         section: 'changed',
         severity: 'info',
         text: 'This lead record changed since you last saw it.',
@@ -175,6 +170,7 @@ export const leadsAdapter = {
     if (hasEvidence(updatedAtId) && daysSinceUpdate != null) {
       insights.push({
         id: 'lead-freshness',
+        entityRef: { kind: 'record', id: String(lead.id) },
         section: 'attention',
         severity: daysSinceUpdate >= 7 ? 'warning' : 'info',
         text: `Lead record last updated ${daysSinceUpdate} day(s) ago.`,
@@ -186,6 +182,7 @@ export const leadsAdapter = {
     if (hasEvidence(statusId) && lead.lifecycleStatus === 'PENDING_VERIFICATION') {
       insights.push({
         id: 'lead-unclaimed',
+        entityRef: { kind: 'record', id: String(lead.id) },
         section: 'attention',
         severity: 'warning',
         text: 'Lead is unclaimed and pending verification — claim it to move it out of the shared queue.',
@@ -201,6 +198,7 @@ export const leadsAdapter = {
     ) {
       insights.push({
         id: 'lead-stale',
+        entityRef: { kind: 'record', id: String(lead.id) },
         section: 'attention',
         severity: 'warning',
         text: 'Lead has been open for more than 7 days without resolution.',

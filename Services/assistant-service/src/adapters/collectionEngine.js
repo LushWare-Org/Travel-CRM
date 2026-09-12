@@ -1,7 +1,7 @@
 // ─── Collection engine ────────────────────────────────────────────────────
 // Turns a page descriptor (plain data) into an adapter implementing the frozen
 // interface the controller calls: parseScope / loadEvidence / computeInsights /
-// defaultQuestions / askTools.
+// defaultQuestions.
 //
 // Why an engine rather than one adapter per page: nine of the ten pages do the
 // same mechanical work — fetch bounded sources concurrently under a deadline,
@@ -180,6 +180,9 @@ async function fetchSource(source, ctx, mode, bundle) {
     if (shape === 'collection' && source.paging) {
       const total = readPath(body, source.paging.totalPath);
       if (typeof total === 'number' && Number.isFinite(total)) {
+        // Recorded BEFORE the completeness check, so a source that fails as
+        // truncated still reports how many rows exist upstream.
+        bundle.sourceTotals[source.name] = total;
         if (total > rows.length) {
           return fail(bundle, source, `truncated: ${rows.length} of ${total} rows`);
         }
@@ -246,8 +249,6 @@ export function createPageAdapter(descriptor) {
     rules = [],
     aggregates = [],
     questionTemplates = [],
-    // Tool names available to ask mode on this page.
-    tools = [],
   } = descriptor;
 
   if (!key) throw new Error('A page descriptor needs a key');
@@ -286,6 +287,11 @@ export function createPageAdapter(descriptor) {
         aggregateIndex: {},
         deterministicInsights: [],
         recordCounts: {},
+        // The upstream total per source, when the endpoint reports one. The
+        // completeness probe below already reads it and used to discard it, which
+        // left everyone downstream unable to tell a complete read from a capped
+        // one — the aggregate in particular could only have guessed.
+        sourceTotals: {},
         unavailableSources: [],
         notAuthorizedSources: [],
         attemptedSources: [],
@@ -436,14 +442,6 @@ export function createPageAdapter(descriptor) {
       }
       return questions.slice(0, 3);
     },
-
-    askTools() {
-      // Engine pages resolve their vocabulary from the DESCRIPTOR, not from the
-      // scope: a page's tool list is a property of the page. The one key whose
-      // scope changes the vocabulary (`/leads`) is hand-written and does not
-      // come through this factory.
-      return tools;
-    },
   };
 }
 
@@ -492,5 +490,10 @@ function runRules(rules, bundle, scope, now, since) {
 function prefix(index) {
   return (insight) => ({ ...insight, id: `${index}:${insight.id}` });
 }
+
+// Identity (ruleId + stable key) is attached by `src/insights/pipeline.js`, not
+// here. Two places computing a key from the same insight is one place too many,
+// and the hand-written adapters never pass through this function anyway — the
+// pipeline sees every adapter's output, so it is the only correct seam.
 
 export { DAY_MS };

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import CollectionBriefing from '../CollectionBriefing';
+import CollectionInsights from '../CollectionInsights';
 import { makeSession } from './copilotTestUtils';
 import type { CopilotSource } from '../types';
 
@@ -10,24 +10,24 @@ vi.mock('../Announcer', () => ({
   LiveStatus: () => null,
 }));
 
-describe('CollectionBriefing', () => {
+describe('CollectionInsights', () => {
   const scopeLabel = 'Billing';
 
   it('renders deterministic loading state', () => {
-    const session = makeSession({ hasScope: true, loading: true, claims: [], deterministic: { status: 'loading', context: null, insights: [], error: null, noAccess: false }, briefing: { status: 'idle', runId: 0, claims: [], sources: [], questions: [], error: null, generatedAt: null, receivedAt: 0, settledWhileOpen: false } } as any);
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    const session = makeSession({ hasScope: true, loading: true, claims: [], deterministic: { status: 'loading', context: null, insights: [], error: null, noAccess: false }, insights: { status: 'idle', runId: 0, claims: [], sources: [], questions: [], error: null, generatedAt: null, receivedAt: 0, settledWhileOpen: false } } as any);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText('Reading the page…')).toBeInTheDocument();
   });
 
   it('renders model pending state', () => {
     const session = makeSession({ hasScope: true, loading: false, modelPending: true, claims: [{ id: '1', section: 'changed', severity: 'info', text: 'Some claim', facts: [], evidenceIds: [], evidenceType: '' }] });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText('Some claim')).toBeInTheDocument();
   });
 
   it('renders empty collection state', () => {
     const session = makeSession({ hasScope: true, loading: false, modelPending: false, error: null, modelPartial: false, claims: [] });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText('Nothing needs you on this page.')).toBeInTheDocument();
     // The count line is omitted when no baseline arrived. Asserting a zero here
     // would be asserting a number nobody measured, which is the bug this pins.
@@ -48,7 +48,7 @@ describe('CollectionBriefing', () => {
       claims: [],
       sources,
     });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText('49 items in the current view')).toBeInTheDocument();
   });
 
@@ -65,48 +65,48 @@ describe('CollectionBriefing', () => {
       claims: [],
       sources,
     });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.queryByText('0 items in the current view')).not.toBeInTheDocument();
   });
 
   it('renders partial loaded state', () => {
     const session = makeSession({ hasScope: true, loading: false, modelPending: false, claims: [], context: { partial: true, unavailableSources: ['source1'], notAuthorizedSources: [] } as any });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText('Partially loaded — 1 sources unavailable')).toBeInTheDocument();
   });
 
   it('renders denied state', () => {
     const session = makeSession({ hasScope: true, loading: false, modelPending: false, claims: [], context: { partial: true, unavailableSources: [], notAuthorizedSources: ['source1'] } as any });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText('Some data is outside your role')).toBeInTheDocument();
   });
 
   it('renders no-access state', () => {
     const session = makeSession({ noAccess: true });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText("You don't have access to this page's data.")).toBeInTheDocument();
   });
 
   it('renders error fallback state', () => {
     const session = makeSession({ error: 'Failed' });
-    render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText("The summary couldn't be generated.")).toBeInTheDocument();
   });
 
   it('renders success state (no status row)', () => {
     const session = makeSession({ hasScope: true, loading: false, claims: [{ id: '1', section: 'changed', severity: 'info', text: 'Success claim', facts: [], evidenceIds: [], evidenceType: '' }] });
-    const { container } = render(<CollectionBriefing session={session} scopeLabel={scopeLabel} />);
+    const { container } = render(<CollectionInsights session={session} scopeLabel={scopeLabel} />);
     expect(screen.getByText('Success claim')).toBeInTheDocument();
     expect(screen.queryByText(/Partially loaded/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Some data is outside/)).not.toBeInTheDocument();
   });
 });
 
-describe('CollectionBriefing — suggested questions', () => {
+describe('CollectionInsights — suggested questions', () => {
   const scopeLabel = 'Billing';
 
   it('omits the block when the scope has no suggested questions', () => {
-    render(<CollectionBriefing session={makeSession({ suggestedQuestions: [] })} scopeLabel={scopeLabel} />);
+    render(<CollectionInsights session={makeSession({ suggestedQuestions: [] })} scopeLabel={scopeLabel} />);
 
     expect(screen.queryByRole('region', { name: 'Suggested questions' })).not.toBeInTheDocument();
   });
@@ -115,7 +115,7 @@ describe('CollectionBriefing — suggested questions', () => {
     const user = userEvent.setup();
     const submit = vi.fn();
     render(
-      <CollectionBriefing
+      <CollectionInsights
         session={makeSession({ suggestedQuestions: ['Who is the most overdue?'], submit })}
         scopeLabel={scopeLabel}
       />
@@ -127,7 +127,7 @@ describe('CollectionBriefing — suggested questions', () => {
 
   it('renders at most three questions', () => {
     render(
-      <CollectionBriefing
+      <CollectionInsights
         session={makeSession({
           suggestedQuestions: ['One?', 'Two?', 'Three?', 'Four?'],
         })}
@@ -141,14 +141,14 @@ describe('CollectionBriefing — suggested questions', () => {
   });
 });
 
-describe('CollectionBriefing — heading focus target', () => {
+describe('CollectionInsights — heading focus target', () => {
   it('marks the real heading as the programmatic focus target', () => {
-    render(<CollectionBriefing session={makeSession({})} scopeLabel="Billing" />);
+    render(<CollectionInsights session={makeSession({})} scopeLabel="Billing" />);
 
-    // ManagementContextCopilot moves focus to `#copilot-briefing-heading` when
+    // ManagementContextCopilot moves focus to `#copilot-insights-heading` when
     // the panel opens. That move silently no-ops if the real heading loses its
     // tabIndex; the shell test renders its own heading stub, so only an
-    // assertion against the real briefing can catch the regression.
-    expect(screen.getByRole('heading', { name: /page briefing/i })).toHaveAttribute('tabindex', '-1');
+    // assertion against the real insights can catch the regression.
+    expect(screen.getByRole('heading', { name: /insights/i })).toHaveAttribute('tabindex', '-1');
   });
 });

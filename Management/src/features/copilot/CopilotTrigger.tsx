@@ -11,7 +11,9 @@ export const COPILOT_RAIL_LABEL = "Expand copilot panel";
 
 /** The attention marker's accessible name, shared by the rail and the floating
  *  trigger so the marker can never drift between the two surfaces. */
-export const ATTENTION_LABEL = "This lead has items needing attention.";
+// Page-agnostic on purpose: this marker renders in the rail on all ten pages, so
+// "this lead" was wrong on nine of them.
+export const ATTENTION_LABEL = "This page has items needing attention.";
 
 type CopilotTriggerProps = Omit<
   ComponentPropsWithoutRef<typeof Button>,

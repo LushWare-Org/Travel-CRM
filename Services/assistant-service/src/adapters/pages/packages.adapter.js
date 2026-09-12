@@ -106,6 +106,7 @@ export const packagesAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `viewed-not-booked:${pkg.id}`,
+            entityRef: { kind: 'record', id: String(pkg.id) },
             section: 'attention',
             severity: 'warning',
             text: 'Active package is getting views but no bookings.',

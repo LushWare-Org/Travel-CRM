@@ -74,11 +74,6 @@ export const billingAdapter = createPageAdapter({
 
   scopeSchema,
 
-  // Invoice questions ("which are overdue, what is outstanding") are what the
-  // rule-cited bundle cannot answer; this tool reads the invoices source
-  // directly, under the same identity and allowlist.
-  tools: ['listInvoices'],
-
   scopeLabel: () => 'Billing',
 
   sources: [
@@ -226,6 +221,7 @@ export const billingAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `reminders-exhausted:${invoice.id}`,
+            entityRef: { kind: 'record', id: String(invoice.id) },
             section: 'attention',
             severity: 'critical',
             text: `Reminded ${invoice.remindersSent} times and still unpaid — this needs a call, not another email.`,

@@ -62,6 +62,7 @@ export const flightsAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `ticketing-deadline:${booking.id}`,
+            entityRef: { kind: 'record', id: String(booking.id) },
             section: 'attention',
             severity: 'critical',
             text: 'Flight ticketing deadline is within three days.',
@@ -82,6 +83,7 @@ export const flightsAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `missing-pnr:${booking.id}`,
+            entityRef: { kind: 'record', id: String(booking.id) },
             section: 'attention',
             severity: 'critical',
             text: 'Ticketed flight booking has no PNR.',
