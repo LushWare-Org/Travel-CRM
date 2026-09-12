@@ -14,9 +14,9 @@ import { PrismaClient as LeadClient }    from './lead-service/node_modules/@pris
 import { PrismaClient as BookClient }    from './booking-service/node_modules/@prisma/client/index.js';
 import { PrismaClient as BillClient }    from './billing-service/node_modules/@prisma/client/index.js';
 import { PrismaClient as CareerClient }  from './career-service/node_modules/@prisma/client/index.js';
+import { requireDatabaseUrl } from './database-url.mjs';
 
-const DB_URL     = 'postgresql://postgres.javgkcjscdhrnlnsgczs:KZ9MNnBwR4eslIsI@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
-const DIRECT_URL = 'postgresql://postgres.javgkcjscdhrnlnsgczs:KZ9MNnBwR4eslIsI@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres';
+const DB_URL     = requireDatabaseUrl('seed.mjs');
 
 const opts = { datasources: { db: { url: DB_URL } } };
 

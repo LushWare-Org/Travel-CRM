@@ -6,9 +6,9 @@
  * Run from Services/: node grant-salesrep-default-permissions.mjs
  */
 import { PrismaClient } from './user-service/node_modules/@prisma/client/index.js';
+import { requireDatabaseUrl } from './database-url.mjs';
 
-const DB_URL = process.env.DATABASE_URL ||
-  'postgresql://postgres.javgkcjscdhrnlnsgczs:KZ9MNnBwR4eslIsI@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
+const DB_URL = requireDatabaseUrl('grant-salesrep-default-permissions.mjs');
 
 const db = new PrismaClient({ datasources: { db: { url: DB_URL } } });
 
