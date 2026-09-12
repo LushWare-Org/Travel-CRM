@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 /**
- * Polite live-region announcements. One region per surface (briefing and
+ * Polite live-region announcements. One region per surface (insights and
  * conversation) so a reveal or a queued replacement is announced once, in the
  * region nearest the action that produced it.
  */

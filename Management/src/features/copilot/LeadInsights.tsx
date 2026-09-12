@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { ClipboardList, Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ClaimItem from "./ClaimItem";
-import { SuggestedQuestions, claimsIn } from "./briefingShared";
+import { SuggestedQuestions, claimsIn } from "./insightShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
 import type { ClaimSection, CopilotClaim, CopilotSession } from "./types";
 
-type LeadBriefingProps = {
+type LeadInsightsProps = {
   session: CopilotSession;
   /** Client-side display label for the active lead. */
   scopeLabel: string;
@@ -30,16 +30,16 @@ function formatMoment(value?: string | null): string | null {
 }
 
 /**
- * The briefing-first hierarchy: lead identity and freshness, what changed since
+ * The insight-first hierarchy: lead identity and freshness, what changed since
  * the agent last saw this lead, the current state, then what needs attention
  * before interpretation and its suggested questions. The conversation below it
- * belongs to the shell, not to this briefing.
+ * belongs to the shell, not to this panel.
  *
  * Deterministic insights render first as a provisional list; a successful
- * non-empty model briefing replaces it atomically — never clearing first and
+ * non-empty model insight set replaces it atomically — never clearing first and
  * never unmounting a control the agent is focused on.
  */
-export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }: LeadBriefingProps) {
+export default function LeadInsights({ session, scopeLabel, leadId, onCollapse }: LeadInsightsProps) {
   const [announcement, announce] = useAnnouncer();
   const claimsRegionRef = useRef<HTMLDivElement | null>(null);
   const [renderedClaims, setRenderedClaims] = useState<CopilotClaim[]>(session.claims);
@@ -54,7 +54,7 @@ export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }
     const focusInside = Boolean(region && focused && focused !== document.body && region.contains(focused));
     if (focusInside) {
       setQueuedClaims(session.claims);
-      announce("Updated briefing ready");
+      announce("Updated insights ready");
       return;
     }
     setRenderedClaims(session.claims);
@@ -83,12 +83,12 @@ export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }
   const hasAnyClaim = renderedClaims.length > 0;
 
   return (
-    <section aria-labelledby="copilot-briefing-heading" className="space-y-4">
+    <section aria-labelledby="copilot-insights-heading" data-copilot-panel="record" className="space-y-4">
       <header className="space-y-1">
         <div className="flex items-start justify-between gap-2">
-          <h2 id="copilot-briefing-heading" tabIndex={-1} className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+          <h2 id="copilot-insights-heading" tabIndex={-1} className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
             <ClipboardList className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            Lead briefing
+            Insights
           </h2>
           {onCollapse && (
             <Button
@@ -112,7 +112,7 @@ export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }
               {momentLabel} <span className="font-mono tabular-nums">{moment}</span>
             </span>
           )}
-          {session.modelPartial && <span className="text-warning">Partial briefing</span>}
+          {session.modelPartial && <span className="text-warning">Partial insights</span>}
         </p>
       </header>
 
@@ -121,7 +121,7 @@ export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }
       {session.noAccess && <p className="text-sm text-muted-foreground">You do not have access to this record.</p>}
 
       {!session.hasScope && (
-        <p className="text-sm text-muted-foreground">Select a lead to generate its situation briefing.</p>
+        <p className="text-sm text-muted-foreground">Select a lead to see its insights.</p>
       )}
 
       {!session.noAccess && session.error && (
@@ -201,16 +201,16 @@ export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }
           {session.modelPending && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-              AI briefing in progress — showing what is already verified.
+              AI insights in progress — showing what is already verified.
             </p>
           )}
 
           {session.modelPartial && (
             <div className="space-y-1.5">
               <p className="text-xs text-muted-foreground">
-                The AI briefing was not available; this is the verified summary.
+                The AI insights were not available; this is the verified summary.
               </p>
-              <Button variant="outline" size="xs" onClick={session.retryBriefing}>
+              <Button variant="outline" size="xs" onClick={session.retryInsights}>
                 Retry
               </Button>
             </div>

@@ -37,8 +37,8 @@ type FilterKey = 'all' | LifecycleStatus;
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PageCopilot from "../features/copilot/PageCopilot";
-import LeadBriefing from "../features/copilot/LeadBriefing";
-import CollectionBriefing from "../features/copilot/CollectionBriefing";
+import LeadInsights from "../features/copilot/LeadInsights";
+import CollectionInsights from "../features/copilot/CollectionInsights";
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // Lifecycle status maps (10 states) plus old-status fallbacks
@@ -412,8 +412,8 @@ const LeadManagement = () => {
   // The copilot scope is the record selected in the persistent pane; nothing is
   // sent when no lead is selected.
   // With no lead selected this is the COLLECTION scope (`{}`), which serves the
-  // analyst briefing for the general leads page — the collection engine's
-  // `leads` descriptor. The record briefing and the collection briefing are
+  // analyst insights for the general leads page — the collection engine's
+  // `leads` descriptor. The record insights and the collection insights are
   // different sections, so the mount below branches on which one applies.
   const detailLeadId = detailLead ? String(detailLead.id ?? detailLead._id ?? "").trim() : "";
   const copilotScope = detailLeadId ? { leadId: detailLeadId } : {};
@@ -427,16 +427,16 @@ const LeadManagement = () => {
         pageKey="leads"
         scope={copilotScope}
         scopeLabel={copilotLabel}
-        renderBriefing={({ session, collapse }) =>
+        renderInsights={({ session, collapse }) =>
           detailLeadId ? (
-            <LeadBriefing
+            <LeadInsights
               session={session}
               scopeLabel={copilotLabel}
               leadId={detailLeadId}
               onCollapse={collapse}
             />
           ) : (
-            <CollectionBriefing
+            <CollectionInsights
               session={session}
               scopeLabel={copilotLabel}
               onCollapse={collapse}

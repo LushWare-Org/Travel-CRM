@@ -11,14 +11,14 @@ type CopilotConversationProps = {
 };
 
 /**
- * The shell's conversation — not the record briefing's. It renders on every
+ * The shell's conversation — not the record panel's. It renders on every
  * page key, so nothing here may assume a lead is in scope: the pending copy is
  * derived from `scopeLabel`, never the record-specific "this lead".
  *
  * It is the second child of `CopilotSurface`, after one `border-t` hairline:
  *
  * -- CopilotSurface (the panel's only scroller) -----------------+
- * |  briefing children(api)                                      |
+ * |  insights children(api)                                      |
  * |    record:     header > changed > current state >            |
  * |                attention > experienced view >                |
  * |                suggested questions                           |
@@ -38,15 +38,15 @@ type CopilotConversationProps = {
  * The root must NOT force a full panel height. `min-h-full` with an `mt-auto`
  * composer pins the bar to the panel's bottom edge, and the operator pays for
  * that with a blank band between the last fact and the bar on every panel that
- * has a briefing above it — measured at 661px of a 768px panel, so almost a
- * full screen scrolled through for nothing. The transcript follows the briefing
+ * has an insights block above it — measured at 661px of a 768px panel, so almost a
+ * full screen scrolled through for nothing. The transcript follows the insights
  * directly and its composer follows the transcript.
  *
  * State contract, both scope kinds (what the operator SEES):
  *
  * | Surface      | Loading                        | Empty                                    | Error                                | Success                       | Partial                       |
  * |--------------|--------------------------------|------------------------------------------|--------------------------------------|-------------------------------|-------------------------------|
- * | Briefing     | skeletons, then deterministic  | "No verified insights…" / examined count | full error + Retry, no stale claims  | scope order + evidence actions| claims kept + partial + Retry |
+ * | Insights     | skeletons, then deterministic  | "No verified insights…" / examined count | full error + Retry, no stale claims  | scope order + evidence actions| claims kept + partial + Retry |
  * | Conversation | pending copy on the submitted turn | no transcript region before the first question; composer stays | turn keeps its question, concise failure + Retry | paired user turn + grounded blocks | verified blocks, no invented text |
  * | Collection ask | same neutral pending copy, single-shot on a page declaring no tools | an empty list is still askable: composer enabled, transcript empty until asked | same per-turn error + Retry          | same paired turn shape        | same                          |
  * | Composer     | present but disabled until the deterministic phase is ready | present (empty is not no-access) | disabled                             | enabled                       | enabled                       |

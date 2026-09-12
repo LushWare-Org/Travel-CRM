@@ -9,7 +9,7 @@ import { setViewport } from './copilotTestUtils';
 
 const api = vi.hoisted(() => ({
   copilotDeterministic: vi.fn(),
-  copilotBriefing: vi.fn(),
+  copilotInsights: vi.fn(),
   copilotAsk: vi.fn(),
   copilotSeen: vi.fn(),
   isCopilotAbort: vi.fn((err: unknown) => (err as { name?: string } | null)?.name === 'AbortError'),
@@ -31,8 +31,8 @@ function StubSections({ api: sectionApi }: { api: CopilotSectionApi }) {
   const { session } = sectionApi;
   return (
     <div>
-      <h2 id="copilot-briefing-heading" tabIndex={-1}>
-        Lead briefing
+      <h2 id="copilot-insights-heading" tabIndex={-1}>
+        Insights
       </h2>
       <p data-testid="surface-open">{sectionApi.open ? 'open' : 'closed'}</p>
       <p data-testid="claims">{session.claims.map((claim) => claim.text).join('|')}</p>
@@ -107,14 +107,14 @@ beforeEach(() => {
       notAuthorizedSources: [],
     })
   );
-  api.copilotBriefing.mockImplementation(({ scope }: { scope: { leadId: string } }) =>
+  api.copilotInsights.mockImplementation(({ scope }: { scope: { leadId: string } }) =>
     Promise.resolve({
       context: { pageKey: 'leads', scopeLabel: `Lead ${scope.leadId}`, generatedAt: '2026-09-10T10:05:00.000Z', partial: false, noAccess: false },
       claims: [
         {
           id: 'claim-1',
           section: 'current_state',
-          text: `Briefing ${scope.leadId}`,
+          text: `Insights ${scope.leadId}`,
           facts: [],
           evidenceIds: [],
           evidenceType: 'record',
@@ -145,7 +145,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     renderShell();
 
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
-    expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a');
+    expect(screen.getByTestId('claims')).toHaveTextContent('Insights a');
     expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('open');
   });
 
@@ -198,7 +198,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
   it('keys the preference per page, so collapsing one page does not silence the others', async () => {
     // The operator collapsed the copilot on `leads` and has never opened
     // `overview`. Under the previous actor-global key, `overview` would have
-    // inherited that collapse and never announced that a briefing exists there;
+    // inherited that collapse and never announced that the insights exist there;
     // the decided behaviour is one discovery moment per page key.
     localStorage.setItem(visibilityKey(ACTOR, 'leads'), 'collapsed');
 
@@ -244,7 +244,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     expect(screen.getAllByRole('button', { name: 'Open copilot' })).toHaveLength(1);
   });
 
-  it('activates the desktop trigger into the panel and moves focus to the briefing heading', async () => {
+  it('activates the desktop trigger into the panel and moves focus to the insights heading', async () => {
     const user = userEvent.setup();
     renderShell();
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
@@ -253,12 +253,12 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     await user.click(screen.getByRole('button', { name: 'Open copilot' }));
 
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Lead briefing' }));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Insights' }));
   });
 
   it('exposes the attention state as a sibling marker plus a visible glyph, never a button child', async () => {
     const user = userEvent.setup();
-    api.copilotBriefing.mockImplementationOnce(() =>
+    api.copilotInsights.mockImplementationOnce(() =>
       Promise.resolve({
         context: { pageKey: 'leads', scopeLabel: 'Lead a', generatedAt: '2026-09-10T10:05:00.000Z', partial: false, noAccess: false },
         claims: [
@@ -286,7 +286,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
     // Both collapsed desktop controls carry the state: the rail's icon marker
     // and the floating trigger's dot.
-    const markers = screen.getAllByLabelText('This lead has items needing attention.');
+    const markers = screen.getAllByLabelText('This page has items needing attention.');
     expect(markers).toHaveLength(2);
     for (const marker of markers) {
       expect(marker).toHaveAttribute('role', 'img');
@@ -317,17 +317,17 @@ describe('ManagementContextCopilot — below xl', () => {
     const user = userEvent.setup();
     renderShell();
 
-    expect(await screen.findByText('Lead briefing ready')).toBeInTheDocument();
+    expect(await screen.findByText('Insights ready')).toBeInTheDocument();
     expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBeNull();
     expect(document.querySelector('[data-copilot-surface="dock"]')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Open copilot' }));
 
     await waitFor(() => expect(api.copilotDeterministic).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId('claims').textContent).toMatch(/Deterministic a|Briefing a/);
+    expect(screen.getByTestId('claims').textContent).toMatch(/Deterministic a|Insights a/);
     expect(localStorage.getItem(mobileCueKey(ACTOR, PAGE))).toBe('true');
     expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('open');
-    await waitFor(() => expect(screen.queryByText('Lead briefing ready')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Insights ready')).not.toBeInTheDocument());
   });
 
   it('moves focus into the drawer heading on open and restores it to the trigger on close', async () => {
@@ -337,7 +337,7 @@ describe('ManagementContextCopilot — below xl', () => {
     const trigger = screen.getByRole('button', { name: 'Open copilot' });
     await user.click(trigger);
 
-    const heading = await screen.findByRole('heading', { name: 'Lead briefing' });
+    const heading = await screen.findByRole('heading', { name: 'Insights' });
     await waitFor(() => expect(document.activeElement).toBe(heading));
 
     await user.click(screen.getByRole('button', { name: 'Close copilot' }));
@@ -348,12 +348,12 @@ describe('ManagementContextCopilot — below xl', () => {
     const user = userEvent.setup();
     renderShell();
 
-    await screen.findByText('Lead briefing ready');
-    await user.click(screen.getByRole('button', { name: 'Dismiss briefing ready cue' }));
+    await screen.findByText('Insights ready');
+    await user.click(screen.getByRole('button', { name: 'Dismiss insights ready cue' }));
 
     expect(localStorage.getItem(mobileCueKey(ACTOR, PAGE))).toBe('true');
     expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBeNull();
-    expect(screen.queryByText('Lead briefing ready')).not.toBeInTheDocument();
+    expect(screen.queryByText('Insights ready')).not.toBeInTheDocument();
   });
 });
 
@@ -361,7 +361,7 @@ describe('ManagementContextCopilot — conversation', () => {
   it('keeps a suggested question paired with its successful answer', async () => {
     const user = userEvent.setup();
     renderShell();
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     await user.click(screen.getByRole('button', { name: 'ask-suggested' }));
 
@@ -376,7 +376,7 @@ describe('ManagementContextCopilot — conversation', () => {
     const user = userEvent.setup();
     api.copilotAsk.mockRejectedValueOnce(new Error('assistant offline'));
     renderShell();
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     await user.click(screen.getByRole('button', { name: 'type' }));
     await user.click(screen.getByRole('button', { name: 'submit' }));
@@ -391,9 +391,9 @@ describe('ManagementContextCopilot — conversation', () => {
     expect(screen.getByTestId('turn-errors')).not.toHaveTextContent('assistant offline');
   });
 
-  it('answers a question with verified blocks while the briefing itself is partial', async () => {
+  it('answers a question with verified blocks while the insights themselves are partial', async () => {
     const user = userEvent.setup();
-    api.copilotBriefing.mockRejectedValueOnce(new Error('model offline'));
+    api.copilotInsights.mockRejectedValueOnce(new Error('model offline'));
     renderShell();
 
     await waitFor(() => expect(screen.getByTestId('model')).toHaveTextContent('partial'));
@@ -412,8 +412,8 @@ describe('ManagementContextCopilot — conversation on every scope', () => {
     const { rerender } = renderShell({ scope: {} });
 
     // The shell owns the conversation, so a collection page (no leadId) has the
-    // composer the record briefing used to own — and it lives in the panel's
-    // single scroll container, after the briefing.
+    // composer the record insights used to own — and it lives in the panel's
+    // single scroll container, after the insights.
     const composer = await screen.findByLabelText('Ask about Alice Traveller');
     const surface = document.querySelector('[data-copilot-surface="surface"]');
     expect(surface).not.toBeNull();
@@ -435,10 +435,10 @@ describe('ManagementContextCopilot — conversation on every scope', () => {
 });
 
 describe('ManagementContextCopilot — scope lifecycle', () => {
-  it('drops the previous lead briefing when the selection is cleared', async () => {
+  it('drops the previous lead insights when the selection is cleared', async () => {
     const { rerender } = renderShell();
 
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     rerender(
       <AuthProvider>
@@ -448,7 +448,7 @@ describe('ManagementContextCopilot — scope lifecycle', () => {
       </AuthProvider>
     );
 
-    await waitFor(() => expect(screen.getByTestId('claims')).not.toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).not.toHaveTextContent('Insights a'));
     expect(screen.getByTestId('claims')).not.toHaveTextContent('Deterministic a');
   });
 });
