@@ -8,9 +8,13 @@ import {
   buildManagementBriefingPrompt,
   canonicalizeBriefingResponse,
   managementBriefingResponseJsonSchema,
-} from '../ai/prompts/managementBriefing.v1.js';
+} from '../ai/prompts/managementBriefing.v2.js';
 import { runAgentLoop } from '../ai/agentRunner.js';
 import { validateClaims, buildSources, insightsToClaims } from '../ai/groundingValidator.js';
+import { buildRankedInsights, withIdentity } from '../insights/pipeline.js';
+import { buildDecisionRows, loadPriorState, markSurfaced, recordDecisions } from '../insights/state.js';
+import { aggregateFromRecords, detectAggregateIntent } from '../insights/aggregate.js';
+import { capabilitySummary, toolsForActor } from '../insights/catalogue.js';
 import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../constants/managementCopilot.js';
 import prisma from '../db/client.js';
 
@@ -108,7 +112,15 @@ async function readLastSeen(actorId, pageKey, fingerprint) {
 }
 
 export const managementCopilotTurn = asyncHandler(async (req, res) => {
-  const { mode, page } = req.body;
+  const { page } = req.body;
+  // 'briefing' is the pre-rename wire value, accepted for ONE release so a client
+  // that has not shipped yet cannot 400. Normalising here means every branch below
+  // reads one token, and the warning is what tells us the legacy value has stopped
+  // arriving and can be dropped.
+  const mode = req.body.mode === 'briefing' ? 'insights' : req.body.mode;
+  if (req.body.mode === 'briefing') {
+    logger.warn({ pageKey: page?.key }, 'legacy mode=briefing accepted; client not yet updated');
+  }
   if (!copilotEnabled() || !pageKeyAllowed(page.key)) {
     return copilotNotFound(res);
   }
@@ -137,9 +149,81 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   // mode='deterministic': no Gemini — stamp + deterministic insights only.
   if (mode === 'deterministic') {
     const insights = adapter.computeInsights(bundle, sinceBoundary);
+
+    // Identity ONCE, before anything consumes it, so both lists address the same
+    // insight by the same stable key. `ranked` is a selection of these, not a
+    // parallel set, and a client switching from one to the other must be able to
+    // match them up.
+    const identified = insights.map(withIdentity);
+
+    // One batched read, and it fails OPEN: an unreadable state shows everything
+    // rather than blanking the panel. Awaited because suppression cannot be
+    // decided without it, but it is a single query for the whole scope.
+    const priorState = await loadPriorState({
+      prisma,
+      actorId: req.user.id,
+      pageKey: page.key,
+      scopeFingerprint: scopeFp,
+    });
+
+    // Rank, gate and cap. The result is EXPOSED alongside the unranked list
+    // rather than replacing it: flipping what renders is the client's half of a
+    // lockstep change, and until that lands the frozen contract keeps the panel
+    // exactly as it is. Skipping straight to ranked output would show the
+    // operator fewer items with no way to expand them.
+    const ranked = buildRankedInsights({
+      insights: identified,
+      evidenceIds: new Set(bundle.evidence.map((item) => item.id)),
+      unavailableSourceCount: bundle.unavailableSources.length,
+      priorState,
+    });
+
+    // Instrumentation, deliberately NOT awaited. A briefing must never wait on,
+    // or fail because of, a log write: the operator gets their page regardless,
+    // and a failure is a warning in the logs rather than an error on screen.
+    void recordDecisions({
+      prisma,
+      rows: buildDecisionRows({
+        decisions: ranked.decisions,
+        requestId: req.requestId ?? null,
+        actorId: req.user.id,
+        pageKey: page.key,
+        scopeFingerprint: scopeFp,
+        rankingVersion: ranked.rankingVersion,
+        scoreByKey: new Map(ranked.ranked.map((item) => [item.key, item.score])),
+      }),
+    });
+    void markSurfaced({
+      prisma,
+      actorId: req.user.id,
+      pageKey: page.key,
+      scopeFingerprint: scopeFp,
+      keys: ranked.ranked.map((item) => item.key),
+    });
     return res.json({
       context: { pageKey: page.key, scopeLabel: bundle.context.scopeLabel, asOf: bundle.context.asOf, noAccess },
-      insights,
+      // Capped at the contract's bound. The engine can emit more than a hundred
+      // insights from one page (three rules can fire per record), and the
+      // contract rejects a longer array outright — which is a pre-existing way
+      // for one busy page to fail every client. `ranked` is the payload that
+      // matters; this list is bounded so it cannot break the contract.
+      insights: identified.slice(0, 100),
+      // The ranked view of the same insights. Additive while the client gains the
+      // affordances for it (`show more`, the quiet state).
+      //
+      // `suppressedCount` is 0 rather than absent: nothing can be suppressed yet
+      // because per-insight acknowledgement state (`InsightState`) does not exist
+      // until the suppression work lands. Reporting a real zero is the honest
+      // form of "not implemented", and it is distinct from asserting that no
+      // insight was flagged.
+      ranked: ranked.ranked,
+      // Real now that per-insight state exists: the count of candidates this
+      // load kept quiet because the operator already acknowledged them. A page
+      // that is quiet for that reason looks identical to an empty one without
+      // this number, and those are different truths.
+      suppressedCount: ranked.decisions.filter((entry) => entry.reason === 'suppressed_unchanged').length,
+      suppressedCriticals: ranked.suppressedCriticals,
+      rankingVersion: ranked.rankingVersion,
       // Same payload the briefing path already builds. Without it the cold-open
       // evidence action has no `sources` entry to render from and falls back to
       // "not captured" — the phase the trust claim actually rests on — and the
@@ -302,33 +386,145 @@ function respondWithFallback(res, page, bundle, adapter, sinceBoundary) {
 }
 
 // mode='ask': bounded tool loop → grounded answer blocks, resolved against the
-// PAGE- AND SCOPE-declared vocabulary (`adapter.askTools(scope)`), never a
-// global tool list. Tool-gathered data is appended to the bundle as turn-local
-// evidence so answer claims cite it correctly. Every outcome here is
-// answer-shaped: an exhausted loop, a rejected claim set, zero declared tools
-// (the single-shot path inside the runner) and an unconfigured provider all
-// return `answerBlocks` — possibly empty — and never the briefing's `claims`.
+// ACTOR's role-derived catalogue, never the page and never a global list. The
+// page decides only what is volunteered unprompted. Tool-gathered data is
+// appended to the bundle as turn-local evidence so answer claims cite it
+// correctly. Every outcome here is answer-shaped: an exhausted loop, a rejected
+// claim set, no reachable tool (the single-shot path inside the runner) and an
+// unconfigured provider all return `answerBlocks` — possibly empty — and never
+// the insights' `claims`.
 async function handleAsk(res, req, page, bundle, adapter, ctx, scope) {
   const question = latestUserQuestion(req.body.messages);
-  const { answerBlocks: rawBlocks, toolEvidence } = await runAgentLoop({
+
+  // PRECOMPUTE, BEFORE GENERATION. A counting question is answered by grouping
+  // the rows this page already fetched, and that happens here rather than inside
+  // the tool loop for two reasons: a slow grouping inside the loop could spend
+  // the whole budget and leave nothing for the answer (the failure this plan
+  // exists to remove), and re-fetching the same rows would double the work on the
+  // slowest path.
+  //
+  // The rows, the count and the panel's own evidence therefore describe the same
+  // read, so the number in the answer cannot disagree with the page.
+  const aggregate = aggregateForQuestion({ question, bundle, page });
+  const promptEvidence = aggregate.evidence.length
+    ? [...bundle.evidence, ...aggregate.evidence]
+    : bundle.evidence;
+
+  // THE VOCABULARY COMES FROM THE ACTOR, NOT THE PAGE. Same operator, same
+  // question, same capability on every screen — which is the whole point of this
+  // change. The page still decides what is volunteered unprompted.
+  const { answerBlocks: rawBlocks, toolEvidence, reason } = await runAgentLoop({
     ctx,
     scopeLabel: bundle.context.scopeLabel,
     question,
-    evidence: bundle.evidence,
-    tools: adapter.askTools(scope),
+    evidence: promptEvidence,
+    tools: toolsForActor(req.user),
     generateStructured,
   });
 
   if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) {
-    return respondWithAnswer(res, page, bundle, adapter, { answerBlocks: [], toolEvidence });
+    // An empty answer and a refused one look identical downstream — both are an
+    // empty `answerBlocks`. Recording which happened, and with what, is the
+    // difference between a diagnosable refusal and the silent "no grounded
+    // answer" this work exists to remove.
+    logger.warn(
+      { pageKey: page.key, question, reason, toolCalls: toolEvidence.length },
+      'ask produced no answer blocks',
+    );
+    return respondWithAnswer(res, page, bundle, adapter, {
+      answerBlocks: [limitationBlock({ actor: req.user, reason })],
+      toolEvidence,
+    });
   }
 
-  const validationBundle = { ...bundle, evidence: [...bundle.evidence, ...toolEvidence] };
+  // The aggregate items must be citable at validation time too, or a correct
+  // count would be dropped for citing evidence the validator cannot see.
+  const validationBundle = { ...bundle, evidence: [...promptEvidence, ...toolEvidence] };
   const guidanceEnabled = process.env.MANAGEMENT_COPILOT_GUIDANCE_ENABLED === 'true';
   const canonical = canonicalizeBriefingResponse({ claims: rawBlocks }, BriefingClaimSchema);
-  const { claims } = validateClaims({ claims: canonical, bundle: validationBundle, enableGuidance: guidanceEnabled });
+  const { claims, rejected } = validateClaims({
+    claims: canonical,
+    bundle: validationBundle,
+    enableGuidance: guidanceEnabled,
+  });
+
+  if (rejected.length > 0) {
+    logger.warn(
+      {
+        pageKey: page.key,
+        question,
+        rejected,
+        // The text is what makes a rejection actionable: the reason alone says a
+        // number was unsupported, not which number or how it was written.
+        rejectedText: canonical
+          .filter((claim) => rejected.some((entry) => entry.id === claim.id))
+          .map((claim) => claim.text),
+      },
+      claims.length === 0 ? 'every ask claim was rejected' : 'some ask claims were rejected',
+    );
+  }
+
+  if (claims.length === 0) {
+    return respondWithAnswer(res, page, bundle, adapter, {
+      answerBlocks: [limitationBlock({ actor: req.user, reason: 'rejected' })],
+      toolEvidence,
+    });
+  }
 
   return respondWithAnswer(res, page, bundle, adapter, { answerBlocks: claims, toolEvidence });
+}
+
+/**
+ * The honest dead end, in place of the bare refusal.
+ *
+ * "No grounded answer for that question." told the operator nothing: not whether
+ * the page lacks the data, not what it could answer instead. Silently, it also
+ * made every capability gap look like a bug.
+ *
+ * SERVER-authored, because a model cannot describe its own limits here — a claim
+ * citing no evidence is rejected by the validator, so the wording has to come
+ * from the one party that cannot invent a capability. `facts` and `evidenceIds`
+ * are empty and the wire contract permits that, so the client renders it through
+ * the ordinary claim path with no change.
+ */
+// The opening depends on WHY nothing came back, because the causes are not
+// interchangeable: a transient provider fault must never be reported as a limit of
+// the page. Getting that wrong is its own kind of dishonesty — the operator would
+// stop asking questions this scope can actually answer.
+const LIMITATION_OPENINGS = {
+  rejected: 'I could not ground an answer to that question on this page — nothing in its data matched it. ',
+  'no-final-answer': 'I could not answer that from this page. ',
+  'budget-exhausted': 'I ran out of time working that out. ',
+};
+
+function limitationBlock({ actor, reason }) {
+  if (reason === 'generation-failed') {
+    return {
+      id: 'limitation:generation-failed',
+      section: 'current_state',
+      text: 'I could not generate an answer just now — that is a temporary fault on my side, not a limit of this page. Try again in a moment.',
+      facts: [],
+      evidenceIds: [],
+      evidenceType: 'computed',
+      severity: 'info',
+    };
+  }
+
+  const readable = capabilitySummary(actor);
+  const opening = LIMITATION_OPENINGS[reason] ?? LIMITATION_OPENINGS['no-final-answer'];
+  const capability = readable
+    ? `Here I can read ${readable}, and a question about those will get a grounded answer.`
+    : 'No data on this page is readable with your role, so I cannot answer questions about it.';
+
+  return {
+    id: 'limitation:ungrounded',
+    section: 'current_state',
+    text: opening + capability,
+    facts: [],
+    evidenceIds: [],
+    evidenceType: 'computed',
+    severity: 'info',
+  };
 }
 
 // The ask response contract. `claims` stays empty — the wire contract requires
@@ -355,6 +551,52 @@ function respondWithAnswer(res, page, bundle, adapter, { answerBlocks, toolEvide
     unavailableSources: bundle.unavailableSources,
     notAuthorizedSources: bundle.notAuthorizedSources,
   });
+}
+
+/**
+ * The aggregate for a question, or nothing.
+ *
+ * The field to group by comes from the OPERATOR'S OWN WORDS ("by destination"),
+ * never from a guess: grouping by the wrong field produces a confident answer to
+ * a question nobody asked, which is worse than not answering. When no field is
+ * named the caller falls through to the tool loop, which can still fetch rows.
+ */
+function aggregateForQuestion({ question, bundle, page }) {
+  const intent = detectAggregateIntent(question);
+  if (!intent.wantsAggregate || !intent.groupByHint) return { evidence: [] };
+
+  const records = Array.isArray(bundle.records) ? bundle.records : [];
+  if (records.length === 0) return { evidence: [] };
+
+  // The read's completeness, as the bundle recorded it. An unknown total counts
+  // as incomplete, so the caller can label rather than assert.
+  const sourceNames = Object.keys(bundle.sourceTotals ?? {});
+  const source = sourceNames[0] ?? 'page';
+  const upstreamTotal = bundle.sourceTotals?.[source] ?? null;
+
+  const result = aggregateFromRecords({
+    records,
+    pageKey: page.key,
+    source,
+    groupBy: intent.groupByHint,
+    question,
+    asOf: bundle.context?.asOf ?? new Date().toISOString(),
+    upstreamTotal,
+  });
+
+  if (result.evidence.length === 0) return { evidence: [] };
+  logger.info(
+    {
+      pageKey: page.key,
+      groupBy: result.groupBy,
+      groups: result.groupCount,
+      suppressedGroups: result.suppressedGroups,
+      truncated: result.truncated,
+      rowsConsidered: result.rowsConsidered,
+    },
+    'aggregate precomputed for a counting question',
+  );
+  return result;
 }
 
 function latestUserQuestion(messages) {
