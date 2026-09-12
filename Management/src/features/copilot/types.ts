@@ -28,6 +28,26 @@ export type CopilotClaim = {
   evidenceIds: string[];
   evidenceType: string;
   severity: ClaimSeverity;
+  /**
+   * Identity that survives a descriptor reorder. Prefer this over `id` as a
+   * React key and as the stable hook: `id` is positional, so inserting a rule
+   * above another renumbers every row after it.
+   */
+  key?: string | null;
+  ruleId?: string | null;
+  /**
+   * Present once the insight has been scored for the ranked list. Absent on
+   * model claims, which carry no score — the ranking is the deterministic
+   * pipeline's, not a property of every claim.
+   */
+  score?: number;
+  components?: Record<string, number>;
+  origin?: "rule" | "model";
+  /** The scored inputs, flattened by the server so "why now" needs no unpacking. */
+  urgency?: number;
+  novelty?: number;
+  confidence?: number;
+  actionability?: number;
 };
 
 export type CopilotSource = {
@@ -61,6 +81,21 @@ export type CopilotTurn = {
 };
 
 export type CopilotSession = {
+  /**
+   * The server's ranked view of the deterministic insights, in SERVER ORDER.
+   * Already sorted by severity band, then score; a client that re-sorts it
+   * destroys the ranking. Empty when the server sent no ranking, in which case
+   * `claims` is the list to render.
+   */
+  ranked: CopilotClaim[];
+  /** How many candidates the ranking dropped as already-acknowledged. */
+  suppressedCount: number;
+  /**
+   * Critical candidates that did not fit, kept separate from `suppressedCount`
+   * so a critical is never silently hidden behind a quiet-state count.
+   */
+  suppressedCriticals: CopilotClaim[];
+  rankingVersion?: string;
   /** Normalized selected lead id, or null when nothing is selected. */
   leadId: string | null;
   hasScope: boolean;
@@ -76,7 +111,7 @@ export type CopilotSession = {
   modelPending: boolean;
   /** Model phase failed or returned nothing usable — keep the list, label it partial. */
   modelPartial: boolean;
-  /** A grounded, presentable briefing result exists for the active lead. */
+  /** A grounded, presentable insights result exists for the active lead. */
   ready: boolean;
   noAccess: boolean;
   sources: CopilotSource[];
@@ -93,6 +128,6 @@ export type CopilotSession = {
   setInput: (value: string) => void;
   submit: (text?: string) => void;
   retryTurn: (turnId: string) => void;
-  retryBriefing: () => void;
+  retryInsights: () => void;
   retryDeterministic: () => void;
 };

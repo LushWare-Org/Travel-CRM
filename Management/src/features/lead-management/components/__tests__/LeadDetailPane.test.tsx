@@ -11,7 +11,7 @@ vi.hoisted(() => {
 
 const {
   mockGetAllLeads, mockGetLeadStats, mockGetSalesReps, mockGetAssignmentSettings, mockGetStoredUser,
-  mockDeterministic, mockBriefing, mockAsk, mockSeen,
+  mockDeterministic, mockInsights, mockAsk, mockSeen,
 } = vi.hoisted(() => ({
   mockGetAllLeads: vi.fn(),
   mockGetLeadStats: vi.fn(),
@@ -19,7 +19,7 @@ const {
   mockGetAssignmentSettings: vi.fn(),
   mockGetStoredUser: vi.fn(),
   mockDeterministic: vi.fn(),
-  mockBriefing: vi.fn(),
+  mockInsights: vi.fn(),
   mockAsk: vi.fn(),
   mockSeen: vi.fn(),
 }));
@@ -36,7 +36,7 @@ vi.mock('../../../../services/api', () => ({
 
 vi.mock('@/services/copilotAPI', () => ({
   copilotDeterministic: mockDeterministic,
-  copilotBriefing: mockBriefing,
+  copilotInsights: mockInsights,
   copilotAsk: mockAsk,
   copilotSeen: mockSeen,
   isCopilotAbort: (err: unknown) => Boolean(err) && (err as { name?: string }).name === 'AbortError',
@@ -123,14 +123,14 @@ beforeEach(() => {
       notAuthorizedSources: [],
     })
   );
-  mockBriefing.mockImplementation(({ scope }: { scope: { leadId: string } }) =>
+  mockInsights.mockImplementation(({ scope }: { scope: { leadId: string } }) =>
     Promise.resolve({
       context: { pageKey: 'leads', scopeLabel: `Lead ${scope.leadId}`, generatedAt: '2026-09-10T10:05:00.000Z', partial: false, noAccess: false },
       claims: [
         {
           id: 'claim-1',
           section: 'current_state',
-          text: `Briefing ${scope.leadId ?? 'collection'}`,
+          text: `Insights ${scope.leadId ?? 'collection'}`,
           facts: [],
           evidenceIds: [leadEvidenceId(scope.leadId, 'destination')],
           evidenceType: 'record',
@@ -187,8 +187,8 @@ describe('LeadDetailPane', () => {
     // Row selection no longer auto-opens the editor.
     expect(screen.queryByTestId('edit-lead-dialog')).not.toBeInTheDocument();
 
-    // The grounded briefing renders in the persistent dock.
-    await waitFor(() => expect(screen.getByText('Briefing lead-a')).toBeInTheDocument());
+    // The grounded insights renders in the persistent dock.
+    await waitFor(() => expect(screen.getByText('Insights lead-a')).toBeInTheDocument());
   });
 
   it('clears selection into the no-lead state and issues no further request', async () => {
@@ -197,12 +197,12 @@ describe('LeadDetailPane', () => {
 
     await user.click(await screen.findByText('Alice Traveller'));
     await waitFor(() => expect(mockDeterministic).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.getByText('Briefing lead-a')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Insights lead-a')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Close lead detail' }));
 
     expect(screen.getByText('Select a lead to see its details and evidence.')).toBeInTheDocument();
-    expect(screen.queryByText('Briefing lead-a')).not.toBeInTheDocument();
+    expect(screen.queryByText('Insights lead-a')).not.toBeInTheDocument();
     expect(screen.queryByText('Deterministic lead-a')).not.toBeInTheDocument();
     // Deselecting does NOT go dormant any more: `{}` is the COLLECTION scope —
     // the general leads page. That is the whole point of the collection mode,
@@ -210,7 +210,7 @@ describe('LeadDetailPane', () => {
     await waitFor(() =>
       expect(mockDeterministic).toHaveBeenCalledWith(expect.objectContaining({ scope: {} })),
     );
-    await waitFor(() => expect(screen.getByText('Briefing collection')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Insights collection')).toBeInTheDocument());
     expect(screen.getByRole('complementary', { name: 'Lead detail' })).toHaveAttribute(
       'data-copilot-record',
       'empty'

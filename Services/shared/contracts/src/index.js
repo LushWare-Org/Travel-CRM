@@ -70,6 +70,8 @@ export {
   ManagementClaimSections,
   ManagementEvidenceTypes,
   ManagementSeverities,
+  ManagementRoles,
+  ManagementToolAccess,
   LEAD_COPILOT_FIELDS,
   leadEvidenceId,
   pageEvidenceId,

@@ -69,6 +69,7 @@ export const hotelsAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `checkin-soon:${booking.id}`,
+            entityRef: { kind: 'record', id: String(booking.id) },
             section: 'attention',
             severity: 'warning',
             text: 'Stay begins within a week — confirm the guest and supplier details.',

@@ -27,7 +27,7 @@ type CopilotSurfaceProps = {
  *
  * `relative` is load-bearing too, not decoration: this element is where the
  * clipping happens, and without a positioning context the absolutely positioned
- * `sr-only` labels deep inside the briefing resolve against the sticky `<aside>`
+ * `sr-only` labels deep inside the insights resolve against the sticky `<aside>`
  * instead. They then escape this element's clip and stretch the app shell's
  * scrollable area by ~1900px, so the page scrolls past its content into blank
  * space whenever the panel is open.

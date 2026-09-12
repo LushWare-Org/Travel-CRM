@@ -42,19 +42,6 @@ export const leadsPageAdapter = {
     return result.data;
   },
 
-  // The ask vocabulary is resolved per SCOPE, from the same `isRecordScope`
-  // discriminator `loadEvidence` uses above — never from `page.key`. A key-based
-  // lookup cannot tell the two `/leads` scopes apart: it would either leave
-  // `getLead` live on the collection scope (the exact defect this seam exists to
-  // remove) or, because this adapter is hand-written and has no `descriptor`,
-  // resolve to no tools at all and silently force every `/leads` ask
-  // single-shot.
-  askTools(scope) {
-    return isRecordScope(scope)
-      ? leadsAdapter.askTools(scope)
-      : leadsCollectionAdapter.askTools(scope);
-  },
-
   loadEvidence(ctx, scope, options) {
     return isRecordScope(scope)
       ? leadsAdapter.loadEvidence(ctx, scope, options)

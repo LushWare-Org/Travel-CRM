@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useCopilotSession, BRIEFING_FRESHNESS_MS } from '../useCopilotSession';
+import { useCopilotSession, INSIGHTS_FRESHNESS_MS } from '../useCopilotSession';
 import type { CopilotScope } from '../types';
 import { deferred } from '@/test/deferred';
 
 const api = vi.hoisted(() => ({
   copilotDeterministic: vi.fn(),
-  copilotBriefing: vi.fn(),
+  copilotInsights: vi.fn(),
   copilotAsk: vi.fn(),
   copilotSeen: vi.fn(),
   isCopilotAbort: vi.fn((err: unknown) => {
@@ -34,7 +34,7 @@ const deterministicResult = (leadId: string, text: string) => ({
   notAuthorizedSources: [],
 });
 
-const briefingResult = (leadId: string, text: string, extra: Record<string, unknown> = {}) => ({
+const insightsResult = (leadId: string, text: string, extra: Record<string, unknown> = {}) => ({
   context: {
     pageKey: 'leads',
     scopeLabel: `Lead ${leadId}`,
@@ -81,8 +81,8 @@ function Harness({ scope, open = true }: HarnessProps) {
       <button type="button" onClick={() => session.submit()}>
         submit
       </button>
-      <button type="button" onClick={() => session.retryBriefing()}>
-        retry-briefing
+      <button type="button" onClick={() => session.retryInsights()}>
+        retry-insights
       </button>
       <button type="button" onClick={() => session.retryDeterministic()}>
         retry-deterministic
@@ -101,8 +101,8 @@ beforeEach(() => {
   api.copilotDeterministic.mockImplementation(({ scope }: { scope: { leadId: string } }) =>
     Promise.resolve(deterministicResult(scope.leadId, `Deterministic ${scope.leadId}`))
   );
-  api.copilotBriefing.mockImplementation(({ scope }: { scope: { leadId: string } }) =>
-    Promise.resolve(briefingResult(scope.leadId, `Briefing ${scope.leadId}`))
+  api.copilotInsights.mockImplementation(({ scope }: { scope: { leadId: string } }) =>
+    Promise.resolve(insightsResult(scope.leadId, `Insights ${scope.leadId}`))
   );
   api.copilotAsk.mockResolvedValue({
     context: { pageKey: 'leads', scopeLabel: 'Lead a', generatedAt: '2026-09-10T10:06:00.000Z', partial: false, noAccess: false },
@@ -139,7 +139,7 @@ describe('useCopilotSession — scope lifecycle', () => {
 
     await act(async () => {});
     expect(api.copilotDeterministic).not.toHaveBeenCalled();
-    expect(api.copilotBriefing).not.toHaveBeenCalled();
+    expect(api.copilotInsights).not.toHaveBeenCalled();
     expect(api.copilotAsk).not.toHaveBeenCalled();
     expect(api.copilotSeen).not.toHaveBeenCalled();
   });
@@ -158,7 +158,7 @@ describe('useCopilotSession — scope lifecycle', () => {
   it('keys the session by lead id: A -> clear -> B leaks nothing', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Harness scope={{ leadId: 'a' }} />);
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     await user.click(screen.getByText('type'));
     expect(screen.getByTestId('input')).toHaveTextContent('typed question');
@@ -169,13 +169,13 @@ describe('useCopilotSession — scope lifecycle', () => {
     expect(screen.getByTestId('lead')).toHaveTextContent('none');
 
     rerender(<Harness scope={{ leadId: 'b' }} />);
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing b'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights b'));
     expect(screen.getByTestId('claims').textContent).not.toContain('a');
 
     expect(api.copilotDeterministic).toHaveBeenCalledTimes(2);
     expect(api.copilotDeterministic.mock.calls[0][0].scope).toEqual({ leadId: 'a' });
     expect(api.copilotDeterministic.mock.calls[1][0].scope).toEqual({ leadId: 'b' });
-    expect(api.copilotBriefing.mock.calls.map((call) => call[0].scope)).toEqual([
+    expect(api.copilotInsights.mock.calls.map((call) => call[0].scope)).toEqual([
       { leadId: 'a' },
       { leadId: 'b' },
     ]);
@@ -183,45 +183,45 @@ describe('useCopilotSession — scope lifecycle', () => {
 
   it('aborts the previous scope and suppresses its late response', async () => {
     const pendingDeterministic = deferred<ReturnType<typeof deterministicResult>>();
-    const pendingBriefing = deferred<ReturnType<typeof briefingResult>>();
+    const pendingInsights = deferred<ReturnType<typeof insightsResult>>();
     api.copilotDeterministic.mockImplementationOnce(() => pendingDeterministic.promise);
-    api.copilotBriefing.mockImplementationOnce(() => pendingBriefing.promise);
+    api.copilotInsights.mockImplementationOnce(() => pendingInsights.promise);
 
     const { rerender } = render(<Harness scope={{ leadId: 'a' }} />);
     const abandonedSignal = api.copilotDeterministic.mock.calls[0][0].signal as AbortSignal;
-    const abandonedBriefingSignal = api.copilotBriefing.mock.calls[0]?.[0]?.signal as AbortSignal | undefined;
+    const abandonedInsightsSignal = api.copilotInsights.mock.calls[0]?.[0]?.signal as AbortSignal | undefined;
     expect(abandonedSignal.aborted).toBe(false);
 
     rerender(<Harness scope={{ leadId: 'b' }} />);
     expect(abandonedSignal.aborted).toBe(true);
-    if (abandonedBriefingSignal) expect(abandonedBriefingSignal.aborted).toBe(true);
+    if (abandonedInsightsSignal) expect(abandonedInsightsSignal.aborted).toBe(true);
 
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing b'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights b'));
 
     // The late response from A can never repopulate B.
     await act(async () => {
       pendingDeterministic.resolve(deterministicResult('a', 'Deterministic a'));
-      pendingBriefing.resolve(briefingResult('a', 'Briefing a'));
+      pendingInsights.resolve(insightsResult('a', 'Insights a'));
     });
 
-    expect(screen.getByTestId('claims')).toHaveTextContent('Briefing b');
-    expect(screen.getByTestId('claims').textContent).not.toContain('Briefing a');
+    expect(screen.getByTestId('claims')).toHaveTextContent('Insights b');
+    expect(screen.getByTestId('claims').textContent).not.toContain('Insights a');
   });
 
-  it('surfaces an interrupted briefing instead of leaving the model phase pending forever', async () => {
-    // The effect's own cleanup aborts an in-flight briefing whenever its
+  it('surfaces an interrupted insights run instead of leaving the model phase pending forever', async () => {
+    // The effect's own cleanup aborts an in-flight insights run whenever its
     // dependencies change — a benign re-render, not a scope change. The abort
     // used to return silently, leaving status "pending" permanently: the start
-    // effect refuses to restart a run it already began (`briefingStartedRef`),
+    // effect refuses to restart a run it already began (`insightsStartedRef`),
     // and the regenerate effect skips "pending" because that status means a
     // request is legitimately in flight. Nothing retried and nothing errored, so
-    // the panel read "AI briefing in progress — showing what is already verified"
+    // the panel read "AI insights in progress — showing what is already verified"
     // indefinitely, with no error and no Retry.
     const interrupted = Object.assign(new Error('cancelled'), { name: 'AbortError' });
-    api.copilotBriefing.mockImplementationOnce(() => Promise.reject(interrupted));
+    api.copilotInsights.mockImplementationOnce(() => Promise.reject(interrupted));
 
     render(<Harness scope={{ leadId: 'a' }} />);
-    await waitFor(() => expect(api.copilotBriefing).toHaveBeenCalled());
+    await waitFor(() => expect(api.copilotInsights).toHaveBeenCalled());
 
     // Recoverable, not stuck: `modelPartial` is what renders the verified summary
     // plus the Retry control, and it is what the reopen path regenerates from.
@@ -233,7 +233,7 @@ describe('useCopilotSession — scope lifecycle', () => {
     api.copilotDeterministic.mockImplementationOnce(() => Promise.reject(aborted));
 
     render(<Harness scope={{ leadId: 'a' }} />);
-    await waitFor(() => expect(api.copilotBriefing).toHaveBeenCalled());
+    await waitFor(() => expect(api.copilotInsights).toHaveBeenCalled());
     expect(screen.getByTestId('error')).toHaveTextContent('');
   });
 
@@ -246,54 +246,54 @@ describe('useCopilotSession — scope lifecycle', () => {
 });
 
 describe('useCopilotSession — model phase visibility', () => {
-  it('runs the deterministic phase immediately but the briefing only while open', async () => {
+  it('runs the deterministic phase immediately but the insights only while open', async () => {
     const { rerender } = render(<Harness scope={{ leadId: 'a' }} open={false} />);
     await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Deterministic a'));
-    expect(api.copilotBriefing).not.toHaveBeenCalled();
+    expect(api.copilotInsights).not.toHaveBeenCalled();
 
     rerender(<Harness scope={{ leadId: 'a' }} open />);
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
-    expect(api.copilotBriefing).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
+    expect(api.copilotInsights).toHaveBeenCalledTimes(1);
   });
 
   it('reuses a kept result within the freshness bound and regenerates past it', async () => {
     const { rerender } = render(<Harness scope={{ leadId: 'a' }} open />);
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     rerender(<Harness scope={{ leadId: 'a' }} open={false} />);
     rerender(<Harness scope={{ leadId: 'a' }} open />);
     await act(async () => {});
-    expect(api.copilotBriefing).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a');
+    expect(api.copilotInsights).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('claims')).toHaveTextContent('Insights a');
 
     // Past the freshness bound the kept result is regenerated, not re-presented.
-    now += BRIEFING_FRESHNESS_MS + 1;
+    now += INSIGHTS_FRESHNESS_MS + 1;
     rerender(<Harness scope={{ leadId: 'a' }} open={false} />);
     rerender(<Harness scope={{ leadId: 'a' }} open />);
-    await waitFor(() => expect(api.copilotBriefing).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(api.copilotInsights).toHaveBeenCalledTimes(2));
   });
 
   it('keeps a result that settles while collapsed and presents it on the next open', async () => {
-    const pending = deferred<ReturnType<typeof briefingResult>>();
-    api.copilotBriefing.mockImplementationOnce(() => pending.promise);
+    const pending = deferred<ReturnType<typeof insightsResult>>();
+    api.copilotInsights.mockImplementationOnce(() => pending.promise);
 
     const { rerender } = render(<Harness scope={{ leadId: 'a' }} open />);
     rerender(<Harness scope={{ leadId: 'a' }} open={false} />);
     await act(async () => {
-      pending.resolve(briefingResult('a', 'Briefing a'));
+      pending.resolve(insightsResult('a', 'Insights a'));
     });
 
     // Settled in the background: kept, not acknowledged.
     expect(api.copilotSeen).not.toHaveBeenCalled();
 
     rerender(<Harness scope={{ leadId: 'a' }} open />);
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
     expect(api.copilotSeen).toHaveBeenCalledTimes(1);
-    expect(api.copilotBriefing).toHaveBeenCalledTimes(1);
+    expect(api.copilotInsights).toHaveBeenCalledTimes(1);
   });
 
-  it('labels the briefing partial and keeps the deterministic list when the model phase fails', async () => {
-    api.copilotBriefing.mockImplementationOnce(() => Promise.reject(new Error('model offline')));
+  it('labels the insights partial and keeps the deterministic list when the model phase fails', async () => {
+    api.copilotInsights.mockImplementationOnce(() => Promise.reject(new Error('model offline')));
 
     render(<Harness scope={{ leadId: 'a' }} open />);
     await waitFor(() => expect(screen.getByTestId('model')).toHaveTextContent('partial'));
@@ -302,9 +302,9 @@ describe('useCopilotSession — model phase visibility', () => {
 });
 
 describe('useCopilotSession — acknowledgement', () => {
-  it('acknowledges exactly once, at presentation, for the active grounded briefing', async () => {
+  it('acknowledges exactly once, at presentation, for the active grounded insights', async () => {
     render(<Harness scope={{ leadId: 'a' }} open />);
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
     await waitFor(() => expect(api.copilotSeen).toHaveBeenCalledTimes(1));
 
     expect(api.copilotSeen.mock.calls[0][0]).toMatchObject({ pageKey: 'leads', scope: { leadId: 'a' } });
@@ -313,26 +313,26 @@ describe('useCopilotSession — acknowledgement', () => {
     expect(api.copilotSeen).toHaveBeenCalledTimes(1);
   });
 
-  it('never acknowledges a collapsed, no-scope, or failed briefing', async () => {
-    api.copilotBriefing.mockImplementationOnce(() => Promise.reject(new Error('model offline')));
+  it('never acknowledges a collapsed, no-scope, or failed insights', async () => {
+    api.copilotInsights.mockImplementationOnce(() => Promise.reject(new Error('model offline')));
     render(<Harness scope={{ leadId: 'a' }} open />);
     await waitFor(() => expect(screen.getByTestId('model')).toHaveTextContent('partial'));
     await act(async () => {});
     expect(api.copilotSeen).not.toHaveBeenCalled();
   });
 
-  it('keeps the briefing usable and retries once on the next genuine open when the acknowledgement fails', async () => {
+  it('keeps the insights usable and retries once on the next genuine open when the acknowledgement fails', async () => {
     api.copilotSeen.mockRejectedValue(new Error('write failed'));
     const { rerender } = render(<Harness scope={{ leadId: 'a' }} open />);
 
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
     await waitFor(() => expect(api.copilotSeen).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId('error')).toHaveTextContent('');
 
     rerender(<Harness scope={{ leadId: 'a' }} open={false} />);
     rerender(<Harness scope={{ leadId: 'a' }} open />);
     await waitFor(() => expect(api.copilotSeen).toHaveBeenCalledTimes(2));
-    expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a');
+    expect(screen.getByTestId('claims')).toHaveTextContent('Insights a');
   });
 });
 
@@ -343,7 +343,7 @@ describe('useCopilotSession — turns', () => {
 
     const user = userEvent.setup();
     render(<Harness scope={{ leadId: 'a' }} />);
-    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a'));
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     await user.click(screen.getByText('type'));
     await user.click(screen.getByText('submit'));

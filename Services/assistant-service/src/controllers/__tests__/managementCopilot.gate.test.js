@@ -290,9 +290,31 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     });
   }
 
+  // The lead list tool and the record read differ in shape: the tool drops a
+  // non-array payload as "no rows", the page scope needs the bare object. Answering
+  // the list request with an array is what puts the lead's figures in the tool result.
+  function stubLeadList() {
+    globalThis.fetch = vi.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: String(url).includes('/api/v1/leads?') ? [lead] : lead }),
+    }));
+  }
+
   const postTurn = (body) => request(app).post('/api/v1/assistant/management/turn').set(authHeaders).send(body);
 
-  it('returns answerBlocks, never a claims payload, when the provider is unconfigured', async () => {
+  // An ungrounded ask returns exactly one SERVER-authored limitation block, not
+  // an empty list. The operator learns what this scope can read; the wording
+  // cannot come from the model, because a claim citing no evidence is rejected by
+  // the validator — which is why silence used to be the only possible outcome.
+  const expectLimitation = (body, expectedId = 'limitation:ungrounded') => {
+    expect(body.answerBlocks).toHaveLength(1);
+    expect(body.answerBlocks[0].id).toBe(expectedId);
+    expect(body.answerBlocks[0].evidenceIds).toEqual([]);
+    expect(body.claims).toEqual([]);
+  };
+
+  it('explains itself, and never leaks a claims payload, when the provider is unconfigured', async () => {
     enableCopilot();
     mockIsAIConfigured.mockReturnValue(false);
     mockGenerateStructured.mockRejectedValue(new Error('AI generation is not configured'));
@@ -301,11 +323,13 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     const res = await postTurn(askBody);
 
     expect(res.status).toBe(200);
-    expect(res.body.answerBlocks).toEqual([]);
-    expect(res.body.claims).toEqual([]);
+    expectLimitation(res.body, 'limitation:generation-failed');
+    // A provider fault must never be reported as a limit of the PAGE: that would
+    // teach the operator to stop asking questions this scope can answer.
+    expect(res.body.answerBlocks[0].text).toMatch(/temporary fault/);
   });
 
-  it('returns answerBlocks: [] when the loop generation fails', async () => {
+  it('explains itself when the loop generation fails', async () => {
     enableCopilot();
     stubLead();
     mockGenerateStructured.mockRejectedValue(new Error('provider down'));
@@ -313,8 +337,7 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     const res = await postTurn(askBody);
 
     expect(res.status).toBe(200);
-    expect(res.body.answerBlocks).toEqual([]);
-    expect(res.body.claims).toEqual([]);
+    expectLimitation(res.body, 'limitation:generation-failed');
   });
 
   it('returns an empty answer, never a briefing body, when every claim is rejected', async () => {
@@ -340,15 +363,21 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     const res = await postTurn(askBody);
 
     expect(res.status).toBe(200);
-    // Every claim cited evidence the bundle does not contain, so the honest
-    // outcome is an empty answer — never the briefing's claims payload.
-    expect(res.body.answerBlocks).toEqual([]);
-    expect(res.body.claims).toEqual([]);
+    // Every claim cited evidence the bundle does not contain, so nothing grounded
+    // survives — and the operator is told that rather than shown a dead end.
+    // `claims` must still never carry the briefing's payload, and no `insights`
+    // may appear in an answer.
+    expectLimitation(res.body);
+    expect(res.body.answerBlocks[0].text).toMatch(/could not ground/);
     expect(res.body.insights).toBeUndefined();
     expect(res.body.context.pageKey).toBe('leads');
   });
 
-  it('passes the record scope vocabulary into the loop', async () => {
+  it('gives the actor the same vocabulary on a record scope as anywhere else', async () => {
+    // The page no longer narrows the vocabulary. A salesRep may read leads and
+    // invoices from any screen, which is what makes a question spanning two
+    // domains answerable from either. The page still decides what is VOLUNTEERED
+    // without being asked — that is what keeps the panel quiet.
     enableCopilot();
     stubLead();
     const prompts = [];
@@ -361,10 +390,31 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
 
     expect(prompts[0]).toContain('- getLead:');
     expect(prompts[0]).toContain('- listLeads:');
+    expect(prompts[0]).toContain('- listInvoices:');
+  });
+
+  it('offers a role with no access no tools at all', async () => {
+    enableCopilot();
+    stubLead();
+    const prompts = [];
+    mockGenerateStructured.mockImplementation(async ({ prompt }) => {
+      prompts.push(prompt);
+      return { tool: 'final_answer', args: { claims: [] } };
+    });
+
+    await request(app)
+      .post('/api/v1/assistant/management/turn')
+      .set({ ...authHeaders, 'x-user-role': 'customer', 'x-user-is-super-admin': 'false' })
+      .send(askBody);
+
+    // Fail closed: an unrecognised capability is an empty vocabulary, and the
+    // prompt should say so rather than offering tools the role cannot use.
+    expect(prompts[0]).not.toContain('- getLead:');
+    expect(prompts[0]).not.toContain('- listLeads:');
     expect(prompts[0]).not.toContain('- listInvoices:');
   });
 
-  it('passes the collection scope vocabulary into the loop', async () => {
+  it('gives the collection scope the same vocabulary as the record scope', async () => {
     enableCopilot();
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -380,8 +430,11 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     const res = await postTurn({ ...askBody, page: { key: 'leads', scope: {}, since: '7_days' } });
 
     expect(res.status).toBe(200);
+    // Identical to the record scope, and that is the point: the page no longer
+    // decides what may be asked.
+    expect(prompts[0]).toContain('- getLead:');
     expect(prompts[0]).toContain('- listLeads:');
-    expect(prompts[0]).not.toContain('- getLead:');
+    expect(prompts[0]).toContain('- listInvoices:');
   });
 
   it('grounds an answer claim that cites tool-gathered evidence', async () => {
@@ -409,6 +462,69 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     expect(res.body.answerBlocks.map((claim) => claim.id)).toEqual(['ask-1']);
     expect(res.body.sources.map((source) => source.id)).toContain('tool:listLeads:1');
     expect(res.body.claims).toEqual([]);
+  });
+
+  it('grounds an answer claim that cites nothing but quotes the tool result', async () => {
+    // The live failure this path exists for: the model reads a tool result, states
+    // a figure from it, and cannot cite it — the id `tool:<name>:<n>` is minted
+    // server-side and never shown. Every claim was deleted as `no-valid-evidence`
+    // and the operator saw a refusal.
+    enableCopilot();
+    // The list tool needs an ARRAY (it drops anything else as "no rows"), while the
+    // record read behind the page scope needs the bare object. `stubLead` answers
+    // both with the object, so the tool result would carry no figures at all and the
+    // test would pass for the wrong reason.
+    stubLeadList();
+    const uncitedClaim = {
+      id: 'ask-uncited',
+      section: 'current_state',
+      text: 'The lead has a budget of 450000.',
+      facts: [],
+      evidenceIds: [],
+      evidenceType: 'computed',
+      severity: 'info',
+    };
+    let step = 0;
+    mockGenerateStructured.mockImplementation(async () =>
+      step++ === 0
+        ? { tool: 'listLeads', args: { limit: 1 } }
+        : { tool: 'final_answer', args: { claims: [uncitedClaim] } },
+    );
+
+    const res = await postTurn(askBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.answerBlocks.map((claim) => claim.id)).toEqual(['ask-uncited']);
+    expect(res.body.answerBlocks[0].evidenceIds).toEqual([]);
+    expect(res.body.claims).toEqual([]);
+  });
+
+  it('still refuses an uncited answer whose number is in no tool result', async () => {
+    // The floor: the relaxation admits computed answers, it does not admit
+    // invented figures. 999999 is nowhere in the lead payload.
+    enableCopilot();
+    stubLeadList();
+    const invented = {
+      id: 'ask-invented',
+      section: 'current_state',
+      text: 'The lead has a budget of 999999.',
+      facts: [],
+      evidenceIds: [],
+      evidenceType: 'computed',
+      severity: 'info',
+    };
+    let step = 0;
+    mockGenerateStructured.mockImplementation(async () =>
+      step++ === 0
+        ? { tool: 'listLeads', args: { limit: 1 } }
+        : { tool: 'final_answer', args: { claims: [invented] } },
+    );
+
+    const res = await postTurn(askBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.answerBlocks).toHaveLength(1);
+    expect(res.body.answerBlocks[0].id).toBe('limitation:ungrounded');
   });
 
   it('returns answerBlocks, not claims, when the scope cannot be read', async () => {

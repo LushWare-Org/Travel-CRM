@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { LEAD_COPILOT_FIELDS } from '@travel-crm/contracts';
 import { domainAuthHeader } from '../utils/cloudRunAuth.js';
-import { serializeToolResult } from '../ai/prompts/managementAnswer.v1.js';
+import { serializeToolResult } from '../ai/prompts/managementAnswer.v2.js';
 
 // ─── Domain tool registry ─────────────────────────────────────────────────
 // The model selects from this fixed, allowlisted tool vocabulary; the server
@@ -37,6 +37,14 @@ function leadServiceUrl() {
 
 function billingServiceUrl() {
   return process.env.BILLING_SERVICE_URL || 'http://localhost:3006';
+}
+
+function analyticsServiceUrl() {
+  return process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3009';
+}
+
+function packageServiceUrl() {
+  return process.env.PACKAGE_SERVICE_URL || 'http://localhost:3003';
 }
 
 // The engine's own ceiling for a page of records (collectionEngine
@@ -174,22 +182,33 @@ const listLeadsTool = {
 const listInvoicesTool = {
   name: 'listInvoices',
   description:
-    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Use `limit` to bound how many are returned.',
-  argsSchema: z.object({ limit: z.number().int().min(1).max(MAX_TOOL_ROWS).optional() }).strict(),
+    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Pass `leadId` to read one lead\'s invoices instead of the whole page. Use `limit` to bound how many are returned.',
+  argsSchema: z
+    .object({
+      limit: z.number().int().min(1).max(MAX_TOOL_ROWS).optional(),
+      // The model reached for this argument constantly — "which of this lead's
+      // invoices are overdue" is a real question and the endpoint for it already
+      // existed. Without it the call was rejected, the model repeated it
+      // identically, and the loop burned its budget on schema errors before
+      // producing nothing.
+      leadId: z.string().min(1).max(255).optional(),
+    })
+    .strict(),
   projection: INVOICE_PROJECTION,
   rowCap: MAX_TOOL_ROWS,
   resultByteBudget: LIST_RESULT_BYTE_BUDGET,
   async execute(ctx, args, signal) {
-    const result = await fetchJson(
-      billingServiceUrl(),
-      `/api/v1/billing/invoices?limit=${MAX_TOOL_ROWS}`,
-      ctx,
-      signal,
-    );
+    const url = args.leadId
+      ? `/api/v1/billing/invoices/lead/${encodeURIComponent(args.leadId)}`
+      : `/api/v1/billing/invoices?limit=${MAX_TOOL_ROWS}`;
+    const result = await fetchJson(billingServiceUrl(), url, ctx, signal);
     if (result.notAuthorized) return { notAuthorized: true };
     if (result.unavailable) return { unavailable: true };
     const now = Date.now();
-    const rows = (Array.isArray(result.data) ? result.data : [])
+    // The by-lead endpoint returns one record rather than a list, so a single
+    // object is wrapped rather than silently discarded as "no rows".
+    const raw = Array.isArray(result.data) ? result.data : result.data ? [result.data] : [];
+    const rows = raw
       .filter((row) => row?.paymentStatus === 'unpaid' || row?.paymentStatus === 'partial')
       .map((row) => {
         // Parse each dueDate once and carry the numeric value for the sort
@@ -217,13 +236,188 @@ function byDueDateAscending(left, right) {
   return a - b;
 }
 
-// Reference tools. The remaining tools (getLeadActivity, getMatchingPackages,
-// getSalesMetrics, getSimilarConvertedLeads, searchManagementKnowledge) map to
-// their domain endpoints in the T7 endpoint audit; each follows the same shape
-// and security posture (allowlisted fields, bounded results, caller identity,
-// 403/404 → notAuthorized) and must declare its projection, row cap and byte
-// budget.
-export const domainTools = [getLeadTool, listLeadsTool, listInvoicesTool];
+// ─── Cross-site reads ─────────────────────────────────────────────────────
+// These are what let a question be answered from any page rather than only the
+// one the operator is standing on. Each calls a route that already exists, under
+// the caller's forwarded identity, and each is gated in `ManagementToolAccess`
+// by the same roles that route's own guard requires.
+//
+// The analytics payloads are aggregates the service has ALREADY computed, which
+// is why their projections name the aggregate groups rather than individual
+// fields: `project` copies an allowlisted key's value verbatim, and the service's
+// own `LIMIT 10` bounds what is inside each group.
+//
+// Two payloads are deliberately narrowed to exclude `recentLeads`/`recentBookings`
+// (`/dashboard/stats` and the personal-performance route). Those rows carry
+// customer EMAIL addresses, and a model prompt is not a place for them; they are
+// also record-level detail rather than cross-site intelligence. If either is
+// wanted later it needs a field-level projection first, not a wider allowlist.
+//
+// The byte budget for all six is the LIST budget, not the RECORD one: a wrapped
+// aggregate is a single row, and `boundResult` drops tail rows to fit, so a
+// budget that one payload exceeded would drop the entire result rather than trim
+// it.
+const timeRangeSchema = z.enum(['daily', 'weekly', 'monthly', 'annual']);
+
+// The company-wide picture, and the single most useful answer to "how are we
+// doing" from a page that carries none of it.
+const getDashboardSnapshotTool = {
+  name: 'getDashboardSnapshot',
+  description:
+    'Read the company snapshot: lead, booking, revenue and package totals, plus leads by status. Lifetime figures, not a time window. A salesRep sees their own book; an admin sees the company.',
+  argsSchema: z.object({}).strict(),
+  projection: ['leads', 'bookings', 'revenue', 'packages', 'leadsByStatus'],
+  rowCap: 5,
+  resultByteBudget: LIST_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const result = await fetchJson(analyticsServiceUrl(), '/api/v1/dashboard/stats', ctx, signal);
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    return boundResult(getDashboardSnapshotTool, result.data ? [result.data] : []);
+  },
+};
+
+// Lead analytics across the company: totals, the trend, status and platform
+// distribution, and the top destinations and countries by lead volume and
+// conversion — the cross-site counterpart to the page's own lead rows.
+const getLeadAnalyticsTool = {
+  name: 'getLeadAnalytics',
+  description:
+    'Read lead analytics: totals by stage, the trend over the window, status and platform distribution, and the top destinations and countries by lead volume and conversion rate. A salesRep is scoped to their own leads.',
+  argsSchema: z.object({ timeRange: timeRangeSchema.optional() }).strict(),
+  projection: [
+    'stats',
+    'trend',
+    'statusDistribution',
+    'categoryDistribution',
+    'topCountries',
+    'topDestinations',
+    'priceRangeDistribution',
+  ],
+  rowCap: 7,
+  resultByteBudget: LIST_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const result = await fetchJson(analyticsServiceUrl(), analyticsPath('/leads/overview', args), ctx, signal);
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    return boundResult(getLeadAnalyticsTool, result.data ? [result.data] : []);
+  },
+};
+
+// Package performance: the questions that had no answer at all before this —
+// which packages are asked about, which convert, and where the catalogue is
+// concentrated by destination.
+const getPackagePerformanceTool = {
+  name: 'getPackagePerformance',
+  description:
+    'Read package performance: totals for itineraries, inquiries and conversions, the trend, performance by destination, and the most-inquired packages by name. Use this for "best performing packages" or "where is the catalogue concentrated".',
+  argsSchema: z.object({ timeRange: timeRangeSchema.optional() }).strict(),
+  projection: ['stats', 'trend', 'destinationPerformance', 'mostInquired'],
+  rowCap: 4,
+  resultByteBudget: LIST_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const result = await fetchJson(analyticsServiceUrl(), analyticsPath('/packages/overview', args), ctx, signal);
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    return boundResult(getPackagePerformanceTool, result.data ? [result.data] : []);
+  },
+};
+
+// The sales team's numbers. Its own tool rather than an argument on the personal
+// one, because the route behind it authorizes admin only.
+const getSalesPerformanceTool = {
+  name: 'getSalesPerformance',
+  description:
+    'Read every sales representative\'s performance for the window: confirmed sales and conversion rate, highest first.',
+  argsSchema: z.object({ timeRange: timeRangeSchema.optional() }).strict(),
+  projection: ['rep', 'sales', 'conversion'],
+  rowCap: MAX_TOOL_ROWS,
+  resultByteBudget: LIST_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const result = await fetchJson(analyticsServiceUrl(), analyticsPath('/salesreps/performance', args), ctx, signal);
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    return boundResult(getSalesPerformanceTool, Array.isArray(result.data) ? result.data : []);
+  },
+};
+
+// The caller's own book. Separate from the team tool because the route rejects an
+// admin and never accepts a rep id — it is always "me".
+const getMyPerformanceTool = {
+  name: 'getMyPerformance',
+  description:
+    'Read your own performance: leads assigned, converted and pending, and your conversion rate for the window.',
+  argsSchema: z.object({ timeRange: timeRangeSchema.optional() }).strict(),
+  projection: ['performance'],
+  rowCap: 1,
+  resultByteBudget: RECORD_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const result = await fetchJson(analyticsServiceUrl(), analyticsPath('/salesreps/me/performance', args), ctx, signal);
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    return boundResult(getMyPerformanceTool, result.data ? [result.data] : []);
+  },
+};
+
+// Catalogue content rather than performance: what a package IS. The route is
+// public and forces `isActive`, so a query cannot widen the catalogue; the tool
+// map still narrows it to the two management roles.
+const searchPackagesTool = {
+  name: 'searchPackages',
+  description:
+    'Search the package catalogue by free text, matching title, description or destination, ranked by rating. Returns the package\'s destination, duration, category, prices, rating, views and bookings.',
+  argsSchema: z.object({ q: z.string().min(1).max(200) }).strict(),
+  projection: [
+    'id',
+    'title',
+    'destination',
+    'durationDays',
+    'category',
+    'basePrice',
+    'sellPrice',
+    'currency',
+    'rating',
+    'numReviews',
+    'views',
+    'bookings',
+    'isActive',
+    'isFeatured',
+  ],
+  rowCap: MAX_TOOL_ROWS,
+  resultByteBudget: LIST_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const result = await fetchJson(
+      packageServiceUrl(),
+      `/api/v1/packages/search/query?q=${encodeURIComponent(args.q)}`,
+      ctx,
+      signal,
+    );
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    return boundResult(searchPackagesTool, Array.isArray(result.data) ? result.data : []);
+  },
+};
+
+/** An analytics path with the optional window the service accepts. */
+function analyticsPath(path, args) {
+  return args.timeRange ? `/api/v1/analytics${path}?timeRange=${args.timeRange}` : `/api/v1/analytics${path}`;
+}
+
+// getSimilarConvertedLeads and searchManagementKnowledge stay unimplemented: no
+// tool-shaped endpoint backs either one (there is no similarity route anywhere,
+// and policy documents are readable only with an internal token), so a tool for
+// them would have to invent its own data source.
+export const domainTools = [
+  getLeadTool,
+  listLeadsTool,
+  listInvoicesTool,
+  getDashboardSnapshotTool,
+  getLeadAnalyticsTool,
+  getPackagePerformanceTool,
+  getSalesPerformanceTool,
+  getMyPerformanceTool,
+  searchPackagesTool,
+];
 
 const toolsByName = new Map(domainTools.map((t) => [t.name, t]));
 
@@ -244,6 +438,14 @@ export function resolveTools(names = []) {
     .map((tool) => ({ name: tool.name, description: tool.description }));
 }
 
+/** The argument names a tool accepts, read from its own schema. */
+function acceptedArguments(tool) {
+  const shape = tool.argsSchema?.shape;
+  if (!shape) return 'none';
+  const keys = Object.keys(shape);
+  return keys.length > 0 ? keys.join(', ') : 'none';
+}
+
 // Executes a model-requested tool. Returns a bounded result object; a malformed
 // tool or args returns a named error so the loop can feed it back to the model.
 // Resolution is against the CALLER's resolved vocabulary, never the whole
@@ -254,7 +456,15 @@ export async function executeTool(name, rawArgs, ctx, allowedNames = [], signal)
   const tool = getTool(name);
   if (!tool) return { error: `unknown tool '${name}'` };
   const parsed = tool.argsSchema.safeParse(rawArgs ?? {});
-  if (!parsed.success) return { error: `invalid args for ${name}: ${parsed.error.issues.map((i) => i.message).join('; ')}` };
+  if (!parsed.success) {
+    // The accepted arguments are DERIVED from the schema, so this cannot drift
+    // from what the tool actually takes. A bare "Unrecognized key" told the model
+    // what was wrong but not what would be right, and live it repeated the same
+    // rejected call until the loop gave up.
+    return {
+      error: `invalid args for ${name}: ${parsed.error.issues.map((i) => i.message).join('; ')}. Accepted arguments: ${acceptedArguments(tool)}`,
+    };
+  }
   try {
     return await tool.execute(ctx, parsed.data, signal);
   } catch {

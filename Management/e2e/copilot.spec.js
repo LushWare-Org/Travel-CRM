@@ -17,7 +17,7 @@ import { SURFACE_SELECTOR, UNBREAKABLE_TOKEN, surfacesWithHorizontalOverflow } f
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-const DOCK = 'section[aria-labelledby="copilot-briefing-heading"]';
+const DOCK = 'section[aria-labelledby="copilot-insights-heading"]';
 const DETAIL_PANE = '[aria-label="Lead detail"]';
 
 let createdLeadId;
@@ -31,12 +31,16 @@ test.afterAll(async () => {
   }).catch(() => {});
 });
 
-test.describe('Management copilot — Evidence Lens', () => {
+// `@requires-model` marks this block as needing a real Gemini round trip. CI
+// excludes it with --grep-invert when no GEMINI_API_KEY secret is configured,
+// because without a key the assistant service answers 503 on its model paths and
+// the failure would say nothing about the change under test.
+test.describe('Management copilot — Evidence Lens @requires-model', () => {
   // One journey across lead creation, two model round-trips, a reload, and a
   // breakpoint flip — well past Playwright's 30s default.
   test.describe.configure({ timeout: 120_000 });
 
-  test('selecting a lead opens the briefing and reveals the field a claim cites', async ({ adminPage: page }) => {
+  test('selecting a lead opens the insights and reveals the field a claim cites', async ({ adminPage: page }) => {
     const leadName = `E2E Copilot Lead ${Date.now()}`;
 
     await test.step('create a lead through the UI', async () => {
@@ -74,7 +78,7 @@ test.describe('Management copilot — Evidence Lens', () => {
     await test.step('the dock opens without covering the record', async () => {
       const dock = page.locator(DOCK);
       await expect(dock).toBeVisible({ timeout: 15_000 });
-      await expect(dock.getByRole('heading', { name: 'Lead briefing' })).toBeVisible();
+      await expect(dock.getByRole('heading', { name: 'Insights' })).toBeVisible();
 
       // Layout, not overlay: the dock must not be position: fixed, and the
       // record and dock must not overlap.
@@ -139,7 +143,7 @@ test.describe('Management copilot — Evidence Lens', () => {
       await page.setViewportSize({ width: 1279, height: 900 });
 
       // The reload above dropped the React-held selection, so re-select the
-      // lead the drawer should be briefing.
+      // lead the drawer should be showing insights for.
       await leadRowByName(page, leadName).getByText(leadName, { exact: true }).click();
 
       // Wait for the below-`xl` media query to swap the desktop dock for the
@@ -155,7 +159,7 @@ test.describe('Management copilot — Evidence Lens', () => {
 
       const drawer = page.locator(`[role="dialog"] ${DOCK}`);
       await expect(drawer).toBeVisible();
-      await expect(drawer.getByRole('heading', { name: 'Lead briefing' })).toBeVisible();
+      await expect(drawer.getByRole('heading', { name: 'Insights' })).toBeVisible();
 
       // The modal makes the record inert, so the same action falls back to the
       // inline evidence detail rather than moving focus behind the drawer.
@@ -197,15 +201,19 @@ test.describe('Management copilot — Evidence Lens', () => {
 
       // T1's core guarantee: the closed lead's session is gone. On `/leads` a
       // cleared selection is no longer "no scope" — the all-pages work made `{}`
-      // a real collection scope, so the panel swaps the record briefing for the
-      // collection briefing instead of unmounting to record-scope guidance. The
+      // a real collection scope, so the panel swaps the record panel for the
+      // collection panel instead of unmounting to record-scope guidance. The
       // guarantee is therefore asserted as a swap plus a leak check against the
-      // closed lead's ID: the previous lead's briefing is gone, the collection
-      // briefing has taken its place, and no evidence action anywhere in the
+      // closed lead's ID: the previous lead's insights are gone, the collection
+      // panel has taken their place, and no evidence action anywhere in the
       // panel still resolves to that lead.
+      //
+      // The swap is asserted on `data-copilot-panel`, not on the heading: both
+      // panels are now titled "Insights", so a copy assertion could not tell them
+      // apart and would prove nothing.
       const dock = page.locator(DOCK);
-      await expect(dock).toContainText('Page briefing');
-      await expect(dock).not.toContainText('Lead briefing');
+      await expect(dock.locator('[data-copilot-panel="collection"]')).toHaveCount(1);
+      await expect(dock.locator('[data-copilot-panel="record"]')).toHaveCount(0);
       await expect(dock.locator(`button[aria-label*="${createdLeadId}"]`)).toHaveCount(0);
       await expect(page.locator(DETAIL_PANE)).toContainText('Select a lead to see its details and evidence.');
     });

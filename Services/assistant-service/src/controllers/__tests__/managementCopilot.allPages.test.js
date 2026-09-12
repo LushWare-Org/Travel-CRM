@@ -226,8 +226,16 @@ describe('selected keys produce grounded insights from real-shaped data', () => 
   });
 });
 
-describe('an ask on a page that declares no tools (S8)', () => {
+describe('an ask by an actor with no tools (S8)', () => {
   it('issues exactly one single-shot generation, with no tool block', async () => {
+    // The zero-tool branch is selected by the ACTOR's vocabulary, not by the
+    // page: an actor whose role can reach no tool has nothing to loop over, so a
+    // single generation is the right shape.
+    const toolLessActor = {
+      ...authHeaders,
+      'x-user-role': 'customer',
+      'x-user-is-super-admin': 'false',
+    };
     globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -255,7 +263,7 @@ describe('an ask on a page that declares no tools (S8)', () => {
 
     const res = await request(app)
       .post('/api/v1/assistant/management/turn')
-      .set(authHeaders)
+      .set(toolLessActor)
       .send({
         mode: 'ask',
         page: { key: 'overview', scope: {}, since: '7_days' },
@@ -265,7 +273,12 @@ describe('an ask on a page that declares no tools (S8)', () => {
     expect(res.status).toBe(200);
     expect(res.body.context.pageKey).toBe('overview');
     expect(res.body.context.noAccess).toBe(false);
-    expect(res.body.answerBlocks).toEqual([]);
+    // No grounded answer, so the operator gets the server-authored limitation.
+    // This actor can reach no tool at all, so the wording says exactly that
+    // rather than naming capabilities that do not exist for this role.
+    expect(res.body.answerBlocks).toHaveLength(1);
+    expect(res.body.answerBlocks[0].id).toBe('limitation:ungrounded');
+    expect(res.body.answerBlocks[0].text).toMatch(/readable with your role/);
     expect(res.body.claims).toEqual([]);
 
     // The branch itself, not merely the envelope: exactly one generation, the

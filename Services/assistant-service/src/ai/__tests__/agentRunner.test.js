@@ -55,7 +55,9 @@ describe('tool vocabulary comes from the passed list (S1)', () => {
     expect(calls[0].prompt).not.toContain('- listInvoices:');
     expect(calls[0].prompt).not.toContain('- getLead:');
     expect(calls[0].schema).toBe(managementAnswerResponseJsonSchema);
-    expect(result).toEqual({ answerBlocks: [], toolEvidence: [] });
+    // The model concluded with no claims, which is a fact about the ANSWER, not a
+    // fault — so it reports `no-final-answer` rather than a generation failure.
+    expect(result).toEqual({ answerBlocks: [], toolEvidence: [], reason: 'no-final-answer' });
   });
 
   it('advertises every resolved tool when the scope declares several', async () => {
@@ -93,15 +95,65 @@ describe('tool vocabulary comes from the passed list (S1)', () => {
     expect(result.toolEvidence[0].value).toEqual({ error: "unknown tool 'listInvoices'" });
   });
 
-  it('caps the loop at four calls', async () => {
+  it('caps the TOOL calls at three, then forces one answer', async () => {
     globalThis.fetch = stubFetch(LEAD_ROWS);
     const generateStructured = vi.fn(async () => ({ tool: 'listLeads', args: { limit: 1 } }));
 
     const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured });
 
+    // Three tool executions plus the forced answer. A stub that only ever returns
+    // tool calls therefore costs four generations, and the fourth cannot be
+    // dodged into a fourth tool.
     expect(generateStructured).toHaveBeenCalledTimes(4);
     expect(result.answerBlocks).toEqual([]);
-    expect(result.toolEvidence).toHaveLength(4);
+    expect(result.toolEvidence).toHaveLength(3);
+  });
+
+  it('forces a final answer after the tool budget instead of ending empty', async () => {
+    globalThis.fetch = stubFetch(LEAD_ROWS);
+    const claim = {
+      id: 'a1',
+      section: 'current_state',
+      text: 'One lead in this scope is new.',
+      facts: [],
+      evidenceIds: [],
+      evidenceType: 'computed',
+      severity: 'info',
+    };
+    let step = 0;
+    const calls = [];
+    const generateStructured = vi.fn(async (args) => {
+      calls.push(args);
+      return step++ < 3 ? { tool: 'listLeads', args: { limit: 1 } } : { claims: [claim] };
+    });
+
+    const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured });
+
+    expect(calls).toHaveLength(4);
+    // Claims-only schema and a prompt with no tool block: the model is told the
+    // budget is gone, so it cannot answer by starting a gather it will not get.
+    expect(calls[3].schema).toBe(managementSingleShotResponseJsonSchema);
+    expect(calls[3].prompt).toMatch(/tool budget is spent/i);
+    expect(calls[3].prompt).not.toContain('Available tools:');
+    // The gathered rows reach the forced answer, which is the whole point.
+    expect(calls[3].prompt).toContain('Tool results:');
+    expect(result.answerBlocks).toEqual([claim]);
+  });
+
+  it('still ends empty when the forced answer itself fails', async () => {
+    globalThis.fetch = stubFetch(LEAD_ROWS);
+    let step = 0;
+    const generateStructured = vi.fn(async () => {
+      if (step++ < 3) return { tool: 'listLeads', args: { limit: 1 } };
+      throw new Error('provider down');
+    });
+
+    const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured });
+
+    // No fabricated fallback: an answer nobody produced stays absent, and the
+    // controller turns that into an honest limitation instead.
+    expect(result.answerBlocks).toEqual([]);
+    expect(result.toolEvidence).toHaveLength(3);
   });
 
   it('keeps the prompt under a stated budget after a full-cap tool result', async () => {
@@ -156,7 +208,7 @@ describe('the zero-tool single-shot path (S2)', () => {
     expect(calls[0].schema).toBe(managementSingleShotResponseJsonSchema);
     expect(calls[0].schema.properties.tool).toBeUndefined();
     expect(calls[0].schema.required).toEqual(['claims']);
-    expect(result).toEqual({ answerBlocks: [], toolEvidence: [] });
+    expect(result).toEqual({ answerBlocks: [], toolEvidence: [], reason: 'no-final-answer' });
   });
 
   it('runs single-shot when the resolved list names no known tool', async () => {
@@ -192,7 +244,9 @@ describe('the zero-tool single-shot path (S2)', () => {
   it('returns the empty answer payload when generation fails', async () => {
     const generateStructured = vi.fn().mockRejectedValue(new Error('not configured'));
     const result = await runAgentLoop({ ...base, tools: [], generateStructured });
-    expect(result).toEqual({ answerBlocks: [], toolEvidence: [] });
+    // The provider failed, so nothing can be concluded about the page — the
+    // controller turns this into a retry-shaped message, never a capability claim.
+    expect(result).toEqual({ answerBlocks: [], toolEvidence: [], reason: 'generation-failed' });
   });
 });
 
@@ -214,8 +268,12 @@ describe('one overall loop budget (T2)', () => {
 
     const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured });
 
-    expect(timeouts).toEqual([17_000, 12_000, 7_000]);
-    expect(timeouts.every((ms) => ms > 0 && ms <= 17_000)).toBe(true);
+    // Tool rounds draw on the budget MINUS the answer reserve (6s of the 17s), so
+    // the last of them stops 6s short and the forced answer always has time to
+    // run. Before the reserve, every live ask spent the whole budget gathering and
+    // the answer never happened.
+    expect(timeouts).toEqual([11_000, 6_000, 1_000]);
+    expect(timeouts.every((ms) => ms > 0 && ms <= 11_000)).toBe(true);
     expect(result.answerBlocks).toEqual([]);
   });
 

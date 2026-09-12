@@ -6,19 +6,21 @@ import CopilotSurface from "./CopilotSurface";
 import CopilotTrigger from "./CopilotTrigger";
 
 /**
- * The heading that names the panel. Both the drawer and the `xl`+ desktop
+ * The heading that names the panel, plus the scope marker each panel carries so
+ * a test can tell the record panel from the collection one without reading copy.
+ * Both the drawer and the `xl`+ desktop
  * trigger move focus onto it on open, so the element the operator lands on is
- * the one that labels the region they just opened. Rendered by `LeadBriefing`
- * (record scopes) or `CollectionBriefing` (collection scopes).
+ * the one that labels the region they just opened. Rendered by `LeadInsights`
+ * (record scopes) or `CollectionInsights` (collection scopes).
  */
-const DRAWER_HEADING_ID = "copilot-briefing-heading";
+const DRAWER_HEADING_ID = "copilot-insights-heading";
 
 type CopilotDrawerProps = {
   children: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   hasAttention: boolean;
-  /** One-time "Lead briefing ready" cue: truthful status copy, not a count. */
+  /** One-time "Insights ready" cue: truthful status copy, not a count. */
   showCue: boolean;
   onDismissCue: () => void;
 };
@@ -50,7 +52,7 @@ export default function CopilotDrawer({
             role="status"
             className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground shadow-dropdown"
           >
-            Lead briefing ready
+            Insights ready
           </p>
         )}
 
@@ -61,7 +63,7 @@ export default function CopilotDrawer({
           />
 
           {showCue && (
-            <Button variant="ghost" size="icon-sm" onClick={onDismissCue} aria-label="Dismiss briefing ready cue">
+            <Button variant="ghost" size="icon-sm" onClick={onDismissCue} aria-label="Dismiss insights ready cue">
               <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           )}

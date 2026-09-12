@@ -6,7 +6,7 @@ import type { CopilotSectionApi } from '../ManagementContextCopilot';
 
 // The real shell owns the session and its transport; this test owns only the
 // grid the page mount produces, so the shell is replaced with a pass-through
-// that hands the briefing renderer a stub api.
+// that hands the insights renderer a stub api.
 vi.mock('../ManagementContextCopilot', () => ({
   default: ({ children }: { children: (api: CopilotSectionApi) => ReactNode }) => (
     <>
@@ -32,7 +32,7 @@ afterEach(() => {
 describe('PageCopilot — layout', () => {
   it("reserves the floating trigger's 72px under the content column at xl", () => {
     render(
-      <PageCopilot pageKey="leads" scopeLabel="Leads" renderBriefing={() => null}>
+      <PageCopilot pageKey="leads" scopeLabel="Leads" renderInsights={() => null}>
         <button type="button">Row action</button>
       </PageCopilot>
     );

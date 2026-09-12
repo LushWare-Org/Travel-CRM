@@ -10,7 +10,7 @@ import CopilotTrigger from "./CopilotTrigger";
 import CopilotConversation from "./CopilotConversation";
 import type { CopilotSession, CopilotScope, SinceWindow } from "./types";
 
-const BRIEFING_HEADING_ID = "copilot-briefing-heading";
+const INSIGHTS_HEADING_ID = "copilot-insights-heading";
 
 export type CopilotSectionApi = {
   session: CopilotSession;
@@ -28,7 +28,7 @@ type ManagementContextCopilotProps = {
   scopeLabel: string;
   since?: SinceWindow;
   /**
-   * The page-owned briefing, hosted by the shared shell. The conversation that
+   * The page-owned insights block, hosted by the shared shell. The conversation that
    * follows it is the shell's own, so every page key has the chat.
    */
   children: (api: CopilotSectionApi) => ReactNode;
@@ -104,7 +104,7 @@ export default function ManagementContextCopilot({
   useEffect(() => {
     if (!dockOpen || !focusOnExpandRef.current) return;
     focusOnExpandRef.current = false;
-    document.getElementById(BRIEFING_HEADING_ID)?.focus();
+    document.getElementById(INSIGHTS_HEADING_ID)?.focus();
   }, [dockOpen]);
 
   const handleDrawerOpenChange = useCallback(
@@ -127,7 +127,7 @@ export default function ManagementContextCopilot({
     collapse: isDesktop && dockOpen ? collapse : undefined,
   });
 
-  // The panel's two children, in reading order: the page-owned briefing first,
+  // The panel's two children, in reading order: the page-owned insights first,
   // then one hairline, then the shell's conversation, whose composer sticks to
   // `CopilotSurface`'s scrollport.
   const body = (
@@ -139,7 +139,7 @@ export default function ManagementContextCopilot({
 
   return (
     <>
-      {dockOpen && <CopilotDock labelledBy={BRIEFING_HEADING_ID}>{body}</CopilotDock>}
+      {dockOpen && <CopilotDock labelledBy={INSIGHTS_HEADING_ID}>{body}</CopilotDock>}
 
       {isDesktop && !dockOpen && (
         <>

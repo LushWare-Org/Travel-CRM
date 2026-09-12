@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 // page key per operator, then honour the persisted collapsed state": a record
 // scope has a notion of a first visit, a collection scope does not, so an
 // actor-global key would auto-open exactly once ever and nine pages would never
-// announce that a briefing exists there. Collapsing on one page therefore no
+// announce that the insights exist there. Collapsing on one page therefore no
 // longer silences the others — that is the intended discovery behaviour, not a
 // regression.
 //

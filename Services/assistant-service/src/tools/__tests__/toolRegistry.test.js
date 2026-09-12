@@ -57,7 +57,17 @@ describe('every tool declares its bound', () => {
       expect(tool.resultByteBudget, `${tool.name} byte budget`).toBeGreaterThan(0);
       expect(typeof tool.argsSchema?.safeParse).toBe('function');
     }
-    expect(toolNames()).toEqual(['getLead', 'listLeads', 'listInvoices']);
+    expect(toolNames()).toEqual([
+      'getLead',
+      'listLeads',
+      'listInvoices',
+      'getDashboardSnapshot',
+      'getLeadAnalytics',
+      'getPackagePerformance',
+      'getSalesPerformance',
+      'getMyPerformance',
+      'searchPackages',
+    ]);
   });
 
   it('declares no non-GET tool', () => {
@@ -106,10 +116,41 @@ describe('argument validation', () => {
     expect(result.error).toMatch(new RegExp(`^invalid args for ${name}:`));
   });
 
-  it('clamps the default list page rather than requesting the cap', async () => {
-    const fetchCalls = captureFetch({ success: true, data: [] });
-    await executeTool('listLeads', {}, ctx, ['listLeads']);
-    expect(fetchCalls[0].url).toBe(`${LEAD}/api/v1/leads?limit=50`);
+  it('names the accepted arguments, so a rejected call can be corrected instead of repeated', async () => {
+    const leads = await executeTool('listLeads', { leadId: 'lead-1' }, ctx, ['listLeads']);
+    // Live, the model sent { leadId } to the list tools over and over; a bare
+    // "Unrecognized key" told it what was wrong but not what would be right, so
+    // it repeated the same call until the loop gave up.
+    expect(leads.error).toMatch(/^invalid args for listLeads:/);
+    expect(leads.error).toMatch(/Accepted arguments: limit$/);
+
+    const invoices = await executeTool('listInvoices', { nope: 1 }, ctx, ['listInvoices']);
+    // Derived from the schema, so it cannot drift from what the tool accepts.
+    expect(invoices.error).toMatch(/Accepted arguments: limit, leadId$/);
+  });
+
+  it('reads one lead\'s invoices when a leadId is given', async () => {
+    const calls = captureFetch({ success: true, data: [] });
+    await executeTool('listInvoices', { leadId: 'lead-1' }, ctx, ['listInvoices']);
+
+    expect(calls[0].url).toBe(`${BILLING}/api/v1/billing/invoices/lead/lead-1`);
+  });
+
+  it('wraps a single record from the by-lead read rather than discarding it as no rows', async () => {
+    captureFetch({
+      success: true,
+      data: { id: 'inv-1', paymentStatus: 'unpaid', dueDate: '2020-01-01T00:00:00.000Z' },
+    });
+
+    const result = await executeTool('listInvoices', { leadId: 'lead-1' }, ctx, ['listInvoices']);
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].overdue).toBe(true);
+  });
+
+  it('still rejects an empty leadId', async () => {
+    const result = await executeTool('listInvoices', { leadId: '' }, ctx, ['listInvoices']);
+    expect(result.error).toMatch(/^invalid args for listInvoices:/);
   });
 });
 

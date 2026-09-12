@@ -70,10 +70,16 @@ export function addBaseline(bundle, name, count) {
 
 export const DAY_MS = 86_400_000;
 
-export function daysAgo(days) {
-  return new Date(Date.now() - days * DAY_MS).toISOString();
+// `from` and not just the real clock: a test that pins its own `now` and passes it
+// here needs the fixture anchored to THAT instant. Ignoring the second argument
+// made the pair disagree — the record sat 62 days before the real clock while the
+// rule measured against a fixed noon — so the day count was exactly right before
+// 12:00 UTC and one day short after it. That is a test that fails every afternoon
+// and passes every morning, which is the worst kind to debug.
+export function daysAgo(days, from = Date.now()) {
+  return new Date(from - days * DAY_MS).toISOString();
 }
 
-export function daysAhead(days) {
-  return new Date(Date.now() + days * DAY_MS).toISOString();
+export function daysAhead(days, from = Date.now()) {
+  return new Date(from + days * DAY_MS).toISOString();
 }

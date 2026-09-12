@@ -120,8 +120,8 @@ export function copilotDeterministic({ pageKey, scope, since = "last_visit", las
  * mode='briefing' — model claims appended to the deterministic phase.
  * @param {CopilotCallOptions} options
  */
-export function copilotBriefing({ pageKey, scope, since = "last_visit", lastSeenAt, signal }) {
-  return request("/assistant/management/turn", { mode: "briefing", page: { key: pageKey, scope, since, lastSeenAt } }, signal);
+export function copilotInsights({ pageKey, scope, since = "last_visit", lastSeenAt, signal }) {
+  return request("/assistant/management/turn", { mode: "insights", page: { key: pageKey, scope, since, lastSeenAt } }, signal);
 }
 
 /**

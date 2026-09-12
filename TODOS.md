@@ -531,6 +531,70 @@
 **Priority:** P3
 **Depends on:** A rendered look at 1280px, or the designer API key so the panel can be visualised
 
+## Copilot Capability Plan (eng review 2026-09-12)
+
+Deferred during `/plan-eng-review` on `docs/designs/actionable-insight-ranking-and-quality-gate.md` and `docs/designs/copilot-question-driven-capability.md`. Each carries the reasoning, because these were decisions rather than omissions.
+
+### Decision-log retention window plus the scheduler it needs
+
+**What:** Decide the retention window for the new insight decision log (one row per candidate per page load), then build the periodic job that enforces it: Supabase `pg_cron` or Cloud Scheduler targeting a Cloud Run Job.
+
+**Why:** The decision log is written at page-load frequency, which is faster than `AssistantEvent` already grows, and `AssistantEvent` has no retention at all today. The ranking design makes the retention window a gate on phase 2, so this decision blocks a phase rather than an idle concern.
+
+**Context:** `AssistantEvent` (prisma/schema.prisma) is the precedent: an eternal sink with no purge, no rollup and no consumer, flagged P3 in this file under Site-Wide Floating Assistant. The new log has the same shape but higher volume. There is no scheduler, worker or queue anywhere in the stack, and services run with `min_instances = 0`, so the job has to be an external trigger, not an in-process timer. The eng review decided (PERF-2/3A) that only candidates reaching L3+ are logged, which reduces but does not remove the growth. Start here: `docs/designs/actionable-insight-ranking-and-quality-gate.md` §9.4 and its phase table.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** Stable keys and the decision log landing (phase 0); the retention window must be decided before phase 2 writes suppression state.
+
+### Contract drift test across the service and client schemas
+
+**What:** A CI test that parses one canonical fixture through both the service's response schema and the Management client's schema, failing the build when they diverge.
+
+**Why:** The approved rollout is lockstep: the contract rename and the reshaped response ship together, across both halves, with downtime tolerated. The two halves do not share deploy machinery (Management ships via Firebase Hosting, the service via Cloud Run), so nothing enforces the ordering and no build-time check exists. Drift would present as a broken panel on every turn, which reads as an outage rather than a version mismatch.
+
+**Context:** Decided during `/plan-eng-review` as option 4C with the safeguard declined (downtime accepted). The replacement guard is the mandatory post-deploy smoke check in the capability doc's Success Criteria; this TODO is the durable fix that would catch the next contract change before it ships. Schemas to compare: `Services/shared/contracts/src/managementCopilot.js` and `Management/src/features/copilot/types.ts`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** The contract v2 fields landing.
+
+### Decide whether the 200-row fail-closed truncation should change
+
+**What:** Decide whether a paged collection source should keep failing closed when its read is truncated, and if not, what it should do instead.
+
+**Why:** `leadsCollection` pages at 200 rows with a `pagination.total` probe, and `collectionEngine` fails the whole source when the total exceeds the rows fetched. So past 200 leads the source is reported `unavailable`, and the operator sees "partially loaded, 1 sources unavailable" for what is actually a page-size limit. The message misdiagnoses a configured cap as an outage, and the same banner is used for a genuinely dead service.
+
+**Context:** `Services/assistant-service/src/adapters/collectionEngine.js` (the truncation probe) and `src/adapters/pages/leadsCollection.adapter.js` (`PAGE_LIMIT`, `paging.totalPath`). The aggregate work routes around it by grouping over loaded rows and threading the upstream total, so this is not a blocker for that work; changing it would alter panel semantics for every paged source, which is why it is its own decision. Related: the eng review added per-source failure reasons to the panel so this case reports a reason rather than a count.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None, but it should be decided before more pages are added to the copilot.
+
+### Named rubric owner per page before derived severity ships
+
+**What:** For each page, name the person who signs off the criticality bands (impact dimensions and thresholds) before derived severity replaces the literal `severity` values.
+
+**Why:** The ranking design's §6.5 makes severity a derived business judgement rather than a literal a developer typed once. That only holds if someone who knows why a missed ticketing deadline costs more than a missing package description owns the bands. Without an owner, deriving severity from conservative defaults would downgrade most `warning` rules to `info`, and the severity floor would then drop them from the panel entirely.
+
+**Context:** Deferred during `/plan-eng-review`; phases 0 to 2 ship on today's literal severities, and §6.5 is adopted per page afterwards. Impact dimensions to classify per rule: `externalImpact`, `irreversibility`, `commitment`, alongside the existing `severity`, `days` and `threshold`. The divergence between a model-emitted severity and the derived band is the calibration signal once this lands. Start with the pages that already carry criticals: `billing` and `flights`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** The derived-band function and the impact-dimension declarations landing.
+
+### Propagate x-request-id on assistant-service outbound fetches
+
+**What:** Forward the caller's `x-request-id` on every outbound fetch the assistant makes to domain services, alongside the `x-user-*` headers it already forwards.
+
+**Why:** `forwardActorHeaders` sends only `x-user-*`, so every evidence read and tool call reaches lead-service, billing-service and the rest without the assistant's correlation id, and each downstream service mints a fresh one. The result is that a tool read cannot be joined to the turn that made it, which defeats the decision log and the per-step trace rows the plan adds for exactly this purpose.
+
+**Context:** `Services/assistant-service/src/middleware/auth.js` (`forwardActorHeaders`) and `src/tools/toolRegistry.js` (`fetchJson` sends `{...ctx.headers, content-type, auth}`). The gateway solves the same problem by mutating `req.headers['x-request-id']` so the proxy forwards it; assistant-service's own `correlationId` copy sets only `req.requestId` and the response header. Small, self-contained, and worth shipping alongside the first instrumentation task.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None.
+
 ## Completed
 
 ### Honor Gemini's RetryInfo.retryDelay on 429 quota errors

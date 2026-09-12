@@ -119,7 +119,7 @@ describe('CopilotConversation — composer', () => {
 
     // The root must NOT force a full panel height. `min-h-full` with an
     // `mt-auto` composer pins the bar to the panel's bottom edge, which the
-    // operator experiences as dead space between the briefing and the bar:
+    // operator experiences as dead space between the insights and the bar:
     // reported at 661px of a 768px panel, so almost a full screen scrolled
     // through for nothing. The composer follows the transcript instead.
     const root = form?.parentElement;
