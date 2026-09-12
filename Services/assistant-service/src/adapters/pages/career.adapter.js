@@ -89,6 +89,7 @@ export const careerAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `vacancy-closing:${vacancy.id}`,
+            entityRef: { kind: 'record', id: String(vacancy.id) },
             section: 'attention',
             severity: 'warning',
             text: 'Open vacancy closes within two weeks.',
@@ -111,6 +112,7 @@ export const careerAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `vacancy-unfilled:${vacancy.id}`,
+            entityRef: { kind: 'record', id: String(vacancy.id) },
             section: 'experienced_view',
             severity: 'info',
             text: 'Active vacancy has received no applications.',

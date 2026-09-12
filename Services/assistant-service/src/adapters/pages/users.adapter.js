@@ -63,6 +63,7 @@ export const usersAdapter = createPageAdapter({
           if (!evidenceId) continue;
           insights.push({
             id: `dormant-rep:${rep.id}`,
+            entityRef: { kind: 'record', id: String(rep.id) },
             section: 'attention',
             severity: 'info',
             text: 'Deactivated staff account has not been touched in over a month.',

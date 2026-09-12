@@ -59,3 +59,71 @@ model ManagementLastSeen {
   @@index([actorId])
   @@schema("crm_assistant")
 }
+
+// ─── InsightState (per-insight acknowledgement and novelty) ───
+// Generalizes ManagementLastSeen from "when did this operator last look at this
+// scope" to "when did they last see THIS insight, and has it changed since".
+// Suppression needs the second question answered: a scope-level timestamp cannot
+// tell an unchanged repeat from news.
+//
+// `lastMaterialValue` is what makes novelty honest. Without it, suppression
+// either hides an insight forever or re-shows it on every load; with it, "changed"
+// means the insight's own value moved (an amount, a count of days, a status),
+// not that time passed.
+//
+// Keyed on `insightKey`, which comes from src/insights/keys.js and survives a
+// descriptor reorder. Keying on the legacy index-prefixed id would have baked a
+// developer's array order into stored state.
+model InsightState {
+  id                String    @id @default(uuid())
+  actorId           String
+  pageKey           String
+  scopeFingerprint  String
+  insightKey        String
+  firstSeenAt       DateTime  @default(now())
+  lastSurfacedAt    DateTime?
+  surfacedCount     Int       @default(0)
+  acknowledgedAt    DateTime?
+  snoozedUntil      DateTime?
+  lastMaterialValue String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([actorId, pageKey, scopeFingerprint, insightKey])
+  @@index([actorId, pageKey])
+  @@schema("crm_assistant")
+}
+
+// ─── InsightDecision (why the panel shows what it shows) ───
+// One row per candidate that got past the structural layers. A dropped insight
+// is a recorded fact with a reason code, not a silent filter, which is what makes
+// "why is this not showing" answerable at all.
+//
+// L0-L2 drops (bad shape, no citation, unauthorized) are deliberately NOT stored
+// per row: they are structural and would swamp the table with noise. They belong
+// in aggregate counters. The volume decision is recorded in the ranking design
+// (PERF-2/3A) and enforced by `decisionsWorthPersisting`.
+//
+// No foreign keys and no joins, same as AssistantEvent: this is a log, addressed
+// by ids that may refer to rows in other services' schemas.
+model InsightDecision {
+  id               String   @id @default(uuid())
+  requestId        String?
+  actorId          String
+  pageKey          String
+  scopeFingerprint String
+  insightKey       String
+  ruleId           String?
+  entityKind       String?
+  entityId         String?
+  severity         String
+  rankScore        Float?
+  decision         String
+  reason           String
+  rankingVersion   String?
+  createdAt        DateTime @default(now())
+
+  @@index([actorId, pageKey, createdAt])
+  @@index([requestId])
+  @@schema("crm_assistant")
+}
