@@ -31,6 +31,50 @@ export const ManagementClaimSections = ['current_state', 'changed', 'attention',
 export const ManagementEvidenceTypes = ['record', 'computed', 'pattern', 'guidance', 'inference'];
 export const ManagementSeverities = ['info', 'warning', 'critical'];
 
+// The roles the platform authorizes on. Every service guards with
+// `authorize(...)`, and `isSuperAdmin` bypasses all of them.
+export const ManagementRoles = ['superAdmin', 'admin', 'salesRep', 'customer'];
+
+// Which roles may reach each copilot tool.
+//
+// Mirrors the guard on the TARGET route in the owning service, because the
+// copilot is a second caller of that route, not a second authority. Two rules
+// hold this map honest:
+//
+//   NEVER WIDER THAN THE ROUTE. `GET /api/v1/billing/invoices` is
+//   `requireAuth`-only, so `listInvoices` is reachable by any authenticated role;
+//   listing just the two management roles here is deliberately narrower than the
+//   route, and narrower is the safe direction.
+//
+//   THE DOMAIN SERVICE STILL DECIDES. A missing entry removes a tool from an
+//   actor's vocabulary, which surfaces to the model as "no such tool" — a visible
+//   absence. It is not a substitute for the downstream ownership and role checks,
+//   which continue to run under the caller's forwarded identity.
+//
+// Roles rather than permission strings, because that is what the services
+// actually enforce: `permissions` is read in exactly one place platform-wide
+// (`manage_leads` in lead-service, affecting which leads a salesRep may modify,
+// not which tools exist). A permission-keyed map would have denied every tool to
+// every operator holding no matching string.
+export const ManagementToolAccess = {
+  getLead: ['admin', 'salesRep'],
+  listLeads: ['admin', 'salesRep'],
+  listInvoices: ['admin', 'salesRep'],
+  // Cross-site reads. Each role list mirrors the guard on the route the tool calls,
+  // so a question about another domain is answerable from any page without widening
+  // what the page volunteers unprompted.
+  getDashboardSnapshot: ['admin', 'salesRep'], // /api/v1/dashboard/stats — authorize('admin','salesRep')
+  getLeadAnalytics: ['admin', 'salesRep'], // /api/v1/analytics/leads/overview — authorize('admin','salesRep')
+  getPackagePerformance: ['admin'], // /api/v1/analytics/packages/overview — authorize('admin')
+  getSalesPerformance: ['admin'], // /api/v1/analytics/salesreps/performance — authorize('admin')
+  // The route behind this one authorizes salesRep only and rejects an admin, which
+  // is why it is its own tool rather than an argument on getSalesPerformance.
+  getMyPerformance: ['salesRep'], // /api/v1/analytics/salesreps/me/performance — authorize('salesRep')
+  // This route carries no auth at all, so listing the two management roles is
+  // narrower than the route — the safe direction, as with listInvoices.
+  searchPackages: ['admin', 'salesRep'], // /api/v1/packages/search/query — public
+};
+
 // The lead adapter's field allowlist. Each entry grounds exactly one field
 // evidence item, and the rendered lead record publishes the same ID via
 // `data-copilot-evidence-id` so a claim can reveal its supporting field.
@@ -68,13 +112,37 @@ export function pageEvidenceId(pageKey, recordKind, recordId, field) {
   return `${pageKey}:${recordKind}:${recordId}:${field}`;
 }
 
-// A typed fact is the only place a risky value (id/date/amount/percentage/
-// count/duration) may appear. Free prose must stay qualitative.
+// What an insight is about. A record is one row; a group is a grouping such as
+// leads by destination; a collection is a whole source, for the rules that
+// aggregate over everything and have no single record to point at.
+export const ManagementEntityRefSchema = z
+  .object({
+    kind: z.enum(['record', 'group', 'collection']),
+    id: z.string().min(1).max(512),
+  })
+  .strict();
+
+// A typed fact is a value the reader may rely on. `value` is canonical: numbers
+// and dates are compared by exact equality against it when prose is checked.
+//
+// A fact either states something read from the evidence (grounded: its value
+// appears inside the cited item) or something computed from it (a count, a
+// duration, a percentage, a rule constant). The second kind carries
+// `derivation`, because "62 days" is nowhere inside the date it was measured
+// from and a groundedness check would otherwise discard it.
+//
+// NOTE ON THE OLD COMMENT: this used to say free prose must stay qualitative,
+// and the validator enforced that by deleting any claim whose prose held a
+// digit — which made every counting question unanswerable. Prose may now carry
+// a number when the claim also states it as a fact here.
 export const BriefingFactSchema = z
   .object({
     kind: z.enum(ManagementFactKinds),
     value: z.string().min(1).max(255),
     evidenceId: z.string().min(1).max(255),
+    unit: z.enum(['days', 'percent', 'currency']).optional(),
+    derivation: z.enum(['grouped-by', 'elapsed-since', 'ratio-of', 'sum-of', 'descriptor-constant']).optional(),
+    derivedFrom: z.array(z.string().min(1).max(255)).max(50).optional(),
   })
   .strict();
 
@@ -109,7 +177,11 @@ export const ManagementMessageSchema = z
 // filters/record kinds/IDs/sort fields with a 400 before any data fetch.
 export const ManagementAssistantTurnRequest = z
   .object({
-    mode: z.enum(['deterministic', 'briefing', 'ask']),
+    // 'briefing' is the pre-rename value, accepted for ONE release so a client
+    // that has not shipped yet cannot 400. Emit-only 'insights'; drop 'briefing'
+    // after the client is out — the assistant logs when the legacy value arrives,
+    // so the drop is observable rather than assumed.
+    mode: z.enum(['deterministic', 'briefing', 'insights', 'ask']),
     page: z
       .object({
         key: z.enum(ManagementPageKeys),
@@ -138,6 +210,15 @@ export const BriefingClaimSchema = z
     evidenceIds: z.array(z.string().min(1).max(255)).max(50),
     evidenceType: z.enum(ManagementEvidenceTypes),
     severity: z.enum(ManagementSeverities),
+    // Ranking metadata, present when a rule-derived insight travelled through
+    // the pipeline and absent on a plain model claim. Optional so a client built
+    // before the ranking work still parses these payloads.
+    key: z.string().min(1).max(512).optional(),
+    ruleId: z.string().min(1).max(255).optional(),
+    entityRef: ManagementEntityRefSchema.optional(),
+    action: z.record(z.string(), z.unknown()).optional(),
+    score: z.number().optional(),
+    scoreComponents: z.record(z.string(), z.number()).optional(),
   })
   .strict();
 
@@ -205,6 +286,25 @@ export const DeterministicInsightSchema = z
     text: z.string().min(1).max(2000),
     fact: BriefingFactSchema.optional(),
     evidenceIds: z.array(z.string().min(1).max(255)).max(50),
+    // Identity that survives a descriptor reorder, and the plural facts a rule
+    // emits when it prints a computed number. Optional throughout: an insight
+    // from before this change parses unchanged.
+    key: z.string().min(1).max(512).nullish(),
+    ruleId: z.string().min(1).max(255).nullish(),
+    entityRef: ManagementEntityRefSchema.optional(),
+    facts: z.array(BriefingFactSchema).max(50).optional(),
+    action: z.record(z.string(), z.unknown()).nullish(),
+    observation: z.boolean().optional(),
+    // Present once the insight has been scored for the ranked list.
+    score: z.number().optional(),
+    components: z.record(z.string(), z.number()).optional(),
+    // The scored inputs, flattened, so a client can show "why now" without
+    // unpacking `components`. All derived server-side.
+    origin: z.enum(['rule', 'model']).optional(),
+    urgency: z.number().optional(),
+    novelty: z.number().optional(),
+    confidence: z.number().optional(),
+    actionability: z.number().optional(),
   })
   .strict();
 
@@ -228,5 +328,15 @@ export const ManagementDeterministicResult = z
     // instead of "not captured" — EvidenceAction derives its inline detail from
     // a sources entry and has none in this phase today.
     sources: z.array(ManagementSourceSchema).max(100).optional(),
+    // The ranked view of the same insights. Additive: `insights` keeps its shape
+    // so a client built before the ranking work still renders, and the client
+    // adopts `ranked` when it gains the affordances for it (`show more`, the
+    // quiet state). `suppressedCount` is separate from a zero assertion on
+    // purpose: "nothing flagged" and "four previously acknowledged" are
+    // different truths and the operator should be able to tell them apart.
+    ranked: z.array(DeterministicInsightSchema).max(100).optional(),
+    suppressedCount: z.number().int().nonnegative().optional(),
+    suppressedCriticals: z.array(DeterministicInsightSchema).max(50).optional(),
+    rankingVersion: z.string().min(1).max(64).optional(),
   })
   .strict();
