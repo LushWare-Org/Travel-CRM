@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.js",
     "test:watch": "vitest"
   },
   "devDependencies": {

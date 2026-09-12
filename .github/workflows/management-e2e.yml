@@ -1,0 +1,165 @@
+name: Management E2E
+
+# The browser suite had no CI job, so three assertions rotted unnoticed when the
+# app changed under them (a salesRep landing move, an evidence chip gaining a
+# captured value, an Invoice action moving into a popover). This workflow runs
+# the suite against a DISPOSABLE stack rather than the shared dev database, so a
+# pull request cannot write to what everyone else is using or exhaust the
+# gateway's 10-login/15-minute limiter.
+#
+# It is deliberately expensive: Postgres + 12 backend processes + a frontend.
+# That is the cost of testing a UI against a real stack, which is the whole point
+# of this suite (no mocks anywhere in it).
+
+on:
+  pull_request:
+    branches: [main, microservices]
+    # Narrower than the microservices CI paths on purpose. This job costs ~15
+    # minutes and 13 processes, so it runs for what can actually change what the
+    # browser sees: the console, the copilot service, the gateway that fronts it,
+    # and the shared packages both depend on. A PR touching only, say,
+    # notification-service does not need it. Widen this list if a change to
+    # another service can reach the copilot.
+    paths: &e2e-paths
+      - 'Management/**'
+      - 'Services/assistant-service/**'
+      - 'Services/gateway/**'
+      - 'Services/shared/**'
+      - '.github/workflows/management-e2e.yml'
+  push:
+    branches: [main, microservices]
+    paths: *e2e-paths
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  # Every service reads DATABASE_URL from its own .env, which the provisioner
+  # writes. The disposable Postgres below uses these credentials.
+  CI_DATABASE_URL: postgresql://travelcrm:travelcrm@127.0.0.1:5432/travelcrm
+  GATEWAY_URL: http://localhost:3000/api/v1
+  PLAYWRIGHT_BASE_URL: http://localhost:5174
+
+jobs:
+  copilot-ui:
+    name: Management browser suite against a disposable stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: travelcrm
+          POSTGRES_PASSWORD: travelcrm
+          POSTGRES_DB: travelcrm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U travelcrm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # .env files are gitignored, so a fresh runner has none and the stack
+      # cannot start. This copies each .env.example to .env and forces the values
+      # that must not come from an example: the database DSN (the examples carry
+      # a Supabase pooler URL that a local Postgres rejects), and the two copilot
+      # gates, without which the panel is not in the Management bundle and the
+      # assistant routes answer 404.
+      - name: Provision env files
+        run: node Services/provision-ci-env.mjs
+
+      - name: Install and generate
+        run: |
+          set -euo pipefail
+          npm ci --prefix Services
+          for dir in Services/*/ Services/shared/*/; do
+            if [ -f "${dir}package.json" ]; then
+              echo "::group::npm ci ${dir}"
+              npm ci --prefix "$dir"
+              echo "::endgroup::"
+            fi
+          done
+          npm ci --prefix Management
+          # Prisma clients are generated per service and are not committed.
+          for dir in Services/*/; do
+            if [ -f "${dir}prisma/schema.prisma" ]; then
+              echo "::group::prisma generate ${dir}"
+              (cd "$dir" && npx prisma generate)
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Migrate
+        working-directory: Services
+        run: node migrate-all.mjs
+
+      # The seeded accounts are the actors every spec logs in as, and
+      # update-passwords.mjs is what makes their known passwords work.
+      - name: Seed
+        working-directory: Services
+        run: |
+          set -euo pipefail
+          node seed.mjs
+          node seed-extended.mjs
+          node update-passwords.mjs
+
+      - name: Start the stack
+        working-directory: Services
+        run: |
+          set -euo pipefail
+          nohup npm start > /tmp/stack.log 2>&1 &
+          echo "stack starting, pid $!"
+
+      # The gateway's JWT middleware runs before its own /health route, so an
+      # unauthenticated probe gets a 401 even when the process is healthy. Any
+      # HTTP response means "listening", which is all that is being waited for.
+      - name: Wait for the gateway
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health | grep -qE '^[1-5][0-9][0-9]$'; then
+              echo "gateway answered after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::gateway never answered on :3000"
+          tail -60 /tmp/stack.log || true
+          exit 1
+
+      # Without a Gemini key the assistant service answers 503 on its model
+      # paths, so the specs that need a real model round trip are excluded rather
+      # than left to fail for a reason that has nothing to do with the change.
+      - name: Run the browser suite
+        working-directory: Management
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${GEMINI_API_KEY:-}" ]; then
+            echo "GEMINI_API_KEY present: running the full suite."
+            npx playwright test -c e2e/playwright.config.js
+          else
+            echo "::warning::No GEMINI_API_KEY secret: excluding specs annotated @requires-model."
+            npx playwright test -c e2e/playwright.config.js --grep-invert "@requires-model"
+          fi
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: Management/e2e/playwright-report
+          retention-days: 7
+
+      - name: Dump stack log on failure
+        if: failure()
+        run: tail -200 /tmp/stack.log || true
