@@ -63,7 +63,11 @@ test.describe('copilot smoke — the counting question', () => {
     await expect(dock.getByText(/Why now:/).first()).toBeVisible();
   });
 
-  test('a counting question gets an answer that carries the number', async ({ adminPage: page }) => {
+  // `@requires-model` marks this as needing a real model round trip, matching the
+  // convention in copilot.spec.js: the job excludes these when no provider key is
+  // configured, rather than letting them fail for a reason that has nothing to do
+  // with the change. The panel test above is deterministic and always runs.
+  test('a counting question gets an answer that carries the number @requires-model', async ({ adminPage: page }) => {
     await page.goto('/leads');
 
     const surface = page.locator(SURFACE_SELECTOR);
