@@ -114,8 +114,40 @@ export function plan({ repoRoot = REPO, databaseUrl, allowPlaceholder = false } 
       ...(isService ? forced.__allServices : {}),
       ...(forced[dir] ?? {}),
     };
-    return { dir, example: existsSync(example), target, values, replacesExisting: existsSync(target) };
+    // `hasExample` and `examplePath` are separate on purpose. This used to return
+    // `example: existsSync(example)` while the writer fed the same field to
+    // readFileSync — so the write path passed a BOOLEAN where a path belongs, and
+    // only ever worked because --dry-run (the only mode that had been run) returns
+    // before reading. A test now exercises the write path for real.
+    return {
+      dir,
+      hasExample: existsSync(example),
+      examplePath: example,
+      target,
+      values,
+      replacesExisting: existsSync(target),
+    };
   });
+}
+
+/**
+ * Materialise each planned .env. Split out of `main` so a test can run the REAL
+ * write path against a temporary repo root — the coverage whose absence let a
+ * boolean-as-path bug reach CI.
+ */
+export function applyPlan(entries, { dryRun = false, log = console.log } = {}) {
+  for (const entry of entries) {
+    const keys = Object.keys(entry.values);
+    log(
+      `  ${entry.dir.padEnd(34)} ${keys.length ? `force ${keys.join(', ')}` : '(copy only)'}` +
+        `${entry.replacesExisting && !dryRun ? ' [REPLACED]' : ''}`,
+    );
+    if (dryRun) continue;
+
+    let body = readFileSync(entry.examplePath, 'utf8');
+    for (const [key, value] of Object.entries(entry.values)) body = forceEnvValue(body, key, value);
+    writeFileSync(entry.target, body);
+  }
 }
 
 function main() {
@@ -137,7 +169,7 @@ function main() {
   }
 
   const entries = plan({ allowPlaceholder: dryRun });
-  const missing = entries.filter((entry) => !entry.example);
+  const missing = entries.filter((entry) => !entry.hasExample);
   if (missing.length > 0) {
     console.error(`✗ ${missing.length} directory has no .env.example, so no .env can be made: ${missing.map((m) => m.dir).join(', ')}`);
     process.exitCode = 1;
@@ -145,16 +177,7 @@ function main() {
   }
 
   console.log(`${dryRun ? 'DRY RUN — ' : ''}provisioning ${entries.length} .env file(s) from .env.example`);
-  for (const entry of entries) {
-    const keys = Object.keys(entry.values);
-    console.log(`  ${entry.dir.padEnd(34)} ${keys.length ? `force ${keys.join(', ')}` : '(copy only)'}${entry.replacesExisting && !dryRun ? ' [REPLACED]' : ''}`);
-    if (dryRun) continue;
-
-    let body = readFileSync(entry.example, 'utf8');
-    for (const [key, value] of Object.entries(entry.values)) body = forceEnvValue(body, key, value);
-    writeFileSync(path.join(entry.target), body);
-  }
-
+  applyPlan(entries, { dryRun });
   if (dryRun) console.log('\nNothing was written.');
 }
 

@@ -67,6 +67,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # The provisioner writes every service's .env, so it is tested before it is
+      # trusted. Its first CI run died on a boolean-as-path bug that --dry-run — the
+      # only mode that had ever been run — returns before reaching.
+      - name: Test the env provisioner
+        run: node --test Services/provision-ci-env.test.mjs
+
       # .env files are gitignored, so a fresh runner has none and the stack
       # cannot start. This copies each .env.example to .env and forces the values
       # that must not come from an example: the database DSN (the examples carry
@@ -105,6 +111,13 @@ jobs:
       # update-passwords.mjs is what makes their known passwords work.
       - name: Seed
         working-directory: Services
+        env:
+          # Explicit, so these provably target the DISPOSABLE Postgres. The scripts
+          # used to carry a hardcoded shared-database DSN and ignore the environment,
+          # which meant this step would have seeded the live dev database and reset
+          # its seed passwords. They now read DATABASE_URL and have no fallback.
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DIRECT_URL: ${{ env.CI_DATABASE_URL }}
         run: |
           set -euo pipefail
           node seed.mjs
