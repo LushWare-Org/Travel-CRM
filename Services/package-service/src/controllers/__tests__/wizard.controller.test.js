@@ -103,7 +103,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     expect(res.status).toBe(200);
     expect(mockPrisma.package.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ isActive: true, basePrice: { lte: 1000 } }),
+      where: expect.objectContaining({ isActive: true, sellPrice: { lte: 1000 } }),
       take: 5,
     }));
     expect(res.body.data.serverResult.packages).toHaveLength(1);

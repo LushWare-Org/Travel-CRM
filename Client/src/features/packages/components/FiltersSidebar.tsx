@@ -1,24 +1,12 @@
 import { Filter, X, Banknote, Clock, Star } from 'lucide-react';
-import { getPriceRangeOptions } from '../../../lib/currency';
 import FilterPanelShell from '../../../components/shared/FilterPanelShell';
-import RangeFilterGroup from '../../../components/shared/RangeFilterGroup';
+import RangeFilterGroup, { type RangeOption } from '../../../components/shared/RangeFilterGroup';
+import { DURATION_OPTIONS, PRICE_RANGE_OPTIONS, RATING_OPTIONS } from '../filterOptions';
 
-const PRICE_RANGE_OPTIONS = getPriceRangeOptions();
-
-export interface RangeOption {
-  label: string;
-  min: number;
-  max: number;
-}
-
-const filterOptions = {
-  durations: [
-    { label: 'Short (1-4 days)', min: 1, max: 4 },
-    { label: 'Medium (5-7 days)', min: 5, max: 7 },
-    { label: 'Long (8+ days)', min: 8, max: Infinity }
-  ],
-  ratings: [5, 4, 3],
-};
+// The option lists live in ../filterOptions because PackagesContainer matches
+// a URL back to one of them to restore the selection, and RangeFilterGroup
+// compares by label — so the two must read from the same source.
+export type { RangeOption };
 
 interface FiltersSidebarProps {
   selectedPriceRange: RangeOption | null;
@@ -67,7 +55,7 @@ export default function FiltersSidebar({
       <RangeFilterGroup
         label="Trip Duration"
         icon={<Clock />}
-        options={filterOptions.durations}
+        options={DURATION_OPTIONS}
         selected={selectedDuration}
         onChange={onDurationChange}
       />
@@ -79,7 +67,7 @@ export default function FiltersSidebar({
           <span className="text-gray-900">Hotel Rating</span>
         </h4>
         <div className="space-y-2">
-          {filterOptions.ratings.map((starCount) => (
+          {RATING_OPTIONS.map((starCount) => (
             <label
               key={starCount}
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"

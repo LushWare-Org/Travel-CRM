@@ -11,13 +11,22 @@ import {
   resolveActivityCatalogIds,
   assembleWhere,
   buildInclude,
+  buildListOrderBy,
+  resolveDestinationRaws,
 } from '../services/package.service.js';
 
 // ── List / Search ─────────────────────────────────────────────
 
+// The public catalogue list. Filters, sorting and pagination are all applied
+// in the database, so the response is the true result set rather than the
+// first page of one the caller then narrows locally — which is what let a
+// count disagree with the number of matching packages.
 export const getPackages = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 12, sort = 'createdAt', order = 'desc', ...rest } = req.query;
-  const skip = (Number(page) - 1) * Number(limit);
+  const { page = 1, limit = 12, sort = 'createdAt', order = 'desc', destination, ...rest } = req.query;
+
+  const pageNumber = Math.max(1, Math.trunc(Number(page)) || 1);
+  const pageSize = Math.min(100, Math.max(1, Math.trunc(Number(limit)) || 12));
+
   const where = assembleWhere(rest);
 
   const isProtected = req.user && ['admin', 'salesRep'].includes(req.user.role);
@@ -25,17 +34,38 @@ export const getPackages = asyncHandler(async (req, res) => {
     where.isActive = true;
   }
 
-  const orderBy = { [sort]: order };
+  // Destinations are addressed by slug but stored as a display string
+  // ("Bali, Indonesia"), so the slug is resolved against the values actually
+  // present. A slug that matches nothing leaves the list unfiltered rather
+  // than empty, which is what the page has always done with an unknown
+  // destination.
+  if (destination) {
+    const raws = await resolveDestinationRaws(destination);
+    if (raws.length > 0) where.destination = { in: raws };
+  }
 
   const include = {
     images: { orderBy: { orderIndex: 'asc' } },
   };
 
   const [data, total] = await Promise.all([
-    prisma.package.findMany({ where, include, orderBy, skip, take: Number(limit) }),
+    prisma.package.findMany({
+      where,
+      include,
+      orderBy: buildListOrderBy(sort, order),
+      skip: (pageNumber - 1) * pageSize,
+      take: pageSize,
+    }),
     prisma.package.count({ where }),
   ]);
-  res.json({ success: true, count: data.length, total, data: data.map(serializePackageList) });
+
+  res.json({
+    success: true,
+    count: data.length,
+    total,
+    pagination: { page: pageNumber, limit: pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    data: data.map(serializePackageList),
+  });
 });
 
 // ── Detail ────────────────────────────────────────────────────
