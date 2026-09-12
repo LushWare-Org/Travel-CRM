@@ -548,3 +548,15 @@
 **Context:** The live assistant-service → user-service authenticated call path was confirmed during the v0.4.0.0 ship review.
 
 **Completed:** v0.4.0.0 (2026-09-09)
+
+### Run the live assistant-router eval replay once the quota allows
+
+**What:** Run `cd Services/assistant-service && npm run eval:router -- evaluation/assistant-router.synthetic.v1.jsonl` (or an approved sanitized corpus) once Gemini quota permits, and compare the router's choices against the corpus expectations.
+
+**Why:** `docs/designs/client-assistant-action-infrastructure.md` changes `allowedFinalTools`, the tool-vocabulary lists and `CORE_TOOLS`, so the router's behaviour changed. Only the offline `--validate-only` path can run here: a live replay attempt on 2026-09-12 over 34 rows returned `AI request timed out` from `Services/assistant-service/src/ai/geminiClient.js:55` for every row inside the 1.5-second per-row budget, leaving latency and cost metrics null. The corpus is well formed but the router's actual choices are unverified. Per `CLAUDE.md:44-45`, synthetic rows are development fixtures only and never count as production enablement evidence, so even a green synthetic replay would not authorise rollout on its own.
+
+**Context:** Update the corpus in the same branch that changes `allowedFinalTools`, then run this. Raised by `/plan-eng-review` as part of the deployment-compatibility finding and confirmed against `CLAUDE.md`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** A raised Gemini quota plus an approved, already-sanitized corpus.
