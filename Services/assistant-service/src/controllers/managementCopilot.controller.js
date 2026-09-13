@@ -378,6 +378,11 @@ function respondWithFallback(res, page, bundle, adapter, sinceBoundary) {
       noAccess: false,
     },
     claims,
+    // Rule-computed claims travelling through the insights response, because
+    // generation failed. Without this flag the client cannot tell a fallback
+    // from a model result, marks it a completed model phase, and any authorship
+    // UI credits the model with the rules' arithmetic.
+    fallback: true,
     suggestedQuestions: adapter.defaultQuestions(bundle),
     sources: buildSources(claims, bundle),
     unavailableSources: bundle.unavailableSources,
@@ -395,6 +400,8 @@ function respondWithFallback(res, page, bundle, adapter, sinceBoundary) {
 // the insights' `claims`.
 async function handleAsk(res, req, page, bundle, adapter, ctx, scope) {
   const question = latestUserQuestion(req.body.messages);
+  const priorClaims = req.body.priorClaims ?? [];
+  const conversation = priorConversation(req.body.messages);
 
   // PRECOMPUTE, BEFORE GENERATION. A counting question is answered by grouping
   // the rows this page already fetched, and that happens here rather than inside
@@ -420,6 +427,8 @@ async function handleAsk(res, req, page, bundle, adapter, ctx, scope) {
     evidence: promptEvidence,
     tools: toolsForActor(req.user),
     generateStructured,
+    priorClaims,
+    conversation,
   });
 
   if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) {
@@ -603,4 +612,30 @@ function latestUserQuestion(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return '';
   const last = [...messages].reverse().find((m) => m.role === 'user');
   return last?.content ?? '';
+}
+
+/**
+ * The turns BEFORE the question being asked.
+ *
+ * `latestUserQuestion` takes the last user message as the question, so the
+ * transcript is everything up to it — leaving the question in would show the
+ * model the same sentence twice with no way to tell which one it is answering.
+ * Bounded to the same tail the client sends, so the two caps cannot disagree.
+ */
+function priorConversation(messages) {
+  if (!Array.isArray(messages)) return [];
+  let questionIndex = -1;
+  messages.forEach((message, index) => {
+    if (message?.role === 'user') questionIndex = index;
+  });
+  if (questionIndex < 0) return [];
+
+  return messages
+    .slice(0, questionIndex)
+    .filter((message) => typeof message?.content === 'string' && message.content.trim().length > 0)
+    .slice(-8)
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'assistant' : 'user',
+      content: message.content,
+    }));
 }

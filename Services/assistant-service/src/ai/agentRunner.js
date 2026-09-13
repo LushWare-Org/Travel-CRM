@@ -61,7 +61,19 @@ const MIN_CALL_TIMEOUT_MS = 1_000;
 // `answerBlocks` are the model's final claims — never null, and never a
 // briefing-shaped `claims` payload. `toolEvidence` are turn-local evidence items
 // so answer claims citing tool-gathered data ground correctly.
-export async function runAgentLoop({ ctx, scopeLabel, question, evidence, tools = [], generateStructured }) {
+export async function runAgentLoop({
+  ctx,
+  scopeLabel,
+  question,
+  evidence,
+  tools = [],
+  generateStructured,
+  // The finding the operator clicked, and the exchange that preceded this
+  // question. Both are data, both are bounded by the prompt builder, and neither
+  // is an instruction.
+  priorClaims = [],
+  conversation = [],
+}) {
   const toolDescriptions = resolveTools(tools);
   const history = [];
 
@@ -72,7 +84,15 @@ export async function runAgentLoop({ ctx, scopeLabel, question, evidence, tools 
     let raw;
     try {
       raw = await generateStructured({
-        prompt: buildManagementAnswerPrompt({ scopeLabel, question, evidence, toolDescriptions: [], history: [] }),
+        prompt: buildManagementAnswerPrompt({
+          scopeLabel,
+          question,
+          evidence,
+          toolDescriptions: [],
+          history: [],
+          priorClaims,
+          conversation,
+        }),
         schema: managementSingleShotResponseJsonSchema,
         temperature: 0.2,
         maxOutputTokens: 8192,
@@ -112,7 +132,15 @@ export async function runAgentLoop({ ctx, scopeLabel, question, evidence, tools 
       return { answerBlocks: [], toolEvidence: historyToEvidence(history), reason: 'budget-exhausted' };
     }
 
-    const prompt = buildManagementAnswerPrompt({ scopeLabel, question, evidence, toolDescriptions, history });
+    const prompt = buildManagementAnswerPrompt({
+      scopeLabel,
+      question,
+      evidence,
+      toolDescriptions,
+      history,
+      priorClaims,
+      conversation,
+    });
 
     let raw;
     try {
@@ -173,7 +201,7 @@ export async function runAgentLoop({ ctx, scopeLabel, question, evidence, tools 
   if (finalMs >= MIN_CALL_TIMEOUT_MS) {
     try {
       const raw = await generateStructured({
-        prompt: buildManagementFinalAnswerPrompt({ scopeLabel, question, evidence, history }),
+        prompt: buildManagementFinalAnswerPrompt({ scopeLabel, question, evidence, history, priorClaims, conversation }),
         schema: managementSingleShotResponseJsonSchema,
         temperature: 0.2,
         maxOutputTokens: 8192,
