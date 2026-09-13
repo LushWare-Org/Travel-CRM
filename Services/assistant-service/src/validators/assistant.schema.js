@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AssistantPageCapabilities, AssistantPageContext } from '@travel-crm/contracts';
+import { AssistantCurrentView, AssistantPageCapabilities, AssistantPageContext } from '@travel-crm/contracts';
 import { ASSISTANT_TOOLS } from '../ai/prompts/assistantTurn.v1.js';
 
 // ─── Assistant turn ───────────────────────────────────────────
@@ -60,6 +60,12 @@ export const assistantTurnSchema = z.object({
   // know, so an undeclared field would silently never reach the controller.
   capabilities: AssistantPageCapabilities.optional(),
   pageContext: AssistantPageContext.optional(),
+  // What the page says is on screen, and the only place a number about the screen
+  // may come from. Untrusted like the pair above, so it is the shared contract's
+  // own bounded schema, and declared here because zod strips what this schema does
+  // not name — an undeclared `currentView` would never reach the controller and
+  // the assistant would keep answering about a page the visitor had left.
+  currentView: AssistantCurrentView.optional(),
 });
 
 // ─── Telemetry events ─────────────────────────────────────────

@@ -2195,6 +2195,32 @@ describe('POST /api/v1/assistant/turn — page actions', () => {
     }
   });
 
+  it('has a dispatch case for every core outcome, so none reaches the 502 default', async () => {
+    // The guard this exists for: a tool in CORE_ASSISTANT_TOOLS with no `switch`
+    // case falls to the default and the visitor gets a 502 for a turn the model
+    // answered correctly. The page-action cases above prove their own names; this
+    // covers the rest of the core set, including `answer_current_view`, whose
+    // sentence the server composes.
+    const cases = [
+      ['navigate', { route: 'packages' }],
+      ['answer_faq_policy', { question: 'refund', selectedSnippetIds: [] }],
+      ['answer_packages', { packageIds: [] }],
+      ['hand_off', { kind: 'human' }],
+      ['request_booking', {}],
+      ['answer_current_view', {}],
+    ];
+
+    for (const [tool, args] of cases) {
+      mockGenerateStructured.mockResolvedValue({ tool, args: { ...args, message: 'On it.' } });
+
+      const res = await request(app)
+        .post('/api/v1/assistant/turn')
+        .send(baseBody({ messages: [assistantMsg(`${tool} please`)] }));
+
+      expect(res.status, `${tool} should dispatch`).toBe(200);
+    }
+  });
+
   it('drops a day the trip does not have before the page ever sees it', async () => {
     mockGenerateStructured.mockResolvedValue({
       tool: 'regenerate_days',
@@ -2342,5 +2368,83 @@ describe('POST /api/v1/assistant/turn — grounded travel search', () => {
     expect(res.body.data.message).toContain('The web lookup did not go through just now');
     expect(res.body.data.message).not.toContain('Looking that up');
     expect(res.body.data.serverResult).toBeNull();
+  });
+});
+
+describe('POST /api/v1/assistant/turn — the view answer', () => {
+  const ask = (content, overrides = {}) => baseBody({ messages: [assistantMsg(content)], ...overrides });
+
+  const PACKAGES_ROUTE = { name: 'packages', path: '/packages', params: ['destination', 'priceMax'] };
+
+  it('composes the count from the page\u2019s own report, and relays that report back', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'answer_current_view',
+      args: { message: 'There are 25 packages.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        ask('how many are showing under 1500', {
+          availableRoutes: [PACKAGES_ROUTE],
+          currentView: {
+            path: '/packages',
+            params: { destination: 'uae', priceMax: '1500' },
+            filteredCount: 3,
+            renderedCount: 2,
+            catalogueTotal: 25,
+          },
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall.tool).toBe('answer_current_view');
+    expect(res.body.data.message).toBe('There are 3 trips matching the filters on this page. 2 are shown so far.');
+    // The model's own sentence named a number the page never reported, and the
+    // screen is the one thing the visitor can check in a second.
+    expect(res.body.data.message).not.toContain('25');
+    expect(res.body.data.serverResult.view.filteredCount).toBe(3);
+  });
+
+  it('says it cannot see the page rather than guessing when nothing was reported', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'answer_current_view', args: {} });
+
+    const res = await request(app).post('/api/v1/assistant/turn').send(ask('what am I looking at?'));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).toBe(
+      "I can't see the page you're on right now. Tell me what you're looking for and I'll help you find it.",
+    );
+    expect(res.body.data.serverResult.view).toBeNull();
+  });
+
+  it('names the page and says so when the page could not count', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'answer_current_view', args: {} });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(ask('how many are showing?', { currentView: { path: '/packages' } }));
+
+    expect(res.body.data.message).toBe(
+      "You're on /packages, but it hasn't told me how many results are showing. Ask me about the catalogue and I'll look it up.",
+    );
+  });
+
+  it('drops the qualifier when the page drew everything it counted, and keeps the singular for one', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'answer_current_view', args: {} });
+
+    const all = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(ask('how many?', { currentView: { path: '/packages', filteredCount: 3, renderedCount: 3 } }));
+    expect(all.body.data.message).toBe('There are 3 trips on this page.');
+
+    const one = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        ask('how many?', {
+          currentView: { path: '/packages', params: { destination: 'japan' }, filteredCount: 1, renderedCount: 1 },
+        }),
+      );
+    expect(one.body.data.message).toBe('There is 1 trip matching the filters on this page.');
   });
 });
