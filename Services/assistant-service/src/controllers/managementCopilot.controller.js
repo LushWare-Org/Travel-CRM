@@ -18,14 +18,14 @@ import { capabilitySummary, toolsForActor } from '../insights/catalogue.js';
 import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../constants/managementCopilot.js';
 import prisma from '../db/client.js';
 
-// The briefing generation runs inside one 17s server deadline. The Management
-// client holds a 20s endpoint timeout WITH AbortSignal support: a scope change
+// The briefing generation runs inside one 45s server deadline. The Management
+// client holds a 50s endpoint timeout WITH AbortSignal support: a scope change
 // aborts the in-flight request, and a timeout surfaces as a recoverable failure
 // with Retry rather than an endless loading state (see design §1). The deadline
 // is defined once in constants/managementCopilot.js and shared with the agent
 // loop, so the loop budget and this phase cannot drift.
 //
-// The phase is allowed a SECOND attempt, but strictly inside that same 17s
+// The phase is allowed a SECOND attempt, but strictly inside that same 45s
 // budget (`deadlineMs`), so worst-case latency does not grow: a transient 503
 // that comes back fast still leaves room and is retried, while an attempt slow
 // enough to leave less than a meaningful retry is not retried at all and falls
@@ -309,7 +309,22 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   }
 
   const canonical = canonicalizeBriefingResponse(raw, BriefingClaimSchema);
-  const { claims } = validateClaims({ claims: canonical, bundle, enableGuidance: guidanceEnabled });
+  const { claims, rejected } = validateClaims({ claims: canonical, bundle, enableGuidance: guidanceEnabled });
+
+  if (rejected.length > 0) {
+    logger.warn(
+      {
+        pageKey: page.key,
+        rejected,
+        // The text is what makes a rejection actionable: the reason alone says a
+        // number was unsupported, not which number or how it was written.
+        rejectedText: canonical
+          .filter((claim) => rejected.some((entry) => entry.id === claim.id))
+          .map((claim) => claim.text),
+      },
+      claims.length === 0 ? 'every briefing claim was rejected' : 'some briefing claims were rejected',
+    );
+  }
 
   if (claims.length === 0) {
     return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
