@@ -2,10 +2,13 @@ import { X } from 'lucide-react';
 import { LEAD_COPILOT_FIELDS, leadEvidenceId } from '@travel-crm/contracts';
 import { Button } from '@/components/ui/button';
 import { LIFECYCLE_STATUS_LABELS } from './LeadStatusBadge';
+import { repLabelFor, type SalesRepOption } from '../utils/salesRepLabel';
 
 interface LeadDetailPaneProps {
   /** The selected lead record, or null when nothing is selected. */
   lead: Record<string, unknown> | null;
+  /** Sales reps the assignee id resolves against; empty degrades to the id prefix. */
+  salesReps?: SalesRepOption[];
   onClose?: () => void;
 }
 
@@ -22,7 +25,13 @@ const FIELD_LABELS: Record<string, string> = {
 
 // The adapter's allowlist is the pane's contract: every allowlisted field
 // renders, each publishing the same evidence id the server cites.
-function formatField(field: string, lead: Record<string, unknown>): string {
+function formatField(
+  field: string,
+  lead: Record<string, unknown>,
+  salesReps?: SalesRepOption[],
+): string {
+  if (field === 'assignedToId') return repLabelFor(lead.assignedToId, salesReps);
+
   const raw = lead[field];
   if (raw === undefined || raw === null || raw === '') return '—';
 
@@ -46,7 +55,7 @@ function formatField(field: string, lead: Record<string, unknown>): string {
  * fields and publishes `data-copilot-evidence-id` for each, which is what the
  * panel's Evidence Lens resolves against — the record is the source view.
  */
-export default function LeadDetailPane({ lead, onClose }: LeadDetailPaneProps) {
+export default function LeadDetailPane({ lead, salesReps, onClose }: LeadDetailPaneProps) {
   const leadId = lead ? String(lead.id ?? lead._id ?? '') : '';
 
   if (!lead || leadId.length === 0) {
@@ -82,7 +91,7 @@ export default function LeadDetailPane({ lead, onClose }: LeadDetailPaneProps) {
               tabIndex={-1}
               className="min-w-0 break-words font-mono text-xs tabular-nums text-foreground outline-none"
             >
-              {formatField(field, lead)}
+              {formatField(field, lead, salesReps)}
             </dd>
           </div>
         ))}
