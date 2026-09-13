@@ -31,9 +31,6 @@ function StubSections({ api: sectionApi }: { api: CopilotSectionApi }) {
   const { session } = sectionApi;
   return (
     <div>
-      <h2 id="copilot-insights-heading" tabIndex={-1}>
-        Insights
-      </h2>
       <p data-testid="surface-open">{sectionApi.open ? 'open' : 'closed'}</p>
       <p data-testid="claims">{session.claims.map((claim) => claim.text).join('|')}</p>
       <p data-testid="model">{session.modelPending ? 'pending' : session.modelPartial ? 'partial' : 'settled'}</p>
@@ -244,7 +241,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     expect(screen.getAllByRole('button', { name: 'Open copilot' })).toHaveLength(1);
   });
 
-  it('activates the desktop trigger into the panel and moves focus to the insights heading', async () => {
+  it('activates the desktop trigger into the panel and moves focus to the tab that names it', async () => {
     const user = userEvent.setup();
     renderShell();
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
@@ -253,7 +250,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     await user.click(screen.getByRole('button', { name: 'Open copilot' }));
 
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Insights' }));
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Insights' }));
   });
 
   it('exposes the attention state as a sibling marker plus a visible glyph, never a button child', async () => {
@@ -330,15 +327,15 @@ describe('ManagementContextCopilot — below xl', () => {
     await waitFor(() => expect(screen.queryByText('Insights ready')).not.toBeInTheDocument());
   });
 
-  it('moves focus into the drawer heading on open and restores it to the trigger on close', async () => {
+  it('moves focus onto the visible tab on open and restores it to the trigger on close', async () => {
     const user = userEvent.setup();
     renderShell();
 
     const trigger = screen.getByRole('button', { name: 'Open copilot' });
     await user.click(trigger);
 
-    const heading = await screen.findByRole('heading', { name: 'Insights' });
-    await waitFor(() => expect(document.activeElement).toBe(heading));
+    const tab = await screen.findByRole('tab', { name: 'Insights' });
+    await waitFor(() => expect(document.activeElement).toBe(tab));
 
     await user.click(screen.getByRole('button', { name: 'Close copilot' }));
     await waitFor(() => expect(document.activeElement).toBe(trigger));

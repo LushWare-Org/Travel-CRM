@@ -17,7 +17,12 @@ import { SURFACE_SELECTOR, UNBREAKABLE_TOKEN, surfacesWithHorizontalOverflow } f
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-const DOCK = 'section[aria-labelledby="copilot-insights-heading"]';
+// The PANEL, despite the name: it is the element carrying `data-copilot-panel`,
+// and it renders both inside the desktop dock and inside the drawer. It used to
+// be found by the heading that named it, which the tab strip replaced.
+const DOCK = '[data-copilot-panel]';
+// The tab strip, which is the panel's title and sits OUTSIDE the panel element.
+const COPILOT_TABS = '[data-copilot-tabs]';
 const DETAIL_PANE = '[aria-label="Lead detail"]';
 
 let createdLeadId;
@@ -78,7 +83,7 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
     await test.step('the dock opens without covering the record', async () => {
       const dock = page.locator(DOCK);
       await expect(dock).toBeVisible({ timeout: 15_000 });
-      await expect(dock.getByRole('heading', { name: 'Insights' })).toBeVisible();
+      await expect(page.locator(COPILOT_TABS).getByRole('tab', { name: 'Insights' })).toBeVisible();
 
       // Layout, not overlay: the dock must not be position: fixed, and the
       // record and dock must not overlap.
@@ -162,7 +167,9 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
 
       const drawer = page.locator(`[role="dialog"] ${DOCK}`);
       await expect(drawer).toBeVisible();
-      await expect(drawer.getByRole('heading', { name: 'Insights' })).toBeVisible();
+      await expect(
+        page.locator(`[role="dialog"] ${COPILOT_TABS}`).getByRole('tab', { name: 'Insights' })
+      ).toBeVisible();
 
       // The modal makes the record inert, so the same action falls back to the
       // inline evidence detail rather than moving focus behind the drawer.

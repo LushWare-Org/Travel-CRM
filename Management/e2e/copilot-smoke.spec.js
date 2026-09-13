@@ -12,7 +12,12 @@ import { SURFACE_SELECTOR } from './utils/copilot.js';
 // the counting question cannot be answered by a fixture. Run it against the local
 // microservices stack (`cd Services && npm start`) with GEMINI_API_KEY set.
 
-const DOCK = 'section[aria-labelledby="copilot-insights-heading"]';
+// The PANEL, despite the name: it is the element carrying `data-copilot-panel`,
+// and it renders both inside the desktop dock and inside the drawer. It used to
+// be found by the heading that named it, which the tab strip replaced.
+const DOCK = '[data-copilot-panel]';
+// The tab strip, which is the panel's title and sits OUTSIDE the panel element.
+const COPILOT_TABS = '[data-copilot-tabs]';
 const RANKED_ITEM = '[data-copilot-item]';
 const BAND_RANK = { critical: 0, warning: 1, info: 2 };
 
@@ -25,9 +30,9 @@ test.describe('copilot smoke — the counting question', () => {
     const dock = page.locator(DOCK);
     await expect(dock).toBeVisible({ timeout: 30_000 });
 
-    // The panel is "Insights", and the page it is anchored to is named beneath the
-    // heading rather than in it — the rename this check exists to catch.
-    await expect(dock.getByRole('heading', { name: 'Insights' })).toBeVisible();
+    // The tab IS the panel's title now, and the page it is anchored to is named
+    // beneath it rather than in it — the rename this check exists to catch.
+    await expect(page.locator(COPILOT_TABS).getByRole('tab', { name: 'Insights' })).toBeVisible();
     await expect(dock).toContainText('Leads');
 
     // Ranked rows, not the legacy sectioned list: these hooks exist only on the

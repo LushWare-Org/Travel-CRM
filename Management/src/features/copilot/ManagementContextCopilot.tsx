@@ -8,10 +8,8 @@ import CopilotDrawer from "./CopilotDrawer";
 import CopilotRail from "./CopilotRail";
 import CopilotTrigger from "./CopilotTrigger";
 import CopilotConversation from "./CopilotConversation";
-import CopilotTabs, { type CopilotTab } from "./CopilotTabs";
+import CopilotTabs, { COPILOT_TAB_IDS, type CopilotTab } from "./CopilotTabs";
 import type { CopilotSession, CopilotScope, SinceWindow } from "./types";
-
-const INSIGHTS_HEADING_ID = "copilot-insights-heading";
 
 export type CopilotSectionApi = {
   session: CopilotSession;
@@ -23,9 +21,9 @@ export type CopilotSectionApi = {
   /**
    * Bring the conversation forward.
    *
-   * Threaded to `SuggestedQuestions` through each panel, because submitting a
-   * question from the Insights tab would otherwise create a turn on a tab the
-   * operator is not looking at.
+   * Threaded to each panel so attaching a finding raises the conversation. The
+   * findings list owns the reading; the tab that answers questions owns the
+   * asking, so nothing is submitted from a tab the operator is not looking at.
    */
   showConversation: () => void;
 };
@@ -117,11 +115,14 @@ export default function ManagementContextCopilot({
   const collapse = useCallback(() => setVisibility("collapsed"), [setVisibility]);
 
   // Opening the panel from either desktop control lands focus on the element
-  // that names the region, exactly as the drawer's `initialFocus` does. Without
-  // the rule a keyboard operator presses the trigger, the panel appears
+  // that names the region, exactly as the drawer's `initialFocus` does. The tab
+  // names the panel now that no heading sits inside it, and it is the ACTIVE tab
+  // that names what is on screen — so the target is derived, not a fixed id.
+  // Without the rule a keyboard operator presses the trigger, the panel appears
   // elsewhere in the tab order, and they must traverse the page to reach what
   // they just opened. The dock is not a dialog, so the move is explicit and
-  // runs on the commit that mounts it — never before the heading exists.
+  // runs on the commit that mounts it — never before the tab exists.
+  const activeTabId = COPILOT_TAB_IDS[activeTab];
   const focusOnExpandRef = useRef(false);
   const expand = useCallback(() => {
     focusOnExpandRef.current = true;
@@ -131,8 +132,8 @@ export default function ManagementContextCopilot({
   useEffect(() => {
     if (!dockOpen || !focusOnExpandRef.current) return;
     focusOnExpandRef.current = false;
-    document.getElementById(INSIGHTS_HEADING_ID)?.focus();
-  }, [dockOpen]);
+    document.getElementById(activeTabId)?.focus();
+  }, [dockOpen, activeTabId]);
 
   const handleDrawerOpenChange = useCallback(
     (next: boolean) => {
@@ -170,7 +171,7 @@ export default function ManagementContextCopilot({
 
   return (
     <>
-      {dockOpen && <CopilotDock labelledBy={INSIGHTS_HEADING_ID}>{body}</CopilotDock>}
+      {dockOpen && <CopilotDock>{body}</CopilotDock>}
 
       {isDesktop && !dockOpen && (
         <>
@@ -193,6 +194,7 @@ export default function ManagementContextCopilot({
         <CopilotDrawer
           open={drawerOpen}
           onOpenChange={handleDrawerOpenChange}
+          initialFocusId={activeTabId}
           hasAttention={session.hasAttention}
           showCue={showCue}
           onDismissCue={dismissCue}

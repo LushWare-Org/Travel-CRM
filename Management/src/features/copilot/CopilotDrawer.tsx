@@ -4,20 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import CopilotTrigger from "./CopilotTrigger";
 
-/**
- * The heading that names the panel, plus the scope marker each panel carries so
- * a test can tell the record panel from the collection one without reading copy.
- * Both the drawer and the `xl`+ desktop
- * trigger move focus onto it on open, so the element the operator lands on is
- * the one that labels the region they just opened. Rendered by `LeadInsights`
- * (record scopes) or `CollectionInsights` (collection scopes).
- */
-const DRAWER_HEADING_ID = "copilot-insights-heading";
-
 type CopilotDrawerProps = {
   children: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * The tab that names the visible panel. The shell owns which tab is active and
+   * passes its id, because opening the drawer has to land focus on the name of
+   * what the operator is about to read — including after they switched tabs.
+   */
+  initialFocusId: string;
   hasAttention: boolean;
   /** One-time "Insights ready" cue: truthful status copy, not a count. */
   showCue: boolean;
@@ -28,12 +24,14 @@ type CopilotDrawerProps = {
  * Below `xl` the record keeps the full content column and the same session body
  * opens in a right-edge modal drawer. It reuses Dialog's portal, overlay, focus
  * trap, Escape dismissal, scroll lock, and focus restoration; opening moves
- * focus to the drawer heading and closing returns it to the trigger.
+ * focus to the tab that names the visible panel and closing returns it to the
+ * trigger.
  */
 export default function CopilotDrawer({
   children,
   open,
   onOpenChange,
+  initialFocusId,
   hasAttention,
   showCue,
   onDismissCue,
@@ -73,7 +71,7 @@ export default function CopilotDrawer({
         showCloseButton={false}
         aria-label="Copilot"
         aria-describedby={undefined}
-        initialFocus={() => document.getElementById(DRAWER_HEADING_ID)}
+        initialFocus={() => document.getElementById(initialFocusId)}
         finalFocus={triggerRef}
         className="fixed inset-y-0 top-0 right-0 left-auto z-50 flex h-[100dvh] w-[min(420px,90vw)] max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-l border-border bg-card p-0 pb-[env(safe-area-inset-bottom)] ring-0 duration-200 data-open:animate-in data-open:slide-in-from-right data-closed:animate-out data-closed:slide-out-to-right sm:max-w-none max-md:w-full"
       >

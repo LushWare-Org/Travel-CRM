@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ClipboardList, Loader2, PanelRightClose } from "lucide-react";
+import { AlertTriangle, Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import InsightRow from "./InsightRow";
-import { ProducerLine, SuggestedQuestions, sectionBuckets } from "./insightShared";
+import { ProducerLine, sectionBuckets } from "./insightShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
 import type { ClaimSection, CopilotClaim, CopilotSession, RenderedInsights } from "./types";
 
@@ -13,7 +13,7 @@ type LeadInsightsProps = {
   leadId?: string | null;
   /** Collapses the persistent desktop dock. Omitted below `xl`. */
   onCollapse?: () => void;
-  /** Bring the conversation forward after a suggested question is submitted. */
+  /** Bring the conversation forward when a finding is attached. */
   onShowConversation?: () => void;
 };
 
@@ -107,38 +107,34 @@ export default function LeadInsights({
   };
 
   return (
-    <section aria-labelledby="copilot-insights-heading" data-copilot-panel="record" className="space-y-4">
+    <div data-copilot-panel="record" className="space-y-4">
       <header className="space-y-1">
-        <div className="flex items-start justify-between gap-2">
-          <h2 id="copilot-insights-heading" tabIndex={-1} className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
-            <ClipboardList className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            Insights
-          </h2>
-          {onCollapse && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onCollapse}
-              aria-label="Collapse copilot"
-              className="shrink-0"
-            >
-              <PanelRightClose className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
-        </div>
-
         {/*
-          Line two of two, same rule as the collection panel: the producer marker
-          never truncates, the scope label truncates first. The old third label
-          ("AI checked this lead") collapsed into the marker — authorship is now
-          stated once, and a label that says "AI" next to a marker that already
-          says it was the duplication this removes.
+          Same rule as the collection panel: the producer marker never truncates,
+          the scope label truncates first. The old third label ("AI checked this
+          lead") collapsed into the marker — authorship is stated once, and a
+          label that says "AI" next to a marker that already says it was the
+          duplication this removes.
+
+          The panel's own name is the tab above it, so this row starts at the
+          scope. `ml-auto` keeps the collapse control out of that wrap argument.
         */}
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <p className="min-w-[4rem] truncate text-sm text-foreground">{scopeLabel}</p>
           <ProducerLine producer={rendered.producer} context={session.context} />
           {leadId && <span className="font-mono text-xs tabular-nums text-muted-foreground">{leadId}</span>}
           {session.modelPartial && <span className="text-xs text-warning">Partial insights</span>}
+          {onCollapse && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onCollapse}
+              aria-label="Collapse copilot"
+              className="ml-auto shrink-0"
+            >
+              <PanelRightClose className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -229,10 +225,8 @@ export default function LeadInsights({
               </Button>
             </div>
           )}
-
-          <SuggestedQuestions session={session} onAsk={onShowConversation} />
         </div>
       )}
-    </section>
+    </div>
   );
 }
