@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
   ASSISTANT_ACTION_TOOLS,
+  ASSISTANT_FORM_FIELD_TYPES,
+  ASSISTANT_FORM_FIELDS,
+  ASSISTANT_FORM_SURFACES,
   ASSISTANT_PAGE_ACTIONS,
+  ASSISTANT_PAGE_SURFACES,
   ASSISTANT_SEARCH_TOOL,
   ASSISTANT_TOOL_NAMES,
   ASSISTANT_VIEW_TOOL,
-  AssistantCurrentView,
   AssistantAction,
+  AssistantCurrentView,
+  assistantFormFieldsSchema,
+  isWritableFormFieldType,
   AssistantPageCapabilities,
   AssistantPageContext,
 } from '../src/assistantActions.js';
@@ -23,6 +29,7 @@ describe('ASSISTANT_ACTION_TOOLS', () => {
       'generate_itinerary',
       'regenerate_days',
       'edit_day',
+      'prefill_form',
     ]);
   });
 
@@ -43,6 +50,7 @@ describe('ASSISTANT_TOOL_NAMES', () => {
       'generate_itinerary',
       'regenerate_days',
       'edit_day',
+      'prefill_form',
       'answer_current_view',
     ]);
   });
@@ -99,6 +107,51 @@ describe('AssistantCurrentView', () => {
     const view = AssistantCurrentView.parse({ path: '/packages', filteredCount: null, renderedCount: null });
     expect(view.filteredCount).toBeNull();
     expect(view.filteredCount).not.toBe(0);
+  });
+});
+
+describe('the form prefill vocabulary', () => {
+  it('frozen: the four forms a page can put on screen are surfaces of their own', () => {
+    expect(ASSISTANT_FORM_SURFACES).toEqual(['contact', 'booking', 'review', 'application']);
+    expect(ASSISTANT_PAGE_SURFACES).toEqual(['planner', 'customize', ...ASSISTANT_FORM_SURFACES]);
+  });
+
+  it('admits only the types the protocol exists for, so the rest are refused by construction', () => {
+    for (const type of ['text', 'email', 'tel', 'textarea', 'date', 'number', 'select']) {
+      expect(isWritableFormFieldType(type), type).toBe(true);
+    }
+    // The three the design names as outside the protocol: a resume file, a
+    // consent checkbox, and a credential.
+    for (const type of ['file', 'checkbox', 'password', 'hidden', 'submit']) {
+      expect(isWritableFormFieldType(type), type).toBe(false);
+    }
+    expect(ASSISTANT_FORM_FIELD_TYPES).toEqual(['text', 'email', 'tel', 'textarea', 'date', 'number', 'select']);
+  });
+
+  it('holds no field of a refused type, in any form', () => {
+    const declared = Object.values(ASSISTANT_FORM_FIELDS).flatMap((fields) => Object.values(fields));
+    expect(declared.every(isWritableFormFieldType)).toBe(true);
+  });
+
+  it('validates each form\u2019s fields by the type it declared', () => {
+    const contact = assistantFormFieldsSchema('contact');
+    expect(contact.parse({ name: 'Ana', email: 'ana@example.com', travelDate: '2027-03-14' })).toEqual({
+      name: 'Ana',
+      email: 'ana@example.com',
+      travelDate: '2027-03-14',
+    });
+    // A wrong value for the declared type fails rather than being coerced.
+    expect(contact.safeParse({ email: 'not an email' }).success).toBe(false);
+    expect(contact.safeParse({ travelDate: '14 March' }).success).toBe(false);
+    expect(assistantFormFieldsSchema('booking').safeParse({ travelers: '4' }).success).toBe(false);
+    expect(assistantFormFieldsSchema('booking').parse({ travelers: 4 })).toEqual({ travelers: 4 });
+  });
+
+  it('strips a field the form does not declare, rather than refusing the whole fill', () => {
+    // Same call as everywhere in this file: a client can be a deploy behind, and
+    // an added field must degrade to "ignored", never to "the action was refused".
+    expect(assistantFormFieldsSchema('review').parse({ name: 'Ana', resume: 'cv.pdf' })).toEqual({ name: 'Ana' });
+    expect(assistantFormFieldsSchema('unknown-form').parse({ name: 'Ana' })).toEqual({});
   });
 });
 

@@ -38,16 +38,91 @@ export const ASSISTANT_PAGE_ACTIONS = [
   'generate_itinerary',
   'regenerate_days',
   'edit_day',
+  // One member for every form on the site rather than one per field: a form
+  // declares its own fields (below), so a new field is data, not a new tool — and
+  // a page that has no form registered is never offered this one.
+  'prefill_form',
 ];
+
+/** Shape-only ISO day. Real-date, past-date and trip-length rules belong to the page that applies it. */
+export const assistantIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 /** The contact fields set_contact_details may write, one per turn. */
 export const ASSISTANT_CONTACT_FIELDS = ['name', 'email', 'phone'];
 
+// ─── Form prefill ────────────────────────────────────────────────────────
+// A form is prefillable field type by field type, and the allowlist is the
+// protocol: only these types may be registered, so a file input, a consent
+// checkbox and a credential field are outside it BY CONSTRUCTION rather than by
+// each form remembering to omit them. `ApplicationForm.tsx`'s resume file and
+// its required `agreeTerms` are the concrete cases the design names.
+const FORM_FIELD_VALUE = {
+  text: z.string().trim().min(1).max(200),
+  email: z.string().trim().min(3).max(320).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/),
+  tel: z.string().trim().min(5).max(40).regex(/^[+()\d\s-]+$/),
+  textarea: z.string().trim().min(1).max(2000),
+  date: assistantIsoDate,
+  number: z.number().int().min(1).max(50),
+  select: z.string().trim().min(1).max(120),
+};
+
+/** Every type a field may declare, and the only ones the registry will accept. */
+export const ASSISTANT_FORM_FIELD_TYPES = Object.keys(FORM_FIELD_VALUE);
+
+/**
+ * The fields each form may have written, and the type of each. The type decides
+ * validation on both sides (one schema per type, below) and the prompt's list of
+ * what may be filled — so a field can be added here and nowhere else.
+ *
+ * `select` values are shape-checked here and validated against the form's own
+ * options on the client, because those options are data (the live vacancies)
+ * rather than a constant this package could hold.
+ */
+export const ASSISTANT_FORM_FIELDS = {
+  contact: { name: 'text', email: 'email', phone: 'tel', subject: 'text', message: 'textarea', travelDate: 'date' },
+  booking: { name: 'text', email: 'email', phone: 'tel', travelers: 'number', message: 'textarea' },
+  review: { name: 'text', comment: 'textarea' },
+  application: { fullName: 'text', email: 'email', phone: 'tel', position: 'select', coverLetter: 'textarea' },
+};
+
+/** Whether a field type may be prefilled at all. A registry refuses anything else. */
+export const isWritableFormFieldType = (type) => ASSISTANT_FORM_FIELD_TYPES.includes(type);
+
+/**
+ * What one form's fields parse to. Built from the type map rather than restated,
+ * so the wire validation, the client's re-validation before it writes a field and
+ * the prompt cannot disagree about a bound.
+ *
+ * Every field is optional: a fill names the fields the visitor actually gave
+ * ("my name is Ana" is one field of six), and the wire rule that a fill must carry
+ * at least one of them belongs to the server's canonicalizer rather than to the
+ * shape.
+ */
+export const assistantFormFieldsSchema = (form) =>
+  z.object(
+    Object.fromEntries(
+      Object.entries(ASSISTANT_FORM_FIELDS[form] ?? {}).map(([field, type]) => [
+        field,
+        // Unknown types never reach here (the registry refuses them); a missing
+        // one degrades to the strictest sensible text rather than throwing.
+        (FORM_FIELD_VALUE[type] ?? FORM_FIELD_VALUE.text).optional(),
+      ]),
+    ),
+  );
+
 /** Server-executed, page-independent: a web-grounded travel answer. */
 export const ASSISTANT_SEARCH_TOOL = 'search_travel_info';
 
+/**
+ * The pages a form can be filled on. A form is a surface, not a sub-capability:
+ * a modal registers its surface while it is open and unregisters it when it
+ * closes, which is what keeps "the assistant may write into the booking form"
+ * true only while that form is on screen.
+ */
+export const ASSISTANT_FORM_SURFACES = ['contact', 'booking', 'review', 'application'];
+
 /** Pages that can register page actions. `revision` carries which one is mounted. */
-export const ASSISTANT_PAGE_SURFACES = ['planner', 'customize'];
+export const ASSISTANT_PAGE_SURFACES = ['planner', 'customize', ...ASSISTANT_FORM_SURFACES];
 
 // What an edit_day may do to one day. One operation per turn keeps the argument
 // the page applies unambiguous — and the enum is the extension point: a new kind
@@ -60,9 +135,6 @@ export const ASSISTANT_DAY_OPERATIONS = [
   'set_title',
   'set_notes',
 ];
-
-/** Shape-only ISO day. Real-date, past-date and trip-length rules belong to the page that applies it. */
-export const assistantIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 // What the browser says it can do this turn. Untrusted input (it is interpolated
 // into the prompt and gates an execution), so every field is bounded here.
@@ -202,6 +274,17 @@ export const AssistantAction = z.discriminatedUnion('tool', [
     values: z.array(DayField).min(1).max(15),
   }),
   z.object({ tool: z.literal(ASSISTANT_SEARCH_TOOL), message: ActionMessage, query: z.string().min(3).max(512) }),
+  z.object({
+    // The values the form's own fields take: a string for every text-like type, a
+    // number for a count, and the form's id deciding which of them are legal.
+    // `fields` is deliberately not per-form here — the union cannot see which form
+    // the turn offered, so the per-form narrowing happens against
+    // `assistantFormFieldsSchema(form)` on the server and again on the client.
+    tool: z.literal('prefill_form'),
+    message: ActionMessage,
+    form: z.enum(ASSISTANT_FORM_SURFACES),
+    fields: z.record(z.string().min(1).max(40), z.union([z.string().max(2000), z.number()])),
+  }),
 ]);
 
 /** Every action name, page-executed and server-executed, in one list. */
