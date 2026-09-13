@@ -10,6 +10,9 @@ import { parseEnvelope } from '../http/envelope';
 export const AssistantTurnTool = z.enum([
   'navigate',
   'answer_faq_policy',
+  'answer_packages',
+  'hand_off',
+  'request_booking',
   'respond_conversationally',
   'redirect_off_topic',
 ]);
@@ -28,10 +31,36 @@ export const AssistantTurnMessage = z.object({
 export const AssistantTurnRequest = z.object({
   sessionId: z.string(),
   messages: z.array(AssistantTurnMessage).min(1).max(20),
+  // Cards already drawn this session. Declared here for the same reason as
+  // `params` on a route: this schema parses the outgoing payload and zod strips
+  // unknown keys, so a field omitted here never leaves the browser.
+  shownPackageIds: z.array(z.string().max(64)).max(200).optional(),
   // Client-owned nav allowlist, sent per request — single source of truth
   // lives client-side (see Change 1's getEnabledAssistantRoutes); the server
   // only validates the model's chosen route against what the client offered.
-  availableRoutes: z.array(z.object({ name: z.string(), path: z.string() })),
+  availableRoutes: z.array(
+    z.object({
+      name: z.string(),
+      path: z.string(),
+      // Query keys the assistant may filter this route by — the page's own
+      // list, declared in config/assistantRoutes.ts. Load-bearing: this schema
+      // parses the outgoing payload, and zod strips unknown keys, so omitting
+      // `params` here would delete it before the request ever left the browser
+      // and the server would never see a filter vocabulary. Optional so the
+      // client and server stay compatible across a staggered deploy; the
+      // server reads a missing list as "this route takes no filters".
+      params: z.array(z.string().max(40)).max(20).optional(),
+      // The closed set of values a filter may take, e.g. the destinations that
+      // actually exist. Carried per route for the same reason `params` is: the
+      // page owns the vocabulary, and the server must not keep a second copy
+      // that drifts. Without it the model names a destination from memory, and
+      // an unresolved slug is not rejected by this API — it returns the whole
+      // catalogue, so the visitor sees an unfiltered page that looks filtered.
+      paramValues: z
+        .record(z.string().max(40), z.array(z.object({ value: z.string().max(60), label: z.string().max(120) })).max(200))
+        .optional(),
+    }),
+  ),
 });
 
 export const AssistantTurnResult = z.object({

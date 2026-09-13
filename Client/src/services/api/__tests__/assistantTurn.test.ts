@@ -73,6 +73,32 @@ describe('sendAssistantTurn', () => {
     });
   });
 
+  it('carries each route filter list through the outgoing parse', async () => {
+    // The request schema parses the payload before it is posted and zod strips
+    // unknown keys, so an omitted `params` field would silently delete the
+    // client's filter vocabulary and the server would navigate unfiltered.
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        data: { toolCall: { tool: 'navigate', args: {} }, serverResult: null, message: 'ok' },
+      },
+    });
+
+    await sendAssistantTurn({
+      sessionId: 'sess-1',
+      messages: [MESSAGE],
+      availableRoutes: [{ name: 'packages', path: '/packages', params: ['destination', 'priceMax'] }],
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/assistant/turn',
+      expect.objectContaining({
+        availableRoutes: [{ name: 'packages', path: '/packages', params: ['destination', 'priceMax'] }],
+      }),
+      { retry: false, timeout: ASSISTANT_TURN_TIMEOUT_MS },
+    );
+  });
+
   it('rejects before calling httpClient.post when messages is []', async () => {
     await expect(sendAssistantTurn({ sessionId: 'sess-1', messages: [], availableRoutes: AVAILABLE_ROUTES })).rejects.toThrow();
     expect(mockPost).not.toHaveBeenCalled();

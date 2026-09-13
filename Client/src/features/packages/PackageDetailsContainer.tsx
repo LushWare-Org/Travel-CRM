@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Clock, Star, MapPin, Check, X, Calendar, Download, ChevronLeft, ChevronRight,
   Award, Sparkles, ChevronDown, Phone, Mail,
@@ -32,6 +32,12 @@ interface Review {
 export default function PackageDetailsContainer() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // A booking handoff from the assistant lands on /package/<id>?book=1 with the
+  // booking step already open. Consumed once per mount, and the parameter is
+  // removed with a replace so a refresh does not reopen the modal and the Back
+  // button is not trapped on the same page.
+  const bookingHandoffConsumedRef = useRef(false);
   const [pkg, setPkg] = useState<NormalizedPackage | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activeSection, setActiveSection] = useState('overview');
@@ -107,15 +113,18 @@ export default function PackageDetailsContainer() {
   }, [id]);
 
   useEffect(() => {
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        name: prev.name || user.name || '',
-        email: prev.email || user.email || '',
-        phone: prev.phone || user.phone || '',
-      }));
-    }
-  }, [user]);
+    if (bookingHandoffConsumedRef.current) return;
+    // Waits for the package because the booking request is submitted against
+    // it; opening the form before the record is known would collect a booking
+    // for nothing.
+    if (!pkg || searchParams.get('book') !== '1') return;
+    bookingHandoffConsumedRef.current = true;
+    setSubmissionType('booking');
+    setShowBookingModal(true);
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('book');
+    setSearchParams(remaining, { replace: true });
+  }, [pkg, searchParams, setSearchParams]);
 
   const heroImages = pkg?.images || [];
   useEffect(() => {

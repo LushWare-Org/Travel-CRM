@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import PackageDetailsContainer from '../PackageDetailsContainer';
 import ReviewModal from '../components/ReviewModal';
 import type { ReviewFormData } from '../components/ReviewModal';
@@ -83,11 +83,27 @@ const mockPackage = {
   raw: { _id: 'pkg-1', id: 'pkg-1', name: 'Bali Bliss', bookings: 12 },
 };
 
-const renderContainer = () =>
+// The search string is asserted because the booking handoff consumes it: the
+// page removes `?book=1` after opening the form, so a refresh does not reopen it
+// and the Back button is not trapped on the same page.
+const LocationProbe = () => {
+  const location = useLocation();
+  return <div data-testid="location-search">{location.search}</div>;
+};
+
+const renderContainer = (entry = '/package/pkg-1') =>
   render(
-    <MemoryRouter initialEntries={['/package/pkg-1']}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
-        <Route path="/package/:id" element={<PackageDetailsContainer />} />
+        <Route
+          path="/package/:id"
+          element={
+            <>
+              <PackageDetailsContainer />
+              <LocationProbe />
+            </>
+          }
+        />
       </Routes>
     </MemoryRouter>
   );
@@ -107,6 +123,25 @@ beforeEach(() => {
 });
 
 describe('PackageDetailsContainer', () => {
+  it('opens the booking form when the assistant hands off with ?book=1', async () => {
+    renderContainer('/package/pkg-1?book=1');
+
+    expect(await screen.findByText('Bali, Indonesia')).toBeInTheDocument();
+    // The assistant's booking chip lands here. Without this the visitor arrives
+    // on the package page with nothing open and has to find the button the
+    // handoff was meant to press for them.
+    expect(await screen.findByText('Book Your Adventure')).toBeInTheDocument();
+    // Consumed, then removed: a refresh must not reopen the form.
+    expect(screen.getByTestId('location-search').textContent).toBe('');
+  });
+
+  it('leaves the booking form closed without the handoff parameter', async () => {
+    renderContainer();
+
+    await screen.findByText('Bali, Indonesia');
+    expect(screen.queryByText('Book Your Adventure')).not.toBeInTheDocument();
+  });
+
   it('renders the package details from the mocked package', async () => {
     renderContainer();
 

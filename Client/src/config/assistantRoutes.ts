@@ -8,16 +8,43 @@ import { PAGE_CONFIG } from './pages';
 // the enabled subset to assistant-service on every turn, so the model's tool
 // vocabulary and the client's executable allowlist can never drift.
 //
-// Parameterized routes (/package/:id, /package/:id/customize) are phase 2's
-// get_package_detail targets — deliberately absent here.
-export const ASSISTANT_ROUTES: { name: string; path: string; enabled: boolean }[] = [
-  { name: 'home', path: '/', enabled: true },
-  { name: 'packages', path: '/packages', enabled: PAGE_CONFIG.packages.enabled },
-  { name: 'destinations', path: '/destinations-international', enabled: PAGE_CONFIG.destinations.enabled },
-  { name: 'about', path: '/about', enabled: PAGE_CONFIG.about.enabled },
-  { name: 'contact', path: '/contact', enabled: PAGE_CONFIG.contact.enabled },
-  { name: 'career', path: '/career', enabled: PAGE_CONFIG.career.enabled },
-  { name: 'planner', path: '/planner', enabled: PAGE_CONFIG.planner.enabled },
+// Path-parameterized routes (/package/:id, /package/:id/customize) are phase
+// 2's get_package_detail targets — deliberately absent here. Query filters are
+// supported, and are a different thing: each entry declares the query keys its
+// own page reads via `params`, which travels with the route on every turn so
+// the assistant can build a filtered URL without this list being duplicated
+// server-side. A route with no filters declares an empty array.
+export const ASSISTANT_ROUTES: {
+  name: string;
+  path: string;
+  enabled: boolean;
+  params: string[];
+}[] = [
+  { name: 'home', path: '/', enabled: true, params: [] },
+  {
+    name: 'packages',
+    path: '/packages',
+    enabled: PAGE_CONFIG.packages.enabled,
+    // Exactly the filters PackagesContainer reads that a visitor can ask for
+    // by name. `view` and `page` are deliberately excluded: nobody asks to be
+    // on page 3 in grid mode, and the page resets `page` on every filter
+    // change, so forwarding either would fight the page's own behaviour.
+    params: [
+      'destination',
+      'category',
+      'priceMin',
+      'priceMax',
+      'durationMin',
+      'durationMax',
+      'rating',
+      'sort',
+    ],
+  },
+  { name: 'destinations', path: '/destinations-international', enabled: PAGE_CONFIG.destinations.enabled, params: [] },
+  { name: 'about', path: '/about', enabled: PAGE_CONFIG.about.enabled, params: [] },
+  { name: 'contact', path: '/contact', enabled: PAGE_CONFIG.contact.enabled, params: [] },
+  { name: 'career', path: '/career', enabled: PAGE_CONFIG.career.enabled, params: [] },
+  { name: 'planner', path: '/planner', enabled: PAGE_CONFIG.planner.enabled, params: [] },
 ];
 
 // Routes where the floating assistant deliberately does not mount — exactly
@@ -55,7 +82,9 @@ export const isAssistantExcludedPath = (pathname: string): boolean => {
 // hand-rolled route matcher that can drift from the first.
 export const isLauncherAlwaysVisiblePath = (pathname: string): boolean => isAssistantExcludedPath(pathname);
 
-// Wire shape the assistant API contract needs ({ name, path } only — the
-// `enabled` flag is a client-side visibility concern, not a per-request one).
-export const getEnabledAssistantRoutes = (): { name: string; path: string }[] =>
-  ASSISTANT_ROUTES.filter((route) => route.enabled).map(({ name, path }) => ({ name, path }));
+// Wire shape the assistant API contract needs. `enabled` is dropped — it is a
+// client-side visibility concern, not a per-request one. `params` is kept: it
+// is the permission half of the filter contract, telling the server which
+// query keys this page actually honours so a filter can never be invented.
+export const getEnabledAssistantRoutes = (): { name: string; path: string; params: string[] }[] =>
+  ASSISTANT_ROUTES.filter((route) => route.enabled).map(({ name, path, params }) => ({ name, path, params }));

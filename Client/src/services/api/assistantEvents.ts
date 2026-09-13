@@ -15,6 +15,9 @@ export type AssistantEventType = 'impression' | 'opened' | 'turn' | 'response' |
 export type AssistantEventTool =
   | 'navigate'
   | 'answer_faq_policy'
+  | 'answer_packages'
+  | 'hand_off'
+  | 'request_booking'
   | 'respond_conversationally'
   | 'redirect_off_topic'
   | null;
