@@ -41,6 +41,7 @@ export default function ReviewModal({
           // `step` is a planner idea; a form has exactly one, so it reports 1.
           pageContext: { surface: 'review', revision: 'review', step: 1 },
           actions: ['prefill_form'],
+          hostedInDialog: true,
           prefill: {
             form: 'review',
             fields: () => ({

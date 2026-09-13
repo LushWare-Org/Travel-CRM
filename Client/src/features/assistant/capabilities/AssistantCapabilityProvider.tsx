@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { z } from 'zod';
 import type { AssistantAction, AssistantCurrentView, AssistantPageContext } from '@travel-crm/contracts';
@@ -76,6 +76,12 @@ export interface AssistantPageRegistration {
   runAction?: (action: AssistantActionPayload) => Promise<string>;
   /** Present only on a page with a form on screen; the `prefill_form` member needs it. */
   prefill?: AssistantFormPrefill;
+  /**
+   * True when the registered form lives inside a dialog. The panel has to sit
+   * above an open dialog to be usable at all, and the layer it takes is the only
+   * thing that says so.
+   */
+  hostedInDialog?: boolean;
 }
 
 interface AssistantCapabilityStore {
@@ -85,6 +91,9 @@ interface AssistantCapabilityStore {
   /** The mounted page's own report of what is on screen, read at send time too. */
   getView: () => AssistantCurrentViewValue | null;
   setView: (view: AssistantCurrentViewValue | null) => void;
+  /** Whether the mounted registration is a dialog-hosted form, for the panel's layer. */
+  setDialogHost: (hosted: boolean) => void;
+  hostedInDialog: boolean;
 }
 
 const AssistantCapabilityContext = createContext<AssistantCapabilityStore | null>(null);
@@ -103,6 +112,9 @@ const AssistantCapabilityContext = createContext<AssistantCapabilityStore | null
 export function AssistantCapabilityProvider({ children }: { children: ReactNode }) {
   const registration = useRef<AssistantPageRegistration | null>(null);
   const currentView = useRef<AssistantCurrentViewValue | null>(null);
+  // State, not a ref: the widget has to re-render to change its layer, and this is
+  // the only part of a registration that is read during render.
+  const [hostedInDialog, setDialogHost] = useState(false);
 
   const store = useMemo<AssistantCapabilityStore>(
     () => ({
@@ -114,8 +126,10 @@ export function AssistantCapabilityProvider({ children }: { children: ReactNode 
       setView: (next) => {
         currentView.current = next;
       },
+      setDialogHost,
+      hostedInDialog,
     }),
-    [],
+    [hostedInDialog],
   );
 
   return <AssistantCapabilityContext.Provider value={store}>{children}</AssistantCapabilityContext.Provider>;
@@ -142,8 +156,18 @@ export function useAssistantPageRegistration(registration: AssistantPageRegistra
 
   useEffect(() => {
     store.set(registration);
-    return () => store.set(null);
+    store.setDialogHost(Boolean(registration?.hostedInDialog));
+    return () => {
+      store.set(null);
+      store.setDialogHost(false);
+    };
   }, [store, registration]);
+}
+
+/** Whether the mounted form lives in a dialog: the panel's layer follows it. */
+export function useAssistantDialogHost(): boolean {
+  const store = useContext(AssistantCapabilityContext);
+  return store?.hostedInDialog ?? false;
 }
 
 /**

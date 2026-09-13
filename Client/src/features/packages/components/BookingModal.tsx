@@ -76,6 +76,7 @@ export default function BookingModal({
           // `step` is a planner idea; the form reports its own first step.
           pageContext: { surface: 'booking', revision: 'booking', step: 1 },
           actions: ['prefill_form'],
+          hostedInDialog: true,
           prefill: {
             form: 'booking',
             fields: () => ({

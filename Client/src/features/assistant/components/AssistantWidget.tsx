@@ -10,6 +10,7 @@ import { isAssistantExcludedPath } from '../../../config/assistantRoutes';
 import { Badge } from '../../../components/ui/badge';
 import { formatCurrency } from '../../../lib/currency';
 import { setAssistantLauncherOpen, useAssistantLauncherOpen } from '../../../components/shared/floating-actions/assistantLauncherState';
+import { useAssistantDialogHost } from '../capabilities/AssistantCapabilityProvider';
 
 const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + route.slice(1);
 
@@ -330,6 +331,9 @@ export default function AssistantWidget() {
   const navigate = useNavigate();
   const chat = useAssistantChat();
   const isOpen = useAssistantLauncherOpen();
+  const dialogHost = useAssistantDialogHost();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const returnFocusTo = useRef<Element | null>(null);
   const [input, setInput] = useState('');
   const openedEventFired = useRef(false);
   const mountPathname = useRef(location.pathname);
@@ -400,6 +404,20 @@ export default function AssistantWidget() {
     resolvePrefillRef.current(assistantMessageId, choice);
   }, []);
 
+  // Opening moves focus into the panel; closing gives it back to whatever had it.
+  // Both are what makes the assistant usable from inside a dialog without the
+  // dialog's own focus trap swallowing it. Declared before the early returns
+  // below, like every other hook here.
+  useEffect(() => {
+    if (isOpen) {
+      returnFocusTo.current = document.activeElement;
+      panelRef.current?.focus();
+      return;
+    }
+    const target = returnFocusTo.current;
+    if (target instanceof HTMLElement) target.focus();
+  }, [isOpen]);
+
   if (isAssistantExcludedPath(location.pathname)) return null;
   if (!isOpen) return null;
 
@@ -413,8 +431,17 @@ export default function AssistantWidget() {
 
   return (
     <div
-      className="fixed right-3 z-floating-action pointer-events-none"
+      className={`fixed right-3 pointer-events-none ${dialogHost ? 'z-floating-assistant' : 'z-floating-action'}`}
       style={{ bottom: `${ASSISTANT_PANEL_BOTTOM_OFFSET_PX}px` }}
+      // Escape closes the assistant FIRST, and only the assistant: the capture
+      // phase stops the dialog underneath from seeing the same key.
+      onKeyDownCapture={(event) => {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        handleClose();
+      }}
+      tabIndex={-1}
+      ref={panelRef}
     >
       <div role="dialog" aria-label="Travel assistant panel" className={PANEL_CLASS}>
         <div className="flex items-center justify-between gap-2 bg-brand-800 px-4 py-3 text-white">
