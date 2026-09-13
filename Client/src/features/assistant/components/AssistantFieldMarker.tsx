@@ -11,7 +11,7 @@ import { Badge } from '../../../components/ui/badge';
  * the system's one accent means "informational" here, while gold means featured —
  * and never a red-family colour, which means destructive.
  */
-export const assistantMarkedFieldClass = (assistantWritten: boolean): string =>
+export const assistantMarkedFieldClass = (assistantWritten?: boolean): string =>
   assistantWritten ? 'bg-brand-50 border-brand-200' : '';
 
 /** The non-colour half: what the value is and where it came from. */

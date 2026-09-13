@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AssistantCapabilityProvider } from '../../assistant/capabilities/AssistantCapabilityProvider';
+
+// The container registers the application form the assistant may fill, and that
+// registration requires the provider the app mounts at its root.
+const renderWithAssistant = (ui: Parameters<typeof render>[0]) =>
+  render(<AssistantCapabilityProvider>{ui}</AssistantCapabilityProvider>);
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CareerContainer from '../CareerContainer';
@@ -46,7 +52,7 @@ beforeEach(() => {
 
 describe('CareerContainer', () => {
   it('renders the open positions and the application form once vacancies load', async () => {
-    render(<CareerContainer />);
+    renderWithAssistant(<CareerContainer />);
 
     expect(screen.getByText('Open Positions')).toBeInTheDocument();
     expect(await screen.findByText('Travel Consultant')).toBeInTheDocument();
@@ -58,7 +64,7 @@ describe('CareerContainer', () => {
 
   it('shows the expected validation errors and does not submit when required fields are empty', async () => {
     const user = userEvent.setup();
-    render(<CareerContainer />);
+    renderWithAssistant(<CareerContainer />);
     await screen.findByText('Travel Consultant');
 
     await user.click(screen.getByRole('button', { name: /submit application/i }));
@@ -80,7 +86,7 @@ describe('CareerContainer', () => {
     uploadResumeToImgbbMock.mockResolvedValue('https://i.imgur.com/jane-resume-uploaded.png');
     submitApplicationMock.mockResolvedValue({ status: 'success' });
 
-    render(<CareerContainer />);
+    renderWithAssistant(<CareerContainer />);
     await screen.findByText('Travel Consultant');
 
     await user.type(screen.getByPlaceholderText('John Doe'), 'Jane Traveler');
