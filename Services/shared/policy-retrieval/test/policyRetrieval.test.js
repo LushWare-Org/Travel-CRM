@@ -46,6 +46,21 @@ describe('retrieveSnippets', () => {
     expect(result[0].quote).toBe('Cancellations within 30 days of departure are non-refundable except for medical emergencies with documentation.');
   });
 
+  it('matches a singular question word against a section that only says the plural', () => {
+    // "what is your cancellation policy" is one of the examples the assistant
+    // itself advertises, and the stored section only ever says "Cancellations".
+    // Scoring on exact tokens meant it matched nothing and fell back to "I don't
+    // have a confirmed answer" every time.
+    const result = retrieveSnippets(documents, 'what is your cancellation policy');
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0].docId).toBe('doc-1');
+
+    // The fold runs on both sides, so the comparison stays exact rather than
+    // becoming a prefix match: a question word that merely STARTS with a
+    // section word must still miss. "deduct" is not "refund".
+    expect(retrieveSnippets(documents, 'is there a deduction for pets')).toEqual([]);
+  });
+
   it('handles documents with no body gracefully', () => {
     expect(retrieveSnippets([{ id: 'd1', title: 'Empty', body: '' }], 'refund policy')).toEqual([]);
   });

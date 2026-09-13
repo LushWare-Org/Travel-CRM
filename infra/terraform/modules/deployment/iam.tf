@@ -206,3 +206,17 @@ resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_career" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
 }
+
+# The public assistant submits a booking request straight to booking-service
+# when a visitor confirms one in the chat, under the same rules as the leads and
+# billing grants above: it reaches the container, and booking-service's own
+# validation still decides what is accepted. Without this grant the call is
+# rejected at the Cloud Run edge before the app runs, which the turn reports to
+# the visitor as "nothing was booked" rather than as a failure.
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_booking" {
+  project  = var.project_id
+  location = var.region
+  name     = module.booking_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}

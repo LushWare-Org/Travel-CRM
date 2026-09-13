@@ -1,4 +1,5 @@
 import slugify from 'slugify';
+import { PackageCategory } from '@prisma/client';
 import prisma from '../db/client.js';
 import { calculateBasePrice, computeMargin } from '../../../shared/pricing-engine/src/index.js';
 
@@ -79,7 +80,7 @@ export function serializePackage(pkg) {
     basePrice,
     defaultMarginType: pkg.defaultMarginType,
     defaultMarginInput,
-    sellPrice: computeMargin(basePrice, pkg.defaultMarginType, defaultMarginInput).sellPrice,
+    sellPrice: resolveSellPrice(pkg, basePrice),
     currency: pkg.currency,
     isActive: pkg.isActive,
     isFeatured: pkg.isFeatured,
@@ -126,7 +127,7 @@ export function serializePackageList(pkg) {
     basePrice: Number(pkg.basePrice),
     defaultMarginType: pkg.defaultMarginType,
     defaultMarginInput: Number(pkg.defaultMarginInput),
-    sellPrice: computeMargin(Number(pkg.basePrice), pkg.defaultMarginType, Number(pkg.defaultMarginInput)).sellPrice,
+    sellPrice: resolveSellPrice(pkg, Number(pkg.basePrice)),
     currency: pkg.currency,
     isActive: pkg.isActive,
     isFeatured: pkg.isFeatured,
@@ -362,6 +363,113 @@ export async function resolveActivityCatalogIds(days) {
 
 // ── Query builder ──────────────────────────────────────────────
 
+/**
+ * The customer-facing price. A real row always carries the generated
+ * `sell_price` column, and reading that rather than recomputing is what stops
+ * a displayed price and a price filter from ever disagreeing. The
+ * `computeMargin` branch below covers objects that have no column — partial
+ * selects and hand-built test fixtures. It is a fallback, not a second
+ * source of truth: never rely on it for a row that came from the database.
+ */
+function resolveSellPrice(pkg, basePrice) {
+  if (pkg.sellPrice !== undefined && pkg.sellPrice !== null) return Number(pkg.sellPrice);
+  return computeMargin(basePrice, pkg.defaultMarginType, Number(pkg.defaultMarginInput)).sellPrice;
+}
+
+// Query strings are strings, may be absent, and may be garbage. A NaN reaching
+// Prisma is a 500, so anything non-finite is treated as "no bound at all".
+function finiteNumber(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+// Public list-sort vocabulary — the names the packages page and the assistant
+// both use — mapped to real columns. `popularity` is review volume rather than
+// bookings, matching what the page has always sorted by client-side.
+const LIST_SORTS = {
+  popularity: { field: 'numReviews', order: 'desc' },
+  'price-low': { field: 'sellPrice', order: 'asc' },
+  'price-high': { field: 'sellPrice', order: 'desc' },
+  duration: { field: 'durationDays', order: 'asc' },
+};
+
+// Columns any caller may order by. Anything outside this set falls back to
+// createdAt rather than reaching Prisma as an unknown field.
+const SORTABLE_COLUMNS = new Set([
+  'createdAt', 'updatedAt', 'basePrice', 'sellPrice', 'rating', 'numReviews',
+  'bookings', 'title', 'durationDays',
+]);
+
+export function buildListOrderBy(sort, order) {
+  const mapped = LIST_SORTS[sort];
+  if (mapped) return { [mapped.field]: mapped.order };
+
+  const column = SORTABLE_COLUMNS.has(sort) ? sort : 'createdAt';
+  return { [column]: order === 'asc' ? 'asc' : 'desc' };
+}
+
+// Mirrors the client's packages.transform slugify exactly; a difference here
+// would make a destination link resolve on the page and not in the query.
+export function destinationSlug(value = '') {
+  return value
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]+/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Every slug a raw destination display string answers to.
+ *
+ * The `destination` column holds a denormalized display string such as
+ * "Bali, Indonesia". The page addresses destinations by slug, and the client's
+ * normalizeDestination derives four per package: the first segment, the last
+ * segment, and a primary slug that prefers the country. Reproduced here so the
+ * server matches the same space the page links in.
+ */
+export function destinationSlugSet(raw = '') {
+  const trimmed = `${raw || ''}`.trim();
+  const slugs = new Set();
+  if (!trimmed) return slugs;
+
+  const parts = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
+  const nameSlug = destinationSlug(parts[0] || trimmed);
+  const countrySlug = parts.length > 1 ? destinationSlug(parts[parts.length - 1]) : '';
+  const primary = countrySlug || nameSlug;
+
+  [primary, nameSlug, countrySlug, destinationSlug(trimmed)].forEach((slug) => {
+    if (slug) slugs.add(slug);
+  });
+  return slugs;
+}
+
+/**
+ * Resolves a destination slug to the raw display strings that answer to it.
+ *
+ * Distinct destinations are bounded by the number of destinations rather than
+ * packages, so this stays cheap, and resolving against what is actually
+ * present means an unknown slug matches nothing — which the controller turns
+ * into an unfiltered list, matching the page's long-standing behaviour.
+ */
+export async function resolveDestinationRaws(slug) {
+  const wanted = destinationSlug(slug);
+  if (!wanted) return [];
+
+  const rows = await prisma.package.findMany({
+    distinct: ['destination'],
+    select: { destination: true },
+    where: { destination: { not: null } },
+  });
+
+  return rows
+    .map((row) => row.destination)
+    .filter((raw) => raw && destinationSlugSet(raw).has(wanted));
+}
+
 export function assembleWhere(query) {
   const where = {};
 
@@ -373,7 +481,24 @@ export function assembleWhere(query) {
   if (query.isFeatured !== undefined) {
     where.isFeatured = query.isFeatured === 'true' || query.isFeatured === true;
   }
-  if (query.category) where.category = query.category;
+  // `category` is a Prisma enum column, and an unrecognised value used to reach
+  // Prisma unchanged and surface as a 500 — so `/packages?category=family`
+  // returned "Something went wrong on our side" instead of a page. That is the
+  // URL the site itself produces: the landing page's category cards lowercase
+  // the name (Stats.tsx), and the assistant writes the same lowercase slug. So
+  // the comparison is case-insensitive against the real enum, and a value that
+  // is not in it matches nothing: an unknown category has no packages, which is
+  // an empty result, not a server fault.
+  if (query.category) {
+    where.category = PackageCategory[String(query.category).trim().toUpperCase()] ?? { in: [] };
+  }
+
+  // A list of raw destination strings, already resolved from a slug by
+  // resolveDestinationRaws. An empty array means "the slug matched nothing" —
+  // the caller decides whether that is an empty result or no filter at all.
+  if (Array.isArray(query.destinations) && query.destinations.length > 0) {
+    where.destination = { in: query.destinations };
+  }
 
   if (query.search) {
     where.OR = [
@@ -383,11 +508,30 @@ export function assembleWhere(query) {
     ];
   }
 
-  if (query.minPrice !== undefined || query.maxPrice !== undefined) {
-    where.basePrice = {};
-    if (query.minPrice !== undefined) where.basePrice.gte = Number(query.minPrice);
-    if (query.maxPrice !== undefined) where.basePrice.lte = Number(query.maxPrice);
+  // Price bounds are on sellPrice — the price a customer is shown — NOT on
+  // basePrice. Filtering basePrice while the cards render sellPrice is the
+  // defect this pair used to carry: at any non-zero margin the two disagree,
+  // so a budget filter silently returned packages priced above it. The
+  // planner wizard's propose_packages tool shares these two params and gets
+  // the same correction.
+  const priceMin = finiteNumber(query.minPrice);
+  const priceMax = finiteNumber(query.maxPrice);
+  if (priceMin !== undefined || priceMax !== undefined) {
+    where.sellPrice = {};
+    if (priceMin !== undefined) where.sellPrice.gte = priceMin;
+    if (priceMax !== undefined) where.sellPrice.lte = priceMax;
   }
+
+  const durationMin = finiteNumber(query.durationMin);
+  const durationMax = finiteNumber(query.durationMax);
+  if (durationMin !== undefined || durationMax !== undefined) {
+    where.durationDays = {};
+    if (durationMin !== undefined) where.durationDays.gte = durationMin;
+    if (durationMax !== undefined) where.durationDays.lte = durationMax;
+  }
+
+  const minRating = finiteNumber(query.minRating);
+  if (minRating !== undefined) where.rating = { gte: minRating };
 
   return where;
 }

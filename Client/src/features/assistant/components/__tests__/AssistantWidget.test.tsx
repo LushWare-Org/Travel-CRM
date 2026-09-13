@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import AssistantWidget from '../AssistantWidget';
@@ -11,6 +11,7 @@ import {
 
 const mockSendAssistantTurn = vi.hoisted(() => vi.fn());
 const mockSendAssistantEvent = vi.hoisted(() => vi.fn());
+const mockLoadAssistantParamValues = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../services/api/assistantTurn', () => ({
   sendAssistantTurn: mockSendAssistantTurn,
@@ -20,9 +21,20 @@ vi.mock('../../../../services/api/assistantEvents', () => ({
   sendAssistantEvent: mockSendAssistantEvent,
 }));
 
+// `sendMessage` loads the destination vocabulary before every turn. Left real,
+// each send here reaches the network from jsdom: the module swallows the
+// failure so nothing asserted wrongly, but the attempt made these tests
+// timing-dependent and they failed intermittently under parallel load.
+vi.mock('../../assistantParamValues', () => ({
+  loadAssistantParamValues: mockLoadAssistantParamValues,
+}));
+
+// The search string is included because a handoff lands on
+// `/package/<id>?book=1`, and the query is the whole of what opens the booking
+// form on the other side.
 const LocationProbe = () => {
   const location = useLocation();
-  return <div data-testid="location-probe">{location.pathname}</div>;
+  return <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>;
 };
 
 // Simulates the router-level navigation the widget doesn't control itself
@@ -104,6 +116,10 @@ const input = () => screen.getByPlaceholderText('Ask about travel, pages, or pol
 beforeEach(() => {
   mockSendAssistantTurn.mockReset();
   mockSendAssistantEvent.mockReset();
+  mockLoadAssistantParamValues.mockReset();
+  mockLoadAssistantParamValues.mockResolvedValue({
+    packages: { destination: [{ value: 'uae', label: 'Dubai' }] },
+  });
   setAssistantLauncherOpen(false);
   localStorage.clear();
 });
@@ -166,6 +182,88 @@ describe('AssistantWidget', () => {
     // Anchor bottom edge is 16px, anchor is 56px tall, 12px gap — the panel
     // clears the anchor at 84px instead of covering it.
     expect(wrapper).toHaveStyle({ bottom: '84px' });
+  });
+
+  it('a booking handoff renders a chip that opens the booking form for that package', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'hand_off', args: { kind: 'booking', packageId: 'p-bali', message: 'On the way.' } },
+      serverResult: { handoff: { kind: 'booking', packageId: 'p-bali', title: 'Bali Honeymoon Bliss' } },
+      message: 'I can take you to the booking form for Bali Honeymoon Bliss.',
+    });
+
+    renderWidget('/packages');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'book it');
+    await user.click(sendButton());
+
+    const chip = await screen.findByRole('button', { name: 'Book this package' });
+    await user.click(chip);
+
+    // The client builds this URL from the id the server resolved — the server
+    // never returns a package path, for the same reason the package card's
+    // `/package/<id>` is built here.
+    expect(screen.getByTestId('location-probe').textContent).toBe('/package/p-bali?book=1');
+  });
+
+  it('a booking awaiting confirmation offers a one-tap send of the visitor\'s yes', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'request_booking', args: { packageId: 'p-bali', message: 'Ready.' } },
+      serverResult: { booking: { status: 'awaiting_confirmation', draft: { title: 'Bali Honeymoon Bliss' } } },
+      message:
+        'Ready to send a booking request: Bali Honeymoon Bliss, 2 travellers, departing 14 Mar 2027, confirmation to ana@example.com. Reply "yes" and I will send it.',
+    });
+
+    renderWidget('/packages');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'book it');
+    await user.click(sendButton());
+
+    const chip = await screen.findByRole('button', { name: 'Send booking request' });
+    await user.click(chip);
+
+    // The chip sends an ordinary user turn rather than calling the server
+    // directly, so the confirmation is still something the visitor said — and
+    // this is the literal the server's affirmation pattern matches.
+    await waitFor(() => expect(mockSendAssistantTurn).toHaveBeenCalledTimes(2));
+    expect(mockSendAssistantTurn.mock.calls[1][0].messages.at(-1).content).toBe('Yes, send it');
+  });
+
+  it('a booking that needs details or is already sent offers no chip', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'request_booking', args: { packageId: 'p-bali', message: 'I need your email.' } },
+      serverResult: { booking: { status: 'needs_details', missing: ['email'] } },
+      message: 'I can send a booking request for Bali Honeymoon Bliss. I still need the email address to confirm it to.',
+    });
+
+    renderWidget('/packages');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'book it');
+    await user.click(sendButton());
+
+    await screen.findByText(/I still need the email address/);
+    expect(screen.queryByRole('button', { name: 'Send booking request' })).not.toBeInTheDocument();
+  });
+
+  it('a human handoff renders the contact chip instead', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'hand_off', args: { kind: 'human', message: 'Sure.' } },
+      serverResult: { handoff: { kind: 'human' } },
+      message: 'Our team can help with that.',
+    });
+
+    renderWidget('/packages');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'can I talk to a person');
+    await user.click(sendButton());
+
+    const chip = await screen.findByRole('button', { name: 'Contact us' });
+    await user.click(chip);
+
+    expect(screen.getByTestId('location-probe').textContent).toBe('/contact');
   });
 
   it('clicking a nav chip navigates with the resolved path and fires a nav_click event', async () => {

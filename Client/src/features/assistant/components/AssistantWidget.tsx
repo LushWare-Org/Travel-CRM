@@ -26,9 +26,10 @@ const INPUT_CLASS =
 interface AssistantTurnExtrasProps {
   data: AssistantTurnData;
   onNavigate: (route: string, path: string) => void;
+  onSendMessage: (text: string) => void;
 }
 
-function AssistantTurnExtras({ data, onNavigate }: AssistantTurnExtrasProps) {
+function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnExtrasProps) {
   if (data.tool === 'navigate') {
     if (!data.path) return null;
     return (
@@ -41,8 +42,94 @@ function AssistantTurnExtras({ data, onNavigate }: AssistantTurnExtrasProps) {
     );
   }
 
+  if (data.tool === 'answer_packages') {
+    if (!data.packages.length) return null;
+    return (
+      <div className="space-y-2 pt-1">
+        {data.packages.map((pkg) => {
+          // Matches the server's own formatting, so a card and the reply beside
+          // it cannot show the same price two different ways.
+          let price = '';
+          if (pkg.price > 0) {
+            try {
+              price = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: /^[A-Za-z]{3}$/.test(pkg.currency) ? pkg.currency.toUpperCase() : 'USD',
+                maximumFractionDigits: 0,
+              }).format(pkg.price);
+            } catch {
+              price = String(Math.round(pkg.price));
+            }
+          }
+
+          return (
+            <div key={pkg.id} className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
+              <p className="text-sm font-semibold text-gray-900">{pkg.title}</p>
+              <p className="text-xs text-gray-600">
+                {[
+                  pkg.destination,
+                  pkg.durationDays > 0 ? `${pkg.durationDays} days` : '',
+                  price,
+                  pkg.numReviews > 0 ? `${pkg.rating} from ${pkg.numReviews} reviews` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('package', `/package/${pkg.id}`)}
+                  className={CHIP_CLASS}
+                >
+                  <ArrowRight className="w-3 h-3" />
+                  View
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (data.tool === 'request_booking') {
+    // One tap instead of typing "yes". The text is the literal the server's
+    // affirmation pattern matches, and it travels as a normal user message, so
+    // the confirmation is still something the visitor said.
+    if (data.booking.status !== 'awaiting_confirmation') return null;
+    return (
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button type="button" onClick={() => onSendMessage('Yes, send it')} className={CHIP_CLASS}>
+          <ArrowRight className="w-3 h-3" />
+          Send booking request
+        </button>
+      </div>
+    );
+  }
+
   if (data.tool === 'respond_conversationally' || data.tool === 'redirect_off_topic') {
     return null;
+  }
+
+  if (data.tool === 'hand_off') {
+    const { handoff } = data;
+    return (
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() =>
+            onNavigate(
+              handoff.kind === 'booking' ? 'package' : 'contact',
+              handoff.kind === 'booking' ? `/package/${handoff.packageId}?book=1` : '/contact',
+            )
+          }
+          className={CHIP_CLASS}
+        >
+          <ArrowRight className="w-3 h-3" />
+          {handoff.kind === 'booking' ? 'Book this package' : 'Contact us'}
+        </button>
+      </div>
+    );
   }
 
   if (data.answered) {
@@ -69,9 +156,10 @@ interface MessageRowProps {
   message: AssistantTurnMessageT;
   turnData: AssistantTurnData | undefined;
   onNavigate: (route: string, path: string) => void;
+  onSendMessage: (text: string) => void;
 }
 
-const MessageRow = memo(function MessageRow({ message, turnData, onNavigate }: MessageRowProps) {
+const MessageRow = memo(function MessageRow({ message, turnData, onNavigate, onSendMessage }: MessageRowProps) {
   if (message.role === 'user') {
     return (
       <div className="flex items-start gap-2 flex-row-reverse">
@@ -86,7 +174,7 @@ const MessageRow = memo(function MessageRow({ message, turnData, onNavigate }: M
       <Bot className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" />
       <div className="min-w-0 space-y-2">
         <p className="text-sm bg-white rounded-xl px-3 py-2 shadow-sm">{message.content}</p>
-        {turnData && <AssistantTurnExtras data={turnData} onNavigate={onNavigate} />}
+        {turnData && <AssistantTurnExtras data={turnData} onNavigate={onNavigate} onSendMessage={onSendMessage} />}
       </div>
     </div>
   );
@@ -164,6 +252,16 @@ export default function AssistantWidget() {
     [chat.sessionId, navigate],
   );
 
+  // A chip that sends a message rather than navigating (the booking
+  // confirmation). Reached through a ref so the callback keeps one identity: it
+  // is a prop of the memoized MessageRow, and a new one per keystroke would
+  // re-render the whole transcript on every character typed.
+  const sendMessageRef = useRef(chat.sendMessage);
+  sendMessageRef.current = chat.sendMessage;
+  const handleChipSend = useCallback((text: string) => {
+    void sendMessageRef.current(text);
+  }, []);
+
   if (isAssistantExcludedPath(location.pathname)) return null;
   if (!isOpen) return null;
 
@@ -205,7 +303,13 @@ export default function AssistantWidget() {
             <p className="text-sm bg-white rounded-xl px-3 py-2 shadow-sm">{GREETING}</p>
           </div>
           {chat.messages.map((message) => (
-            <MessageRow key={message.id} message={message} turnData={turnByMessageId.get(message.id)} onNavigate={handleChipClick} />
+            <MessageRow
+              key={message.id}
+              message={message}
+              turnData={turnByMessageId.get(message.id)}
+              onNavigate={handleChipClick}
+              onSendMessage={handleChipSend}
+            />
           ))}
           {chat.isSending && (
             <div className="flex items-center gap-2 text-sm text-gray-600" role="status" aria-live="polite">

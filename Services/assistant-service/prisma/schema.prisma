@@ -4,8 +4,12 @@
 //
 // Design decisions:
 //   • AssistantEvent is a telemetry sink only (impression/opened/turn/
-//     response/nav_click/error) — the turn protocol itself is stateless,
-//     per docs/designs/site-wide-floating-assistant.md Eng Review Decisions.
+//     response/nav_click/error). The turn protocol is NOT stateless any more:
+//     AssistantSession/AssistantMessage below are the conversation, and the
+//     client's resent message window is only a fallback for a store that could
+//     not be read. This reverses the Eng Review decision in
+//     docs/designs/site-wide-floating-assistant.md, because a booking request
+//     has to be gated on a confirmation the client cannot forge.
 //   • eventType is a plain String (validated at the Zod layer, not a
 //     Postgres enum) so new event types can be added without a migration.
 //   • No cross-schema FKs — sessionId is opaque client-generated.
@@ -125,5 +129,56 @@ model InsightDecision {
 
   @@index([actorId, pageKey, createdAt])
   @@index([requestId])
+  @@schema("crm_assistant")
+}
+
+// ─── AssistantSession (the visitor's conversation) ────────────
+// `id` is the client's opaque sessionId — the same value the telemetry rows
+// already carry, generated once per browser in localStorage. This is the only
+// table in the service that stores what a visitor said, and the only one whose
+// rows are PII (the booking draft holds an email address). Expiry is lazy: a
+// session read after SESSION_TTL_MS is reset in place, and nothing sweeps rows
+// nobody comes back to — this repo has no scheduler.
+//
+// The booking fields are the reason this exists. `bookingStatus` is the
+// server's own record that it asked for confirmation, `bookingAskedTurn` makes
+// that confirmation mean *this* turn's question, and `bookingId` is what stops
+// a second "yes" from writing twice.
+model AssistantSession {
+  id               String   @id
+  createdAt        DateTime @default(now())
+  lastSeenAt       DateTime
+  shownPackageIds  String[] @default([])
+  bookingDraft     Json?
+  bookingStatus    String?
+  bookingId        String?
+  bookingAskedTurn Int?
+  // Completed turns, incremented once per turn. A monotonic counter rather than
+  // a message seq, because seq advances by two per turn (user + assistant) and
+  // "was the confirmation the very next thing the visitor heard?" has to be an
+  // equality, not arithmetic a later reader has to re-derive.
+  turnCount        Int      @default(0)
+
+  @@index([lastSeenAt])
+  @@schema("crm_assistant")
+}
+
+// ─── AssistantMessage (one turn's messages) ───────────────────
+// `id` is the client's own message id, and it is the dedupe key: a retried turn
+// re-sends the same ids and `createMany({ skipDuplicates: true })` then appends
+// nothing. Same idea as lead-service's LeadCommunicationLog.externalMessageId.
+//
+// `seq` orders the transcript. A timestamp cannot, because both messages of one
+// turn are written together.
+model AssistantMessage {
+  id        String   @id
+  sessionId String
+  seq       Int
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, seq])
+  @@index([sessionId, seq])
   @@schema("crm_assistant")
 }

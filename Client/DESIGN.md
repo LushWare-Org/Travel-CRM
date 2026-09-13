@@ -1,5 +1,5 @@
 ---
-version: 0.1.0
+version: 0.2.0
 name: lush-client
 description: "The design system for LUSH Ware's customer-facing Client app - the luxury, eco-conscious travel booking site travellers actually see (home, destinations, packages, booking funnel, itinerary planner, my-account). Warm and brand-forward: a green/gold palette rooted in the existing LUSH brand, a warm neutral gray scale (not Tailwind's cool default), Fraunces serif for display, Inter for UI. The opposite of the Management app's cool operational Signal Console system: this is an editorial, image-led, high-consideration booking experience, not a data-processing tool. One interactive accent (green), gold reserved for featured/highlight moments, elevation by border and image contrast first with shadow reserved for genuinely floating chrome, and a deliberately small motion budget (Ken Burns hero, interactive hover/reveal, scroll-linked section entrances)."
 colors:
@@ -337,6 +337,12 @@ Settled `/plan-design-review` decision, formalized: **exactly three motion patte
 | `z-overlay` | 90 | Scrims/backdrops for modals and the mobile drawer |
 | `z-modal` | 100 | Modal/drawer content above their own overlay (mobile menu portal, dialogs) |
 
+### Assistant-over-dialog token
+
+| Token | Value | For |
+
+| `z-floating-assistant` | 110 | The floating assistant panel while a dialog is open, so a modal-hosted form can still be filled |
+
 ## Components
 
 > `src/components/ui/` holds the Phase 0 shadcn/Base UI primitives (button, card, input, select, dialog, sheet, tabs, badge, checkbox - all importing `cn` from `@/lib/utils`). These are the *only* sanctioned building blocks for new chrome; hand-rolled `fixed inset-0` modals, bespoke `<button className="bg-brand-600 rounded-lg…">` strings, and duplicated filter/range markup migrate onto them in later phases.
@@ -368,6 +374,34 @@ Settled `/plan-design-review` decision, formalized: **exactly three motion patte
 ### Checkbox
 - **`checkbox.tsx`**: the sanctioned checkbox for filter lists (destination regions, star ratings, price/duration ranges) - consumed by the shared `RangeFilterGroup` and the filter drawers in Phase 1.
 
+## Assistant Affordances
+
+Added for the site-wide floating assistant's action surface (`docs/designs/client-assistant-action-infrastructure.md`). These are the only new interface elements that feature introduces, and each derives from tokens that already exist.
+
+### Assistant-written field marker
+
+**Use colour plus a non-colour signal, never colour alone.** A prefillable field the assistant wrote carries `bg-brand-50` on the control, a `border-brand-200` hairline, and an adjacent `badge` (`variant="outline"`) reading "Filled by assistant" with a small icon carrying the accessible name. Field text stays `gray-900`.
+
+- Green-family because the system's one accent is green and the marker is informational, not a highlight. **Never gold** - gold means featured or pending, and a prefill is neither.
+- **Never a coloured left border on a rounded card** (the pattern this system retires) and never `red-600`, which means destructive.
+- The marker clears the moment the visitor edits or clears that field themselves.
+
+### Confirm chip
+
+Two `outline`/`ghost` buttons at `--radius-button` (12px) inside the assistant bubble: `Replace it` and `Keep mine`. Minimum 44px touch target, keyboard operable and dismissible, and never rendered as a modal of its own.
+
+### Action announcement
+
+A single `body-sm` line in `gray-600` inside the transcript naming what changed, e.g. "I've set your dates to 12-19 October." It is narration rather than a claim, so it takes no accent colour and no badge. A polite live region speaks the same string.
+
+### View-summary block (count answers)
+
+The one place a number about the current screen is stated. A `bg-gray-50` panel with a `border-gray-200` hairline at `--radius-card`; the figure set in Fraunces at `text-display-md` in `brand-600`, because it is an editorial figure exactly like a price; the active filters as `badge` pills; and a `body-sm gray-600` qualifier line whenever the count is partial.
+
+### Floating above a dialog
+
+The dialog tokens put modal content at `z-modal` (100), above `z-floating-action` (70), so the assistant is unreachable while the review or booking dialog is open. The panel raises to `z-floating-assistant` (110) only while a dialog is open and returns to `z-floating-action` after. Opening the assistant from inside a dialog moves focus to the assistant; closing it returns focus to the triggering control; Escape closes the assistant first, then the dialog.
+
 ## Do's and Don'ts
 
 ### Do
@@ -376,6 +410,8 @@ Settled `/plan-design-review` decision, formalized: **exactly three motion patte
 - Elevate in-flow cards with a `gray-200` border; add shadow only to genuinely floating elements (dropdown/popover, launcher, modal/drawer).
 - Give every heading the Fraunces it inherits by default, and every price the green it earns as an editorial figure.
 - Stay inside the three-pattern motion budget - Ken Burns heroes, hover/reveal, scroll-linked headings - and respect `prefers-reduced-motion`.
+- Give the assistant's own surfaces the page's typography and materials: `Inter` for its chrome, `Fraunces` for any figure it states, and the same `gray-200` hairlines as everything else.
+- Signal assistant-written state with colour plus a label or icon, and with the same `brand-50`/`brand-200`/`brand-700` family as the rest of the interface.
 - Use the named z-index utilities, never bare `z-50`/`z-[9999]`.
 
 ### Don't
@@ -385,6 +421,8 @@ Settled `/plan-design-review` decision, formalized: **exactly three motion patte
 - Don't add shine sweeps, typewriter effects, decorative pulse, or any ambient animation outside the hero zoom.
 - Don't set body copy in Fraunces, headings in Inter, or any user-readable text below 12px.
 - Don't hand-roll a modal, drawer, or filter control when `dialog`/`sheet`/`tabs`/`checkbox`/`select` exist - and don't add a second radius on the same element kind.
+- Don't signpost an assistant-written field with colour alone, and don't reach for gold or `red-600` to do it - gold means featured and red means error.
+- Don't let the assistant move the visitor's viewport or take focus unasked; narrate in the transcript instead.
 
 ## Known Gaps
 
@@ -392,6 +430,7 @@ Settled `/plan-design-review` decision, formalized: **exactly three motion patte
 - **Radius tokens are specified, not defined.** `--radius-card`/`--radius-button`/`--radius-input`/`--radius-modal` and the two shadow custom properties are named here for later phases to add to `index.css` - Phase 0 does not touch the file beyond what is already committed.
 - **The legacy `body { font-family: 'Open Sans' … }` rule is stale** (Open Sans no longer loads); it is corrected when a phase edits page styling.
 - **Page code still contains bare `z-` values, gradient CTAs, hand-rolled modals, and inert `py-section-*` classes.** All are tracked by `docs/CLIENT-REWAMP-PLAN.md` phases and are intentionally out of scope here - this file is the target they converge on.
+- **`z-floating-assistant` (110) is specified here and not yet defined.** Add it to `index.css` with the assistant action-surface phase, in the same change that raises the panel above an open dialog.
 
 ## Iteration Guide
 

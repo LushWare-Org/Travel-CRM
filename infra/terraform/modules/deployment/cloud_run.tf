@@ -335,6 +335,11 @@ module "assistant_service" {
     PACKAGE_SERVICE_URL   = module.package_service.uri
     FLIGHT_SERVICE_URL    = module.flight_service.uri
     CAREER_SERVICE_URL    = module.career_service.uri
+    # The public assistant can take a booking request in the chat and submit it
+    # here. A URL without the matching run.invoker grant (iam.tf) is worse than
+    # no URL at all — the fetch fails at the Cloud Run edge instead of falling
+    # back, so the visitor is told the booking could not be sent.
+    BOOKING_SERVICE_URL   = module.booking_service.uri
   })
   memory                = local.services.assistant-service.memory
   cpu                   = local.services.assistant-service.cpu

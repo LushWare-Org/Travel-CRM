@@ -157,8 +157,8 @@
 
   <h4>Three findings worth reading first</h4>
   <ol>
-    <li><b>Two assistants share one service.</b> A public, anonymous, stateless conversation loop (<code>/assistant/turn</code>) and an authenticated, evidence-grounded operator copilot (<code>/assistant/management/*</code>). They share a Gemini client and a Postgres schema and nothing else.</li>
-    <li><b>Only one of them has a tool-calling loop.</b> The site-wide assistant is a single structured call that picks one of four outcomes. The operator copilot runs a bounded 4-call agent loop over a fixed tool registry.</li>
+    <li><b>Two assistants share one service.</b> A public, anonymous conversation loop (<code>/assistant/turn</code>) and an authenticated, evidence-grounded operator copilot (<code>/assistant/management/*</code>). They share a Gemini client and a Postgres schema and nothing else.</li>
+    <li><b>Only one of them has a tool-calling loop.</b> The site-wide assistant is a single structured call that picks one of seven outcomes. The operator copilot runs a bounded 4-call agent loop over a fixed tool registry.</li>
     <li><b>The binding constraints are time budgets, not prompt logic.</b> Four independent deadlines (30s client → 27s server → 20s model → 1.5s router) plus a 17s copilot budget, a 4-tool-call cap, and a <code>max_instances = 10</code>, <code>min_instances = 0</code> deployment. Capability work that ignores them will pass tests and fail in production.</li>
   </ol>
 </section>
@@ -231,6 +231,8 @@
     <tbody>
       <tr><td><code>AssistantEvent</code></td><td>turn path (awaited), events route (fire-and-forget)</td><td>indexes on <code>sessionId</code>, <code>(sessionId,turnId)</code>, <code>createdAt</code></td><td>eternal sink; no TTL, no purge job, no consumer</td></tr>
       <tr><td><code>ManagementLastSeen</code></td><td><code>/management/seen</code> upsert (awaited)</td><td>unique <code>(actorId,pageKey,scopeFingerprint)</code></td><td>the only server-side state the copilot keeps — not a transcript</td></tr>
+      <tr><td><code>AssistantSession</code></td><td>every public turn</td><td>primary key <code>id</code> (the client's sessionId), index on <code>lastSeenAt</code></td><td>the conversation's own state: <code>shownPackageIds</code>, the booking draft, <code>bookingStatus</code>/<code>bookingId</code>, and a turn counter. Reset in place when read after 30 days; nothing sweeps it, because the repo has no scheduler</td></tr>
+      <tr><td><code>AssistantMessage</code></td><td>every public turn</td><td>unique <code>(sessionId,seq)</code>, primary key <code>id</code> (the client's message id)</td><td>the transcript. The message id is the dedupe key, so a retried turn appends nothing. This is the only table in the service holding PII the visitor typed</td></tr>
     </tbody>
   </table>
   <div class="note warn"><b>Latency coupling:</b> the public turn <i>awaits</i> its <code>AssistantEvent</code> insert before writing the response (<code>assistant.controller.js</code> → <code>recordAssistantResolution</code>). The insert itself swallows failures, so it never errors a turn — but it does put a Supabase round trip on the critical path of every conversation turn.</div>
@@ -292,19 +294,22 @@
     <li><b>Stage 1 short-circuit.</b> Commit only if the class is enabled, confidence ≥ threshold (default <code>0.95</code>), and intent is <code>social</code> or <code>off_topic</code> with no actionable clause. Then the server returns reviewed copy with <b>no second model call</b>, records telemetry, and exits.</li>
     <li><b>Policy retrieval.</b> <code>fetchPolicyDocuments()</code> → GET <code>user-service /api/v1/admin/internal/policy-documents</code> with <code>x-internal-token</code>; 3s abort; 60s in-process TTL cache; on failure serves stale cache, else <code>[]</code>. Then <code>retrieveSnippets()</code>: keyword overlap over blank-line sections (tokens length ≥4, stopword-filtered), <code>maxSnippets 2</code>, <code>minScore 1</code>. <b>No embeddings, no vector store.</b></li>
     <li><b>Stage 2 — the resolver.</b> One structured call, <code>maxOutputTokens 1024</code>, <code>temperature 0.7</code>, <span class="t">timeout min(20s, remaining)</span>, <code>maxAttempts 1</code>. Emits a flat <code>{ tool, args }</code>.</li>
-    <li><b>Canonicalize + parse.</b> Flat payload → strict 4-way discriminated union. Parse failure → <code>502</code> <code>AI response did not match the tool contract</code>.</li>
+    <li><b>Canonicalize + parse.</b> Flat payload → strict 6-way discriminated union. Parse failure → <code>502</code> <code>AI response did not match the tool contract</code>.</li>
     <li><b>Deterministic dispatch.</b> A server-side <code>switch</code>, not the model, decides what the user sees (see below).</li>
     <li><b>Message guard.</b> Empty → reviewed fallback string; longer than 2000 → sliced. A response can never be empty, because an empty assistant bubble would poison every later turn's resent window.</li>
     <li><b>Telemetry (awaited).</b> One validated <code>AssistantEvent</code> row: tool, route, router metadata, per-stage latency, <code>fallbackUsed</code>, <code>failureCategory</code>.</li>
   </ol>
 
-  <h3>The four outcomes and who owns the prose</h3>
+  <h3>The seven outcomes and who owns the prose</h3>
   <table>
     <thead><tr><th>Tool</th><th>Args</th><th>Server-side resolution</th><th>Prose owner</th></tr></thead>
     <tbody>
       <tr><td><code>navigate</code></td><td><code>route, message</code></td><td>matches the requested name against <code>availableRoutes</code> the client sent <i>this</i> request; a miss is logged and returns <code>{route:null,path:null}</code></td><td>model for the lead-in, server owns the declined copy</td></tr>
       <tr><td><code>answer_faq_policy</code></td><td><code>question, selectedSnippetIds, message</code></td><td>keeps only snippets whose ids were both retrieved server-side and selected; a <code>sensitive</code> router intent forces the refusal message regardless of model output</td><td>server — verbatim snippet sections only</td></tr>
-      <tr><td><code>respond_conversationally</code></td><td><code>mode: social|travel_general</code></td><td><code>travel_general</code> prose is accepted only when the router also said <code>travel_general</code>; otherwise the reviewed social copy is substituted</td><td>model, sanitized (HTML stripped; any message containing a URL is discarded)</td></tr>
+      <tr><td><code>answer_packages</code></td><td><code>packageIds, message</code></td><td>ids are kept only when the catalogue contains them; whether a card is drawn is the server's decision, made from the ids the client has already drawn plus the visitor's words; the model's prose survives only when every number in it resolves to a record</td><td>model, grounded — the server replaces any sentence stating a number no record supports</td></tr>
+      <tr><td><code>respond_conversationally</code></td><td><code>mode: social|travel_general|capability</code></td><td><code>travel_general</code> prose is accepted when the router said <code>travel_general</code> or did not answer, and is refused when it cites visa, health or legal ground; <code>capability</code> is server copy</td><td>model, sanitized (HTML stripped; any message containing a URL is discarded), except <code>capability</code></td></tr>
+      <tr><td><code>hand_off</code></td><td><code>kind: booking|human, packageId, message</code></td><td>a booking resolves against the catalogue, falling back to the package the conversation is about; an unresolvable booking, and every <code>human</code> kind, return the contact channels instead</td><td>server</td></tr>
+      <tr><td><code>request_booking</code></td><td><code>packageId, email, travelDate, endDate, travelers, name, phone, message</code></td><td>the server owns the state machine: which fields are still missing, whether the visitor confirmed on the very next turn, and whether a booking was already sent. The email must appear in the visitor's own words, and the write happens at most once per session</td><td>server — the model reports only what it read</td></tr>
       <tr><td><code>redirect_off_topic</code></td><td><code>{}</code></td><td>fixed copy</td><td>server</td></tr>
     </tbody>
   </table>
@@ -583,7 +588,7 @@ catch { return { unavailable: true } }                                    // nev
       <tr><td>Per-source failure reporting</td><td>single fallback message</td><td><span class="pill p-ok">YES</span> unavailable + notAuthorized lists</td></tr>
       <tr><td>Write / take actions</td><td><span class="pill p-prod">NO</span> intentionally read-only</td><td><span class="pill p-prod">NO</span> deferred (confirmed-action copilot)</td></tr>
       <tr><td>Streaming responses</td><td><span class="pill p-phys">NO</span></td><td><span class="pill p-phys">NO</span></td></tr>
-      <tr><td>Server-side conversation memory</td><td><span class="pill p-phys">NO</span> stateless by design</td><td><span class="pill p-phys">NO</span> only <code>ManagementLastSeen</code></td></tr>
+      <tr><td>Server-side conversation memory</td><td><span class="pill p-prod">YES</span> <code>AssistantSession</code> + <code>AssistantMessage</code>; the client's resent window is a fallback</td><td><span class="pill p-phys">NO</span> only <code>ManagementLastSeen</code></td></tr>
       <tr><td>Cross-page working memory</td><td>—</td><td><span class="pill p-prod">DEFERRED</span> pinned evidence / unfinished questions</td></tr>
       <tr><td>Proactive review queue</td><td>—</td><td><span class="pill p-prod">DEFERRED</span> the "ten-times return loop"</td></tr>
     </tbody>
@@ -608,13 +613,13 @@ catch { return { unavailable: true } }                                    // nev
 
   <h3>L2 — Architectural <span class="pill p-arch">ARCHITECTURAL</span></h3>
   <ul>
-    <li><b>Stateless by design.</b> Continuity is the client's job; a device switch or a cleared store loses the thread.</li>
+    <li><b>Conversation state is server-side now.</b> The turn reads and writes <code>AssistantSession</code>/<code>AssistantMessage</code>, and the client's resent window is used only when the store cannot be read. A device switch keeps the thread only if the same <code>sessionId</code> travels, which it does not — the id lives in that browser's localStorage.</li>
     <li><b>Retries effectively disabled</b> on the public path (<code>maxAttempts: 1</code>) — transient provider failures are user-visible failures.</li>
     <li><b>Deadlines are arithmetic, not watchdogs</b> — expiry is checked at two points and nothing aborts in-flight work.</li>
     <li><b>Evidence preload sits outside the model budget</b> for the copilot, so a slow domain service delays the response without consuming the 17 s.</li>
     <li><b>No aggregate prompt budget</b> in the tool loop; growth is per-result only.</li>
     <li><b>Grounding over-rejects by construction</b> (any numeric-shaped prose is suspect), so richer prose styles trade directly against claim survival.</li>
-    <li><b>Four outcomes hard-coded into one union</b> shared by prompt, canonicalizer, controller, wire schema, client enum and telemetry enum — extending the public vocabulary is a six-file, versioned change.</li>
+    <li><b>Six outcomes hard-coded into one union</b> shared by prompt, canonicalizer, controller, wire schema, client enum and telemetry enum — extending the public vocabulary is a six-file, versioned change.</li>
     <li><b>Telemetry insert awaited</b> on the public turn's critical path.</li>
     <li><b>Feature-gated dark launch</b>: copilot routes 404 unless two env vars and a client build flag agree.</li>
   </ul>
@@ -775,7 +780,7 @@ catch { return { unavailable: true } }                                    // nev
       <tr><td><code>GEMINI_API_KEY</code></td><td>— (secret)</td><td>Absent → <code>503</code> from the model seam; copilot briefing falls back to deterministic</td></tr>
       <tr><td><code>GEMINI_MODEL</code></td><td><code>gemini-3.5-flash</code></td><td>Resolver model pin</td></tr>
       <tr><td><code>GEMINI_ROUTER_MODEL</code></td><td><code>gemini-3.5-flash</code></td><td>Stage-1 model, pinned independently of the resolver</td></tr>
-      <tr><td><code>ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED</code></td><td><code>false</code></td><td>Master gate for the 4-outcome vocabulary; false → legacy 2-tool behaviour</td></tr>
+      <tr><td><code>ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED</code></td><td><code>false</code></td><td>Master gate for the conversational outcomes; false → the four always-available tools only (<code>navigate</code>, <code>answer_faq_policy</code>, <code>answer_packages</code>, <code>hand_off</code>)</td></tr>
       <tr><td><code>ASSISTANT_ROUTER_SOCIAL_ENABLED</code> / <code>…_OFF_TOPIC_ENABLED</code></td><td><code>false</code></td><td>Per-class commit gates, rolled out only against a passing evaluation corpus</td></tr>
       <tr><td><code>ASSISTANT_ROUTER_SOCIAL_THRESHOLD</code> / <code>…_OFF_TOPIC_THRESHOLD</code></td><td><code>0.95</code></td><td>Confidence required to skip the resolver</td></tr>
       <tr><td><code>MANAGEMENT_COPILOT_ENABLED</code></td><td><code>false</code></td><td>Off → turn and seen routes return an undisclosed <code>404</code></td></tr>
@@ -820,8 +825,10 @@ read infra/terraform/deployments/dev/iam.tf         # per-target run.invoker gra
 read Client/src/services/api/assistantTurn.ts
 read Client/src/features/assistant/hooks/useAssistantChat.ts
 
-# a live eval harness already exists for the router
-npm --prefix Services/assistant-service run eval:router</code></pre>
+# live eval harnesses — the router corpus, and the conversation audit
+npm --prefix Services/assistant-service run eval:router
+npm --prefix Services/assistant-service run eval:conversations            # 40 real conversations, end to end
+npm --prefix Services/assistant-service run eval:conversations -- --workflow detail</code></pre>
   <p class="small">Tests worth running before changing anything on these paths: <code>src/ai/__tests__/geminiClient.test.js</code>, <code>src/ai/__tests__/agentRunner.test.js</code>, <code>src/controllers/__tests__/managementCopilot.gate.test.js</code>, <code>src/controllers/__tests__/managementCopilot.allPages.test.js</code>, <code>src/tools/__tests__/toolRegistry.test.js</code>, <code>src/controllers/__tests__/assistant.controller.test.js</code> — and <code>Services/e2e-tests/client-contracts/assistantTurn.spec.js</code> for the live gateway round trip.</p>
 </section>
 

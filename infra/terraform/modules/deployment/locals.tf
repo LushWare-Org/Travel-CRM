@@ -169,7 +169,7 @@ locals {
         CLIENT_URL                                = "https://lush-ware-client-${var.env}.web.app"
         MANAGEMENT_COPILOT_ENABLED                = var.management_copilot_enabled
         MANAGEMENT_COPILOT_PAGE_KEYS              = var.management_copilot_page_keys
-        ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = "false"
+        ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = "true"
         GEMINI_ROUTER_MODEL                       = "gemini-3.5-flash"
         ASSISTANT_ROUTER_SOCIAL_ENABLED           = "false"
         ASSISTANT_ROUTER_OFF_TOPIC_ENABLED        = "false"

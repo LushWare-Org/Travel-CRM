@@ -7,6 +7,8 @@ import {
   assembleWhere,
   recomputeBasePrice,
   buildInclude,
+  buildListOrderBy,
+  destinationSlugSet,
 } from '../package.service.js';
 
 // Mock the shared pricing engine
@@ -342,21 +344,48 @@ describe('assembleWhere', () => {
     expect(where.OR[0].title.contains).toBe('beach');
   });
 
-  it('filters by price range', () => {
+  // Price bounds are on sellPrice — the price a customer is shown — and never
+  // on basePrice. They used to be on basePrice, which silently let the
+  // planner offer packages above the budget asked for whenever a package
+  // carried a margin. This is the guard on that correction.
+  it('filters the price range on sellPrice, never basePrice', () => {
     const where = assembleWhere({ minPrice: 100, maxPrice: 500 });
-    expect(where.basePrice).toEqual({ gte: 100, lte: 500 });
+    expect(where.sellPrice).toEqual({ gte: 100, lte: 500 });
+    expect(where.basePrice).toBeUndefined();
   });
 
   it('parses string price filters into numbers', () => {
     const where = assembleWhere({ minPrice: '100', maxPrice: '500' });
-    expect(where.basePrice).toEqual({ gte: 100, lte: 500 });
-    expect(typeof where.basePrice.gte).toBe('number');
-    expect(typeof where.basePrice.lte).toBe('number');
+    expect(where.sellPrice).toEqual({ gte: 100, lte: 500 });
+    expect(typeof where.sellPrice.gte).toBe('number');
+    expect(typeof where.sellPrice.lte).toBe('number');
   });
 
   it('filters by min price only', () => {
     const where = assembleWhere({ minPrice: 100 });
-    expect(where.basePrice).toEqual({ gte: 100 });
+    expect(where.sellPrice).toEqual({ gte: 100 });
+  });
+
+  it('ignores a price bound that is not a finite number', () => {
+    expect(assembleWhere({ maxPrice: 'cheap' })).toEqual({});
+    expect(assembleWhere({ maxPrice: '' })).toEqual({});
+    expect(assembleWhere({ minPrice: Number.NaN })).toEqual({});
+  });
+
+  it('filters by duration range on durationDays', () => {
+    expect(assembleWhere({ durationMin: 5, durationMax: 7 })).toEqual({ durationDays: { gte: 5, lte: 7 } });
+  });
+
+  it('filters by minimum rating', () => {
+    expect(assembleWhere({ minRating: 4 })).toEqual({ rating: { gte: 4 } });
+  });
+
+  it('filters by an explicit list of destination display strings', () => {
+    expect(assembleWhere({ destinations: ['Bali, Indonesia'] })).toEqual({ destination: { in: ['Bali, Indonesia'] } });
+  });
+
+  it('leaves destinations unfiltered when the resolved list is empty', () => {
+    expect(assembleWhere({ destinations: [] })).toEqual({});
   });
 
   it('combines multiple filters', () => {
@@ -364,6 +393,43 @@ describe('assembleWhere', () => {
     expect(where.isActive).toBe(true);
     expect(where.category).toBe('GROUP');
     expect(where.OR).toHaveLength(3);
+  });
+});
+
+describe('buildListOrderBy', () => {
+  it('maps the public sort vocabulary to real columns', () => {
+    expect(buildListOrderBy('price-low')).toEqual({ sellPrice: 'asc' });
+    expect(buildListOrderBy('price-high')).toEqual({ sellPrice: 'desc' });
+    expect(buildListOrderBy('popularity')).toEqual({ numReviews: 'desc' });
+    expect(buildListOrderBy('duration')).toEqual({ durationDays: 'asc' });
+  });
+
+  it('still accepts the Management vocabulary and honours its direction', () => {
+    expect(buildListOrderBy('createdAt', 'asc')).toEqual({ createdAt: 'asc' });
+    expect(buildListOrderBy('title', 'asc')).toEqual({ title: 'asc' });
+  });
+
+  it('falls back to createdAt rather than passing an unknown column to Prisma', () => {
+    expect(buildListOrderBy('notAColumn', 'asc')).toEqual({ createdAt: 'asc' });
+    expect(buildListOrderBy(undefined, 'desc')).toEqual({ createdAt: 'desc' });
+  });
+});
+
+describe('destinationSlugSet', () => {
+  it('answers to both segments of a display string and to the whole string', () => {
+    const slugs = destinationSlugSet('Bali, Indonesia');
+    expect(slugs.has('bali')).toBe(true);
+    expect(slugs.has('indonesia')).toBe(true);
+    expect(slugs.has('bali-indonesia')).toBe(true);
+  });
+
+  it('treats a single-segment destination as its own name and country', () => {
+    expect(destinationSlugSet('Dubai').has('dubai')).toBe(true);
+  });
+
+  it('returns nothing for an empty or whitespace value', () => {
+    expect(destinationSlugSet('').size).toBe(0);
+    expect(destinationSlugSet('   ').size).toBe(0);
   });
 });
 

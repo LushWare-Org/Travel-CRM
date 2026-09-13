@@ -7,11 +7,14 @@ const { mockDomainAuthHeader } = vi.hoisted(() => ({ mockDomainAuthHeader: vi.fn
 // seam is the only way to assert which base URL each tool mints its token for.
 vi.mock('../../utils/cloudRunAuth.js', () => ({ domainAuthHeader: mockDomainAuthHeader }));
 
-const { executeTool, getTool, toolNames, domainTools, MAX_TOOL_ROWS } = await import('../toolRegistry.js');
+const { executeTool, getTool, toolNames, domainTools, MAX_TOOL_ROWS, PUBLIC_TOOL_NAMES } = await import(
+  '../toolRegistry.js'
+);
 const { serializeToolResult } = await import('../../ai/prompts/managementAnswer.v1.js');
 
 const LEAD = 'http://lead.test';
 const BILLING = 'http://billing.test';
+const PACKAGE = 'http://package.test';
 
 const ctx = {
   user: { id: 'rep-1', role: 'salesRep' },
@@ -23,6 +26,7 @@ let realFetch;
 beforeEach(() => {
   process.env.LEAD_SERVICE_URL = LEAD;
   process.env.BILLING_SERVICE_URL = BILLING;
+  process.env.PACKAGE_SERVICE_URL = PACKAGE;
   mockDomainAuthHeader.mockReset();
   mockDomainAuthHeader.mockResolvedValue({ Authorization: 'Bearer test-token' });
   realFetch = globalThis.fetch;
@@ -32,6 +36,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
   delete process.env.LEAD_SERVICE_URL;
   delete process.env.BILLING_SERVICE_URL;
+  delete process.env.PACKAGE_SERVICE_URL;
 });
 
 function jsonResponse(body, status = 200) {
@@ -67,7 +72,17 @@ describe('every tool declares its bound', () => {
       'getSalesPerformance',
       'getMyPerformance',
       'searchPackages',
+      'listPackages',
+      'countPackages',
+      'getPackageDetail',
     ]);
+  });
+
+  it('marks the public tools, so the registry is exactly the union of public and management vocabulary', () => {
+    // `insights/__tests__/catalogue.test.js` asserts this union against
+    // `allToolNames()`. Deriving the list from the marker is what stops a tool
+    // being registered and then forgotten by both vocabularies.
+    expect(PUBLIC_TOOL_NAMES).toEqual(['listPackages', 'countPackages', 'getPackageDetail']);
   });
 
   it('declares no non-GET tool', () => {
@@ -433,5 +448,140 @@ describe('listInvoices filters, orders and derives overdue (S5)', () => {
     const result = await executeTool('listInvoices', {}, ctx, ['listInvoices']);
     expect(result.data.map((row) => row.id)).toEqual(['inv-dated', 'inv-nodate']);
     expect(result.data[1].overdue).toBe(false);
+  });
+});
+
+describe('the public catalogue tools', () => {
+  it('reads the whole published catalogue, bounded, under the package service audience', async () => {
+    mockDomainAuthHeader.mockImplementation(async (base) => ({ Authorization: `Bearer ${base}` }));
+    const calls = captureFetch({ success: true, data: [{ id: 'p-1', title: 'Japan Cultural Journey' }] });
+
+    const result = await executeTool('listPackages', { limit: 5 }, ctx, ['listPackages']);
+
+    expect(calls[0].url).toBe(`${PACKAGE}/api/v1/packages?limit=5`);
+    expect(mockDomainAuthHeader).toHaveBeenCalledWith(PACKAGE);
+    expect(result.data).toHaveLength(1);
+  });
+
+  it('projects only the allowlisted catalogue fields', async () => {
+    captureFetch({
+      success: true,
+      data: [{ id: 'p-1', title: 'Japan Cultural Journey', createdBy: 'user-9', costPrice: 'SHOULD-NOT-LEAK' }],
+    });
+
+    const result = await executeTool('listPackages', {}, ctx, ['listPackages']);
+
+    expect(Object.keys(result.data[0]).sort()).toEqual([...getTool('listPackages').projection].sort());
+    expect(JSON.stringify(result)).not.toMatch(/createdBy|costPrice|SHOULD-NOT-LEAK/);
+  });
+
+  it('counts with the service\'s own query names, not this tool\'s argument names', async () => {
+    // `assembleWhere` reads `minPrice`/`maxPrice`/`minRating`. Sending the tool's
+    // own `priceMax` would be ignored by the service, and the reply would state
+    // the size of the whole catalogue instead of the filtered set — a wrong
+    // number delivered with full confidence.
+    const calls = captureFetch({ success: true, total: 3, data: [] });
+
+    const result = await executeTool(
+      'countPackages',
+      { priceMin: 1000, priceMax: 2000, rating: 4, destination: 'dubai' },
+      ctx,
+      ['countPackages'],
+    );
+
+    const url = new URL(calls[0].url);
+    expect(url.pathname).toBe('/api/v1/packages');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      limit: '1',
+      minPrice: '1000',
+      maxPrice: '2000',
+      minRating: '4',
+      destination: 'dubai',
+    });
+    expect(result.data[0].total).toBe(3);
+  });
+
+  it('reports the envelope total rather than the number of rows returned', async () => {
+    // The count is read from the response envelope, which reports the whole
+    // match independently of the single row requested.
+    captureFetch({ success: true, total: 7, data: [{ id: 'p-1' }] });
+
+    const result = await executeTool('countPackages', {}, ctx, ['countPackages']);
+
+    expect(result.data[0].total).toBe(7);
+  });
+
+  it('degrades to unavailable when the envelope carries no usable total', async () => {
+    captureFetch({ success: true, data: [] });
+
+    const result = await executeTool('countPackages', {}, ctx, ['countPackages']);
+
+    expect(result).toEqual({ unavailable: true });
+  });
+
+  it('reshapes a package detail instead of projecting it, so the day tree cannot be truncated mid-structure', async () => {
+    const calls = captureFetch({
+      success: true,
+      data: {
+        id: 'p-1',
+        title: 'Japan Cultural Journey',
+        destination: 'Japan',
+        durationDays: 9,
+        sellPrice: 4485,
+        currency: 'USD',
+        rating: 4.7,
+        numReviews: 16,
+        description: 'Nine days of temples.',
+        inclusions: ['Hotels', { label: 'Rail pass' }],
+        exclusions: ['Flights'],
+        itineraryDays: Array.from({ length: 25 }, (_, i) => ({
+          dayNumber: i + 1,
+          title: `Day ${i + 1}`,
+          description: 'x'.repeat(500),
+          places: [{ id: 'place-1' }],
+          activities: [{ id: 'activity-1' }],
+          transports: [{ id: 'transport-1' }],
+          flights: [{ id: 'flight-1' }],
+        })),
+        internalCost: 'SHOULD-NOT-LEAK',
+      },
+    });
+
+    const result = await executeTool('getPackageDetail', { id: 'p-1' }, ctx, ['getPackageDetail']);
+
+    expect(calls[0].url).toBe(`${PACKAGE}/api/v1/packages/p-1`);
+    const detail = result.data[0];
+    expect(detail.title).toBe('Japan Cultural Journey');
+    expect(detail.inclusions).toEqual(['Hotels', '{"label":"Rail pass"}']);
+    expect(detail.itinerary).toHaveLength(10);
+    expect(detail.itinerary[0]).toEqual({ dayNumber: 1, title: 'Day 1' });
+    // The deep per-day tree is gone, not merely trimmed.
+    expect(JSON.stringify(result)).not.toMatch(/places|activities|transports|flights|internalCost|SHOULD-NOT-LEAK/);
+  });
+
+  it('encodes the package id into the request path', async () => {
+    const calls = captureFetch({ success: true, data: { id: 'a/../b' } });
+
+    await executeTool('getPackageDetail', { id: 'a/../b' }, ctx, ['getPackageDetail']);
+
+    expect(calls[0].url).toBe(`${PACKAGE}/api/v1/packages/a%2F..%2Fb`);
+  });
+
+  it('survives a detail record with no inclusions or itinerary', async () => {
+    captureFetch({ success: true, data: { id: 'p-1', title: 'Bare', inclusions: null } });
+
+    const result = await executeTool('getPackageDetail', { id: 'p-1' }, ctx, ['getPackageDetail']);
+
+    expect(result.data[0].inclusions).toEqual([]);
+    expect(result.data[0].itinerary).toEqual([]);
+  });
+
+  it('rejects a call by a caller whose vocabulary omits the public tools', async () => {
+    const calls = captureFetch({ success: true, data: [] });
+
+    const result = await executeTool('listPackages', {}, ctx, ['listLeads']);
+
+    expect(result).toEqual({ error: "unknown tool 'listPackages'" });
+    expect(calls).toHaveLength(0);
   });
 });

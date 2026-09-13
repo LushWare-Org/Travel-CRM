@@ -13,7 +13,17 @@ export const assistantResolutionMetadataSchema = z
     confidenceBucket: z.enum(['low', 'medium', 'high']).optional(),
     committed: z.boolean().optional(),
     abstainReason: boundedString.optional(),
-    finalStageTwoTool: z.enum(['navigate', 'answer_faq_policy', 'respond_conversationally', 'redirect_off_topic']).optional(),
+    finalStageTwoTool: z
+      .enum([
+        'navigate',
+        'answer_faq_policy',
+        'answer_packages',
+        'hand_off',
+        'request_booking',
+        'respond_conversationally',
+        'redirect_off_topic',
+      ])
+      .optional(),
     stageOneLatencyMs: z.number().int().nonnegative().max(27_000).optional(),
     stageTwoLatencyMs: z.number().int().nonnegative().max(27_000).optional(),
     fallbackUsed: z.boolean().optional(),
@@ -25,7 +35,17 @@ const assistantResolutionEventSchema = z
   .object({
     sessionId: boundedString,
     turnId: boundedString,
-    tool: z.enum(['navigate', 'answer_faq_policy', 'respond_conversationally', 'redirect_off_topic']).nullable(),
+    tool: z
+      .enum([
+        'navigate',
+        'answer_faq_policy',
+        'answer_packages',
+        'hand_off',
+        'request_booking',
+        'respond_conversationally',
+        'redirect_off_topic',
+      ])
+      .nullable(),
     route: boundedString.nullable(),
     metadata: assistantResolutionMetadataSchema,
   })

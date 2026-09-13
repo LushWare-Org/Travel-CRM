@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { LEAD_COPILOT_FIELDS } from '@travel-crm/contracts';
 import { domainAuthHeader } from '../utils/cloudRunAuth.js';
+import { ROUTE_PARAM_RULES } from '../ai/routeParams.js';
 import { serializeToolResult } from '../ai/prompts/managementAnswer.v2.js';
 
 // ─── Domain tool registry ─────────────────────────────────────────────────
@@ -135,7 +136,13 @@ async function fetchJson(baseUrl, path, ctx, signal) {
     return { unavailable: true };
   }
   const json = await res.json();
-  return { data: json?.data ?? null };
+  // `total` is the envelope's match count, which the list endpoints report
+  // independently of the page they were asked for. Carried through because it
+  // is the only authoritative count in this system — a tool that needs one must
+  // read it here rather than recompute it from a page of rows. Callers that do
+  // not ask for it are unaffected.
+  const total = Number(json?.total);
+  return { data: json?.data ?? null, ...(Number.isFinite(total) ? { total } : {}) };
 }
 
 const getLeadTool = {
@@ -398,6 +405,197 @@ const searchPackagesTool = {
   },
 };
 
+// ─── Public catalogue reads ───────────────────────────────────────────────
+// These three back the public-site assistant, which has no user identity at
+// all. The routes behind them are public (package-service forces `isActive`
+// when no user is present), so they take no role in `ManagementToolAccess` and
+// no management role can reach them; the public turn passes its own allowlist
+// to `executeTool`. They live here so the outbound call still gets the per-
+// target Cloud Run ID token and the result is still bounded by declaration.
+
+// The filters a package query may carry, in one shape so `countPackages` and
+// `listPackages` cannot disagree about what a filter is or which values are
+// acceptable. Both send them to the same service endpoint.
+const PACKAGE_FILTER_FIELDS = {
+  destination: z.string().min(1).max(60).optional(),
+  category: z.string().min(1).max(60).optional(),
+  priceMin: z.number().min(0).max(1_000_000).optional(),
+  priceMax: z.number().min(0).max(1_000_000).optional(),
+  durationMin: z.number().int().min(1).max(365).optional(),
+  durationMax: z.number().int().min(1).max(365).optional(),
+  rating: z.number().optional(),
+};
+
+// These names are not the service's query names. `assembleWhere` reads
+// `minPrice`/`maxPrice`/`minRating`; sending `priceMax` would be ignored and the
+// query would silently describe the whole catalogue instead of the filtered set,
+// so the three bounded numerics are mapped.
+const PACKAGE_QUERY_NAMES = { priceMin: 'minPrice', priceMax: 'maxPrice', rating: 'minRating' };
+
+// The published catalogue, for answering questions about what exists — and, when
+// a filter is given, the matching page of it. `getPackages` reports the whole
+// match count independently of the `limit` it applies, so a caller that wants
+// both a preview and the total asks once and gets both from the same response.
+const listPackagesTool = {
+  name: 'listPackages',
+  public: true,
+  description:
+    'List the published packages (id, title, description, destination, duration, category, prices, rating, review count). Use `limit` to bound how many are returned, and the filter arguments to list only the packages that match them.',
+  argsSchema: z
+    .object({
+      ...PACKAGE_FILTER_FIELDS,
+      limit: z.number().int().min(1).max(50).optional(),
+      sort: z.enum(ROUTE_PARAM_RULES.sort.values).optional(),
+    })
+    .strict(),
+  projection: [
+    'id',
+    'title',
+    'slug',
+    'description',
+    'destination',
+    'durationDays',
+    'category',
+    'sellPrice',
+    'basePrice',
+    'currency',
+    'rating',
+    'numReviews',
+    'isActive',
+    'isFeatured',
+  ],
+  rowCap: 50,
+  resultByteBudget: LIST_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const params = new URLSearchParams({ limit: String(args.limit ?? 50) });
+    for (const [key, value] of Object.entries(args)) {
+      if (key === 'limit' || value === undefined) continue;
+      params.set(PACKAGE_QUERY_NAMES[key] ?? key, String(value));
+    }
+    const result = await fetchJson(packageServiceUrl(), `/api/v1/packages?${params}`, ctx, signal);
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    const bounded = boundResult(listPackagesTool, Array.isArray(result.data) ? result.data : []);
+    // Carried through so one read answers both "how many" and "which ones", and
+    // the two can never describe different filter sets.
+    return Number.isFinite(result.total) ? { ...bounded, total: result.total } : bounded;
+  },
+};
+
+// The number that answers "how many", read from the service's own count rather
+// than recomputed from a page of rows. `getPackages` reports `total` for the
+// whole match independently of the `limit` it applies, so this asks for one row
+// and still learns the full count.
+const countPackagesTool = {
+  name: 'countPackages',
+  public: true,
+  description:
+    'Count the published packages matching a destination, category, price, duration or rating. Returns the exact total, not a page of results.',
+  argsSchema: z.object({ ...PACKAGE_FILTER_FIELDS }).strict(),
+  projection: ['total'],
+  rowCap: 1,
+  resultByteBudget: RECORD_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const params = new URLSearchParams({ limit: '1' });
+    for (const [key, value] of Object.entries(args)) {
+      if (value === undefined) continue;
+      params.set(PACKAGE_QUERY_NAMES[key] ?? key, String(value));
+    }
+    const result = await fetchJson(packageServiceUrl(), `/api/v1/packages?${params}`, ctx, signal);
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    if (!Number.isFinite(result.total)) return { unavailable: true };
+    return boundResult(countPackagesTool, [{ total: result.total }]);
+  },
+};
+
+const DETAIL_TEXT_LIMIT = 400;
+const DETAIL_LIST_LIMIT = 10;
+const DETAIL_ITEM_LIMIT = 120;
+const DETAIL_DAY_LIMIT = 10;
+
+const truncate = (value, limit) => {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+};
+
+// `inclusions`/`exclusions` are Json columns that may hold strings or objects.
+const summarizeDetailList = (value) =>
+  (Array.isArray(value) ? value : [])
+    .slice(0, DETAIL_LIST_LIMIT)
+    .map((entry) => truncate(typeof entry === 'string' ? entry : JSON.stringify(entry), DETAIL_ITEM_LIMIT))
+    .filter(Boolean);
+
+// A day's places, activities, transports and flights are a deep tree that would
+// exhaust this record's byte budget and then be trimmed mid-structure by
+// `boundResult`, leaving an unparseable fragment in the prompt. The outline
+// keeps `dayNumber` and `title` only: enough to describe the shape of the trip.
+function summarizePackageDetail(record) {
+  return {
+    id: record.id ?? null,
+    title: truncate(record.title, DETAIL_ITEM_LIMIT) || null,
+    destination: truncate(record.destination, DETAIL_ITEM_LIMIT) || null,
+    durationDays: record.durationDays ?? null,
+    category: record.category ?? null,
+    sellPrice: record.sellPrice ?? record.basePrice ?? null,
+    currency: record.currency ?? null,
+    rating: record.rating ?? null,
+    numReviews: record.numReviews ?? null,
+    description: truncate(record.description, DETAIL_TEXT_LIMIT) || null,
+    inclusions: summarizeDetailList(record.inclusions),
+    exclusions: summarizeDetailList(record.exclusions),
+    itinerary: (Array.isArray(record.itineraryDays) ? record.itineraryDays : [])
+      .slice(0, DETAIL_DAY_LIMIT)
+      .map((day) => ({
+        dayNumber: day?.dayNumber ?? null,
+        title: truncate(day?.title, DETAIL_ITEM_LIMIT) || null,
+      }))
+      .filter((day) => day.dayNumber !== null || day.title),
+  };
+}
+
+// What a package IS, in detail: what the price buys and how the days run.
+// `getPackageById` increments the view counter, so this is only ever called for
+// a package the visitor actually named — never speculatively across the
+// catalogue.
+const getPackageDetailTool = {
+  name: 'getPackageDetail',
+  public: true,
+  description:
+    'Read one package in full: description, what is included and excluded, and the day-by-day outline.',
+  argsSchema: z.object({ id: z.string().min(1).max(255) }).strict(),
+  projection: [
+    'id',
+    'title',
+    'destination',
+    'durationDays',
+    'category',
+    'sellPrice',
+    'currency',
+    'rating',
+    'numReviews',
+    'description',
+    'inclusions',
+    'exclusions',
+    'itinerary',
+  ],
+  rowCap: 1,
+  resultByteBudget: RECORD_RESULT_BYTE_BUDGET,
+  async execute(ctx, args, signal) {
+    const result = await fetchJson(
+      packageServiceUrl(),
+      `/api/v1/packages/${encodeURIComponent(args.id)}`,
+      ctx,
+      signal,
+    );
+    if (result.notAuthorized) return { notAuthorized: true };
+    if (result.unavailable) return { unavailable: true };
+    const record = result.data;
+    if (!record || typeof record !== 'object') return boundResult(getPackageDetailTool, []);
+    return boundResult(getPackageDetailTool, [summarizePackageDetail(record)]);
+  },
+};
+
 /** An analytics path with the optional window the service accepts. */
 function analyticsPath(path, args) {
   return args.timeRange ? `/api/v1/analytics${path}?timeRange=${args.timeRange}` : `/api/v1/analytics${path}`;
@@ -417,7 +615,17 @@ export const domainTools = [
   getSalesPerformanceTool,
   getMyPerformanceTool,
   searchPackagesTool,
+  listPackagesTool,
+  countPackagesTool,
+  getPackageDetailTool,
 ];
+
+// The tools that answer to no actor at all. Derived from the `public` marker on
+// the tools themselves rather than listed again, so a tool cannot be added to
+// the registry and forgotten here — the same way the access map cannot silently
+// omit a management tool. `insights/__tests__/catalogue.test.js` asserts the
+// registry is exactly the union of these and the management vocabulary.
+export const PUBLIC_TOOL_NAMES = domainTools.filter((tool) => tool.public === true).map((tool) => tool.name);
 
 const toolsByName = new Map(domainTools.map((t) => [t.name, t]));
 
