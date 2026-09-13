@@ -186,11 +186,20 @@ form on screen registers no `runAction` at all — the runner handles the fill
 itself, against the live form, because the collision decision needs the values as
 they are at that moment rather than as they were when the page last rendered.
 
-`z-floating-assistant` (110) is now defined in `index.css` and the panel takes it
-while a form-bearing dialog is open; `/reset-password/:token` joined the excluded
-paths, because a reset link carries a credential. The dialog's own focus and
-Escape interplay — the assistant closing before the dialog — is stated in DESIGN.md
-and is NOT yet implemented.
+`z-floating-assistant` (110) is now defined in `index.css`, and `/reset-password/:token`
+joined the excluded paths, because a reset link carries a credential. Escape is
+implemented in the capture phase on the panel: it closes the assistant and stops
+the key before the dialog underneath sees it, which is the design's ordering.
+
+**The layer itself is wired but NOT working, and the browser says so.** The
+registration carries `hostedInDialog`, the provider holds it as state, the panel
+switches class on it — and with the booking dialog genuinely open
+(`/package/<id>?book=1` renders its contact step) the panel still computes
+`z-index: 70`, the layer below the dialog. So a modal-hosted form is registered and
+fillable *if* the visitor can reach the panel, and the booking and review dialogs
+are the two forms whose browser pass is therefore still missing. Focus moving into
+the panel and back on close is likewise unverified. This needs one debugging pass
+with the layer inspected from inside an open dialog.
 
 ### Deferred, not in this branch
 
