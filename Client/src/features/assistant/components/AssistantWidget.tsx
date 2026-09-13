@@ -56,9 +56,10 @@ interface AssistantTurnExtrasProps {
   data: AssistantTurnData;
   onNavigate: (route: string, path: string) => void;
   onSendMessage: (text: string) => void;
+  onResolvePrefill: (choice: 'replace' | 'keep') => void;
 }
 
-function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnExtrasProps) {
+function AssistantTurnExtras({ data, onNavigate, onSendMessage, onResolvePrefill }: AssistantTurnExtrasProps) {
   if (data.tool === 'navigate') {
     if (!data.path) return null;
     return (
@@ -66,6 +67,30 @@ function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnE
         <button type="button" onClick={() => onNavigate(data.route, data.path)} className={CHIP_CLASS}>
           <ArrowRight className="w-3 h-3" />
           Go to {routeLabel(data.route)}
+        </button>
+      </div>
+    );
+  }
+
+  if (data.tool === 'page_action' && data.pending && Object.keys(data.pending.fields).length > 0) {
+    // The collision confirm: a control inside the bubble, not a turn. Two buttons
+    // at the button radius, each a 44px target, keyboard operable, and "keep mine"
+    // leaves the visitor's own text exactly as it was.
+    return (
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => onResolvePrefill('replace')}
+          className="inline-flex min-h-[44px] items-center rounded-xl border border-brand-200 bg-white px-3 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50"
+        >
+          Replace it
+        </button>
+        <button
+          type="button"
+          onClick={() => onResolvePrefill('keep')}
+          className="inline-flex min-h-[44px] items-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          Keep mine
         </button>
       </div>
     );
@@ -249,9 +274,16 @@ interface MessageRowProps {
   turnData: AssistantTurnData | undefined;
   onNavigate: (route: string, path: string) => void;
   onSendMessage: (text: string) => void;
+  onResolvePrefill: (assistantMessageId: string, choice: 'replace' | 'keep') => void;
 }
 
-const MessageRow = memo(function MessageRow({ message, turnData, onNavigate, onSendMessage }: MessageRowProps) {
+const MessageRow = memo(function MessageRow({
+  message,
+  turnData,
+  onNavigate,
+  onSendMessage,
+  onResolvePrefill,
+}: MessageRowProps) {
   if (message.role === 'user') {
     return (
       <div className="flex items-start gap-2 flex-row-reverse">
@@ -266,7 +298,14 @@ const MessageRow = memo(function MessageRow({ message, turnData, onNavigate, onS
       <Bot className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" />
       <div className="min-w-0 space-y-2">
         <p className="text-sm bg-white rounded-xl px-3 py-2 shadow-sm">{message.content}</p>
-        {turnData && <AssistantTurnExtras data={turnData} onNavigate={onNavigate} onSendMessage={onSendMessage} />}
+        {turnData && (
+          <AssistantTurnExtras
+            data={turnData}
+            onNavigate={onNavigate}
+            onSendMessage={onSendMessage}
+            onResolvePrefill={(choice) => onResolvePrefill(message.id, choice)}
+          />
+        )}
       </div>
     </div>
   );
@@ -353,6 +392,13 @@ export default function AssistantWidget() {
   const handleChipSend = useCallback((text: string) => {
     void sendMessageRef.current(text);
   }, []);
+  // Same reason as the send ref above: the chip is a prop of the memoized row, and
+  // a fresh closure per keystroke would re-render the whole transcript.
+  const resolvePrefillRef = useRef(chat.resolvePrefill);
+  resolvePrefillRef.current = chat.resolvePrefill;
+  const handleResolvePrefill = useCallback((assistantMessageId: string, choice: 'replace' | 'keep') => {
+    resolvePrefillRef.current(assistantMessageId, choice);
+  }, []);
 
   if (isAssistantExcludedPath(location.pathname)) return null;
   if (!isOpen) return null;
@@ -401,6 +447,7 @@ export default function AssistantWidget() {
               turnData={turnByMessageId.get(message.id)}
               onNavigate={handleChipClick}
               onSendMessage={handleChipSend}
+              onResolvePrefill={handleResolvePrefill}
             />
           ))}
           {chat.isSending && (

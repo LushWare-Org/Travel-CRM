@@ -1,5 +1,8 @@
 import type { FormEvent } from 'react';
 import { Star, X } from 'lucide-react';
+import { useAssistantPageRegistration } from '../../assistant/capabilities/AssistantCapabilityProvider';
+import { assistantFieldState, useAssistantWrittenFields } from '../../assistant/actions/useAssistantFormPrefill';
+import { AssistantFilledBadge, assistantMarkedFieldClass } from '../../assistant/components/AssistantFieldMarker';
 
 export interface ReviewFormData {
   name: string;
@@ -25,6 +28,38 @@ export default function ReviewModal({
   onSubmit,
   onClose,
 }: ReviewModalProps) {
+  const { written, markWritten, clearWritten } = useAssistantWrittenFields();
+
+  // Registered only while the modal is open: a form that is not on screen must
+  // not be fillable, and this component stays mounted (rendering null) when it
+  // closes.
+  useAssistantPageRegistration(
+    open
+      ? {
+          surface: 'review',
+          revision: 'review',
+          // `step` is a planner idea; a form has exactly one, so it reports 1.
+          pageContext: { surface: 'review', revision: 'review', step: 1 },
+          actions: ['prefill_form'],
+          prefill: {
+            form: 'review',
+            fields: () => ({
+              name: assistantFieldState(reviewData.name, written.has('name')),
+              comment: assistantFieldState(reviewData.comment, written.has('comment')),
+            }),
+            write: (fields) => {
+              setReviewData({
+                ...reviewData,
+                ...(typeof fields.name === 'string' ? { name: fields.name } : {}),
+                ...(typeof fields.comment === 'string' ? { comment: fields.comment } : {}),
+              });
+              markWritten(Object.keys(fields));
+            },
+          },
+        }
+      : null,
+  );
+
   return open ? (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-modal flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full review-modal-mobile p-6 lg:p-8">
@@ -44,10 +79,20 @@ export default function ReviewModal({
                   type="text"
                   required
                   value={reviewData.name}
-                  onChange={(e) => setReviewData({ ...reviewData, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none form-input-mobile"
+                  onChange={(e) => {
+                    clearWritten('name');
+                    setReviewData({ ...reviewData, name: e.target.value });
+                  }}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none form-input-mobile ${assistantMarkedFieldClass(
+                    written.has('name'),
+                  )}`}
                   placeholder="Enter your name"
                 />
+                {written.has('name') && (
+                  <div className="mt-1">
+                    <AssistantFilledBadge />
+                  </div>
+                )}
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -78,11 +123,21 @@ export default function ReviewModal({
                 <textarea
                   required
                   value={reviewData.comment}
-                  onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none resize-none form-input-mobile"
+                  onChange={(e) => {
+                    clearWritten('comment');
+                    setReviewData({ ...reviewData, comment: e.target.value });
+                  }}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none resize-none form-input-mobile ${assistantMarkedFieldClass(
+                    written.has('comment'),
+                  )}`}
                   rows={4}
                   placeholder="Share your experience..."
                 />
+                {written.has('comment') && (
+                  <div className="mt-1">
+                    <AssistantFilledBadge />
+                  </div>
+                )}
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button

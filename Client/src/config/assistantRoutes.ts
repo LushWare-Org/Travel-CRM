@@ -89,7 +89,14 @@ export const isAssistantExcludedPath = (pathname: string): boolean => {
   // leave the widget mounted directly over the excluded page it exists to avoid
   // (found in /ship's Codex adversarial review). Normalize before comparing.
   const normalized = normalizePath(pathname);
-  return normalized === '/login' || normalized === '/my-account';
+  return (
+    normalized === '/login' ||
+    normalized === '/my-account' ||
+    // A reset link carries a credential, and a credential is the one field the
+    // assistant may never read or write — so the page it lives on is not a page
+    // it opens at all.
+    normalized.startsWith('/reset-password/')
+  );
 };
 
 // Wire shape the assistant API contract needs. `enabled` is dropped — it is a

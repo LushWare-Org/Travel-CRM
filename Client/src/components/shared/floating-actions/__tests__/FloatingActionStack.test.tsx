@@ -61,7 +61,6 @@ describe('FloatingActionStack', () => {
     '/contact',
     '/career',
     '/destinations-international',
-    '/reset-password/abc',
   ])('renders the launcher immediately, with no scroll gate, on %s', async (path) => {
     await renderStack(path);
 
@@ -70,7 +69,9 @@ describe('FloatingActionStack', () => {
     expect(launcherContainer()).not.toHaveClass('pointer-events-none');
   });
 
-  it.each(['/login', '/my-account'])(
+  // A reset link carries a credential, so the assistant does not mount there at
+  // all — the launcher is its only opener.
+  it.each(['/login', '/my-account', '/reset-password/abc'])(
     'renders no launcher at all on the assistant-excluded route %s',
     async (path) => {
       await renderStack(path);

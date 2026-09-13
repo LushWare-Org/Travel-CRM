@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { z } from 'zod';
 import type { AssistantAction, AssistantCurrentView, AssistantPageContext } from '@travel-crm/contracts';
+import { ASSISTANT_FORM_SURFACES } from '@travel-crm/contracts';
 
 /**
  * One action the page can execute against its own state. Derived from the shared
@@ -9,6 +10,9 @@ import type { AssistantAction, AssistantCurrentView, AssistantPageContext } from
  * to name, and the runner cannot hand it an action shape the contract rejects.
  */
 export type AssistantPageAction = z.infer<typeof AssistantAction>['tool'];
+
+/** One of the site's forms, as the contract names it. A form id is also its surface id. */
+export type AssistantFormValue = (typeof ASSISTANT_FORM_SURFACES)[number];
 
 export type AssistantActionPayload = z.infer<typeof AssistantAction>;
 
@@ -36,13 +40,42 @@ export type AssistantPageContextValue = z.infer<typeof AssistantPageContext>;
  */
 export type AssistantCurrentViewValue = z.infer<typeof AssistantCurrentView>;
 
+/** What one of a form's writable fields holds, and who put it there. */
+export interface AssistantFormFieldState {
+  value: string | number;
+  /**
+   * `visitor` is the one that matters: the assistant never overwrites text the
+   * visitor typed without a confirm, and the mark it leaves on its own writes is
+   * cleared the moment the visitor edits that field.
+   */
+  source: 'visitor' | 'assistant' | 'empty';
+}
+
+/**
+ * A form the mounted page can have filled. Deliberately read-through rather than
+ * a copy: `fields()` reports what the form holds at the moment a fill arrives, so
+ * a collision is decided against the live form rather than against whatever it
+ * held when the page last rendered.
+ */
+export interface AssistantFormPrefill {
+  form: AssistantFormValue;
+  fields: () => Record<string, AssistantFormFieldState>;
+  write: (fields: Record<string, string | number>) => void;
+}
+
 export interface AssistantPageRegistration {
   surface: AssistantPageContextValue['surface'];
   revision: string;
   pageContext: AssistantPageContextValue;
   actions: AssistantPageAction[];
-  /** Executes the action against the page and resolves to a line for the transcript ('' says nothing). */
-  runAction: (action: AssistantActionPayload) => Promise<string>;
+  /**
+   * Executes one of the page's OTHER actions and resolves to a line for the
+   * transcript ('' says nothing). Absent on a page whose only registered action is
+   * `prefill_form`, which the runner handles itself against `prefill` below.
+   */
+  runAction?: (action: AssistantActionPayload) => Promise<string>;
+  /** Present only on a page with a form on screen; the `prefill_form` member needs it. */
+  prefill?: AssistantFormPrefill;
 }
 
 interface AssistantCapabilityStore {

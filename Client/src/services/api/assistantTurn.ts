@@ -34,6 +34,9 @@ export const AssistantTurnTool = z.enum([
   // the request rather than from model args: the page reports what is on screen
   // and the assistant relays its numbers.
   'answer_current_view',
+  // The form-filling member: the page writes the values into the form it has on
+  // screen, and presses no button.
+  'prefill_form',
 ]);
 
 // Identical shape to WizardTurnMessage: `id`/`at` are required so the

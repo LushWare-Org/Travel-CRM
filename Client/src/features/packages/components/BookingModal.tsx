@@ -16,6 +16,10 @@ import {
 } from '@/components/ui/dialog';
 import Stepper from '@/components/shared/Stepper';
 
+import { useAssistantPageRegistration } from '../../assistant/capabilities/AssistantCapabilityProvider';
+import { assistantFieldState, useAssistantWrittenFields } from '../../assistant/actions/useAssistantFormPrefill';
+import { AssistantFilledBadge, assistantMarkedFieldClass } from '../../assistant/components/AssistantFieldMarker';
+
 export interface BookingFormData {
   name: string;
   email: string;
@@ -59,6 +63,44 @@ export default function BookingModal({
   onSubmit,
   onClose,
 }: BookingModalProps) {
+  const { written, markWritten, clearWritten } = useAssistantWrittenFields();
+
+  // Registered while the dialog is open, and only then: a modal-hosted form is not
+  // a page, so the assistant may fill it exactly as long as it is on screen. The
+  // panel raises above the dialog while this is registered (see the widget).
+  useAssistantPageRegistration(
+    open
+      ? {
+          surface: 'booking',
+          revision: 'booking',
+          // `step` is a planner idea; the form reports its own first step.
+          pageContext: { surface: 'booking', revision: 'booking', step: 1 },
+          actions: ['prefill_form'],
+          prefill: {
+            form: 'booking',
+            fields: () => ({
+              name: assistantFieldState(formData.name, written.has('name')),
+              email: assistantFieldState(formData.email, written.has('email')),
+              phone: assistantFieldState(formData.phone, written.has('phone')),
+              travelers: assistantFieldState(formData.travelers, written.has('travelers')),
+              message: assistantFieldState(formData.message, written.has('message')),
+            }),
+            write: (fields) => {
+              setFormData({
+                ...formData,
+                ...(typeof fields.name === 'string' ? { name: fields.name } : {}),
+                ...(typeof fields.email === 'string' ? { email: fields.email } : {}),
+                ...(typeof fields.phone === 'string' ? { phone: fields.phone } : {}),
+                ...(typeof fields.travelers === 'number' ? { travelers: fields.travelers } : {}),
+                ...(typeof fields.message === 'string' ? { message: fields.message } : {}),
+              });
+              markWritten(Object.keys(fields));
+            },
+          },
+        }
+      : null,
+  );
+
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
       <DialogContent
@@ -108,6 +150,7 @@ export default function BookingModal({
                     required
                     value={formData.email}
                     onChange={(e) => {
+                      clearWritten('email');
                       setFormData({...formData, email: e.target.value});
                       if (formErrors.email) {
                         setFormErrors({...formErrors, email: ''});
@@ -116,10 +159,11 @@ export default function BookingModal({
                     className={`w-full px-5 py-4 text-base border-2 rounded-2xl focus:ring-4 transition-all max-sm:px-4 max-sm:py-3 ${
                       formErrors.email
                         ? 'border-red-500 focus:border-red-500 focus:ring-red-100'
-                        : 'border-gray-300 focus:border-brand-600 focus:ring-brand-100 bg-white'
+                        : `border-gray-300 focus:border-brand-600 focus:ring-brand-100 bg-white ${assistantMarkedFieldClass(written.has('email'))}`
                     }`}
                     placeholder="your.email@example.com"
                   />
+                  {written.has('email') && <AssistantFilledBadge />}
                   {formErrors.email && (
                     <p className="text-red-600 text-sm font-semibold mt-2 flex items-center gap-2">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -141,14 +185,18 @@ export default function BookingModal({
                       type="text"
                       value={formData.name}
                       onChange={(e) => {
+                        clearWritten('name');
                         setFormData({...formData, name: e.target.value});
                         if (formErrors.name) {
                           setFormErrors({...formErrors, name: ''});
                         }
                       }}
-                      className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-600 transition-all bg-white hover:bg-gray-50 max-sm:px-4 max-sm:py-3"
+                      className={`w-full px-5 py-4 text-base border-2 border-gray-300 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-600 transition-all bg-white hover:bg-gray-50 max-sm:px-4 max-sm:py-3 ${assistantMarkedFieldClass(
+                        written.has('name'),
+                      )}`}
                       placeholder="John Doe"
                     />
+                    {written.has('name') && <AssistantFilledBadge />}
                   </div>
 
                   {/* Phone - Optional with country code */}
@@ -160,9 +208,10 @@ export default function BookingModal({
                     <PhoneInput
                       international
                       defaultCountry="LK"
-                      value={formData.phone}
-                      onChange={(value) => {
-                        setFormData({...formData, phone: value || ''});
+                                              value={formData.phone}
+                        onChange={(value) => {
+                          clearWritten('phone');
+                          setFormData({...formData, phone: value || ''});
                         if (formErrors.phone) {
                           setFormErrors({...formErrors, phone: ''});
                         }
@@ -314,11 +363,17 @@ export default function BookingModal({
                         type="number"
                         min="1"
                         value={formData.travelers}
-                        onChange={(e) => setFormData({...formData, travelers: +e.target.value || 1})}
-                        className="flex-1 min-w-0 px-5 py-4 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-600 transition-all bg-white"
+                        onChange={(e) => {
+                          clearWritten('travelers');
+                          setFormData({...formData, travelers: +e.target.value || 1});
+                        }}
+                        className={`flex-1 min-w-0 px-5 py-4 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-600 transition-all bg-white ${assistantMarkedFieldClass(
+                          written.has('travelers'),
+                        )}`}
                         placeholder="2"
                         aria-label="Number of travelers"
                       />
+                      {written.has('travelers') && <AssistantFilledBadge />}
                       <button
                         type="button"
                         onClick={() => setFormData({...formData, travelers: formData.travelers + 1})}
@@ -344,10 +399,16 @@ export default function BookingModal({
                     <textarea
                       rows={4}
                       value={formData.message}
-                      onChange={(e) => setFormData({...formData, message: e.target.value})}
-                      className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-600 transition-all resize-none bg-white hover:bg-gray-50 placeholder:text-gray-400"
+                      onChange={(e) => {
+                        clearWritten('message');
+                        setFormData({...formData, message: e.target.value});
+                      }}
+                      className={`w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-600 transition-all resize-none bg-white hover:bg-gray-50 placeholder:text-gray-400 ${assistantMarkedFieldClass(
+                        written.has('message'),
+                      )}`}
                       placeholder="Any dietary requirements, accessibility needs, or special occasions? We're here to make your trip perfect!"
                     />
+                    {written.has('message') && <AssistantFilledBadge />}
                   </div>
                 </div>
 
