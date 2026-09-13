@@ -77,6 +77,16 @@ vi.mock('../../booking/bookingRequest.js', () => ({
   submitWebsiteBooking: mockSubmitWebsiteBooking,
 }));
 
+// The grounded search is mocked rather than exercised here: its own suite covers
+// the provider call, the two grounded response shapes and the citation rules,
+// and this suite is about what the turn does with the result.
+const mockGenerateGrounded = vi.hoisted(() => vi.fn());
+
+vi.mock('../../ai/groundedSearch.js', () => ({
+  generateGrounded: mockGenerateGrounded,
+  GROUNDING_TIMEOUT_MS: 12_000,
+}));
+
 const { default: app } = await import('../../app.js');
 
 // Turn messages must carry a stable id and an ISO timestamp (see the
@@ -113,6 +123,26 @@ const DESTINATION_ROUTES = [
   },
 ];
 
+// A client that offers the planner and a package's customization page — the two
+// places the site builds a trip the catalogue does not already contain. The
+// customize target is a template the server fills from the package it resolved,
+// which is what keeps an id the model can neither see nor author out of the URL.
+const CUSTOM_TRIP_ROUTES = [
+  {
+    name: 'packages',
+    path: '/packages',
+    params: ['destination'],
+    paramValues: {
+      destination: [
+        { value: 'japan', label: 'Japan' },
+        { value: 'uae', label: 'Dubai' },
+      ],
+    },
+  },
+  { name: 'planner', path: '/planner', params: [] },
+  { name: 'customize', path: '/package/:id/customize', params: [] },
+];
+
 function baseBody(overrides = {}) {
   return {
     sessionId: 'session-1',
@@ -140,6 +170,9 @@ beforeEach(() => {
   delete process.env.ASSISTANT_ROUTER_SOCIAL_ENABLED;
   delete process.env.ASSISTANT_ROUTER_OFF_TOPIC_ENABLED;
   delete process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED;
+  // Grounded search is on by default (an opt-out flag); a case that wants it off
+  // sets it.
+  delete process.env.ASSISTANT_TRAVEL_SEARCH_ENABLED;
 });
 
 describe('POST /api/v1/assistant/turn — stage-one router', () => {
@@ -646,11 +679,18 @@ describe('POST /api/v1/assistant/turn — conversational outcomes', () => {
         args: { mode: 'social', socialSubtype: 'greeting' },
       },
       serverResult: { mode: 'social', source: 'resolver' },
-      message: 'Hi! I can help you explore destinations, find packages, navigate the site, or answer LushWare policy questions.',
+      message: 'Hi! I can help you explore destinations, find packages, build a custom trip with AI, or answer LushWare policy questions.',
     });
     expect(res.body.data.message).not.toContain('Untrusted');
+    // Two attempts, and both inside what is left of the turn: the resolver's
+    // occasional runaway answer is a sampling artefact, so a second draw is worth
+    // its latency, but never past the caller's own deadline.
     expect(mockGenerateStructured).toHaveBeenCalledWith(
-      expect.objectContaining({ maxAttempts: 1, timeoutMs: expect.any(Number) }),
+      expect.objectContaining({
+        maxAttempts: 2,
+        timeoutMs: expect.any(Number),
+        deadlineMs: expect.any(Number),
+      }),
     );
   });
 
@@ -670,8 +710,31 @@ describe('POST /api/v1/assistant/turn — conversational outcomes', () => {
       toolCall: { tool: 'respond_conversationally', args: { mode: 'capability' } },
       serverResult: { mode: 'capability', source: 'resolver' },
     });
-    expect(res.body.data.message).toContain('filter the packages list');
+    expect(res.body.data.message).toContain('take you to any page');
     expect(res.body.data.message).not.toContain('Untrusted');
+    // No planner on this client, so no custom-trip promise: what the assistant
+    // may offer is what this turn actually registered.
+    expect(res.body.data.message).not.toContain('take you to the planner');
+  });
+
+  it('names the custom-trip routes only when the client offered them', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'capability' },
+    });
+
+    const offered = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ availableRoutes: CUSTOM_TRIP_ROUTES }));
+    const withheld = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Hello')] }));
+
+    expect(offered.body.data.message).toContain('take you to the planner');
+    expect(offered.body.data.message).toContain('customization page, where you tailor that trip');
+    expect(withheld.body.data.message).not.toContain('take you to the planner');
+    expect(withheld.body.data.message).not.toContain('customization page');
   });
 
   it.each([
@@ -1406,6 +1469,157 @@ describe('POST /api/v1/assistant/turn — answering about packages', () => {
     });
   });
 
+  it('sends a visitor to the customization page of the package they named', async () => {
+    mockLoadPackageCatalogue.mockResolvedValue(CATALOGUE);
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'navigate',
+      args: { route: 'customize', message: 'Opening it for you.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('i want to customize the japan cultural journey')],
+          availableRoutes: CUSTOM_TRIP_ROUTES,
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    // The model names the route; the id comes from the catalogue the server
+    // loaded. A literal ":id" here would be a URL that 404s.
+    expect(res.body.data.serverResult).toEqual({
+      route: 'customize',
+      path: '/package/p-japan/customize',
+    });
+    expect(res.body.data.message).toBe('Opening the customization page for Japan Cultural Journey.');
+  });
+
+  it('sends a visitor to the customization page of the package under discussion', async () => {
+    mockLoadPackageCatalogue.mockResolvedValue(CATALOGUE);
+    mockGenerateStructured.mockResolvedValue({ tool: 'navigate', args: { route: 'customize' } });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('i want my own version of it')],
+          availableRoutes: CUSTOM_TRIP_ROUTES,
+          shownPackageIds: ['p-dubai'],
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult).toEqual({
+      route: 'customize',
+      path: '/package/p-dubai/customize',
+    });
+  });
+
+  it('asks which package rather than sending a customize link with no package in it', async () => {
+    mockLoadPackageCatalogue.mockResolvedValue(CATALOGUE);
+    mockGenerateStructured.mockResolvedValue({ tool: 'navigate', args: { route: 'customize' } });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('can you customise something for me')],
+          availableRoutes: CUSTOM_TRIP_ROUTES,
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult).toEqual({ route: 'packages', path: '/packages' });
+    expect(res.body.data.message).toContain('Which package would you like to customise?');
+  });
+
+  it('answers a place the catalogue does not have honestly, not with everything it has', async () => {
+    mockLoadPackageCatalogue.mockResolvedValue(CATALOGUE);
+    mockLoadFilteredPackages.mockResolvedValue({ packages: [], total: 25 });
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'navigate',
+      args: { route: 'packages', destination: 'tokyo', message: 'We have no Tokyo trips.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('do you have any tokyo packages')],
+          availableRoutes: CUSTOM_TRIP_ROUTES,
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    // "tokyo" is not one of the destinations the page lists, so the filter is
+    // dropped — and a count over the whole catalogue would then read as an answer
+    // about Tokyo. That sentence is what this replaces.
+    expect(res.body.data.serverResult.path).toBe('/packages');
+    expect(res.body.data.message).toContain("I don't have a trip for that place");
+    expect(res.body.data.message).not.toContain('There are');
+  });
+
+  it('keeps the model clause for a place we cover only as a country, and adds the count', async () => {
+    mockLoadPackageCatalogue.mockResolvedValue(CATALOGUE);
+    mockLoadFilteredPackages.mockResolvedValue({
+      packages: [
+        { id: 'p-japan-a', title: 'Japan Cherry Blossom Trail' },
+        { id: 'p-japan', title: 'Japan Cultural Journey' },
+      ],
+      total: 2,
+    });
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'navigate',
+      args: {
+        route: 'packages',
+        destination: 'japan',
+        message: 'We have no Tokyo-specific trip.',
+      },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('i mean one include tokyo city')],
+          availableRoutes: CUSTOM_TRIP_ROUTES,
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult.path).toBe('/packages?destination=japan');
+    // The clause was previously discarded outright, so the one sentence that said
+    // "not Tokyo" never reached the visitor.
+    expect(res.body.data.message.startsWith('We have no Tokyo-specific trip.')).toBe(true);
+    expect(res.body.data.message).toContain('Japan Cultural Journey');
+  });
+
+  it('drops a model clause stating a number no record supports', async () => {
+    mockLoadPackageCatalogue.mockResolvedValue(CATALOGUE);
+    mockLoadFilteredPackages.mockResolvedValue({
+      packages: [{ id: 'p-japan', title: 'Japan Cultural Journey' }],
+      total: 1,
+    });
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'navigate',
+      args: { route: 'packages', destination: 'japan', message: 'There are 9 packages waiting.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('packages in japan')],
+          availableRoutes: CUSTOM_TRIP_ROUTES,
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).not.toContain('9 packages');
+    expect(res.body.data.message).toContain('Japan Cultural Journey');
+  });
+
   it('leaves the model text in place when no count can be resolved', async () => {
     mockLoadPackageCatalogue.mockResolvedValue([]);
     mockLoadFilteredPackages.mockResolvedValue({ packages: [], total: null });
@@ -1868,5 +2082,265 @@ describe('POST /api/v1/assistant/turn — answering about packages', () => {
     expect(res.body.data.serverResult.booking).toEqual({ status: 'unavailable' });
     expect(res.body.data.message).toContain('booking form on the package page');
     expect(mockSubmitWebsiteBooking).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/v1/assistant/turn — page actions', () => {
+  const CAPABILITIES = {
+    version: 1,
+    surface: 'planner',
+    actions: [
+      'set_destination',
+      'set_travellers',
+      'set_preferences',
+      'set_contact_details',
+      'go_to_step',
+      'generate_itinerary',
+      'regenerate_days',
+      'edit_day',
+    ],
+  };
+  const PAGE_CONTEXT = {
+    surface: 'planner',
+    revision: 'planner',
+    step: 3,
+    destination: 'Kandy',
+    duration: 3,
+    days: [{ dayNumber: 1, title: 'Arrival' }],
+  };
+
+  const pageBody = (overrides = {}) =>
+    baseBody({ capabilities: CAPABILITIES, pageContext: PAGE_CONTEXT, ...overrides });
+
+  it('returns the validated action with the page revision it was chosen against', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'edit_day',
+      args: { dayNumber: 3, operation: 'add_activities', values: ['whale watching'], message: 'Adding that now.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(pageBody({ messages: [assistantMsg('add whale watching to day 3')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall).toEqual({
+      tool: 'edit_day',
+      args: { dayNumber: 3, operation: 'add_activities', values: ['whale watching'], message: 'Adding that now.' },
+    });
+    // The action travels without the model's own line — the client parses it
+    // against the shared action contract, which has no `message` on the page
+    // fields beyond the reply.
+    expect(res.body.data.serverResult).toEqual({
+      action: { tool: 'edit_day', dayNumber: 3, operation: 'add_activities', values: ['whale watching'] },
+      revision: 'planner',
+      surface: 'planner',
+    });
+    expect(res.body.data.message).toBe('Adding that now.');
+  });
+
+  it('has a line of its own for every page action that runs without a model message', async () => {
+    // The shared NO_MESSAGE_FALLBACK ("Sorry, I didn't quite catch that") reads as
+    // failure next to an action that ran, so every page action needs its own
+    // sentence. This is the guard that would have caught the split vocabulary
+    // shipping with four tools and no fallbacks.
+    const cases = [
+      ['set_destination', { destination: 'Kandy' }],
+      ['set_travellers', { travelers: 3 }],
+      ['set_preferences', { preferences: 'slow pace' }],
+      ['set_contact_details', { field: 'email', value: 'ana@example.com' }],
+      ['go_to_step', { step: 2 }],
+      ['generate_itinerary', {}],
+      ['regenerate_days', { dayNumbers: [1] }],
+      ['edit_day', { dayNumber: 1, operation: 'set_title', values: ['Arrival'] }],
+    ];
+
+    for (const [tool, args] of cases) {
+      mockGenerateStructured.mockResolvedValue({ tool, args });
+
+      const res = await request(app)
+        .post('/api/v1/assistant/turn')
+        .send(pageBody({ messages: [assistantMsg(`${tool} please`)] }));
+
+      expect(res.status, `${tool} should dispatch`).toBe(200);
+      expect(res.body.data.message, `${tool} needs its own line`).not.toContain('quite catch that');
+      expect(res.body.data.message.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('dispatches every one of the page actions the browser can register', async () => {
+    // One case per name in ASSISTANT_PAGE_ACTIONS: an action with no `switch`
+    // case falls to the default and answers 502, which is exactly what happened
+    // when this vocabulary was split and four names were added without cases.
+    const cases = [
+      ['set_destination', { destination: 'Kandy' }],
+      ['set_travellers', { travelers: 3 }],
+      ['set_preferences', { preferences: 'slow pace' }],
+      ['set_contact_details', { field: 'email', value: 'ana@example.com' }],
+      ['go_to_step', { step: 2 }],
+      ['generate_itinerary', {}],
+      ['regenerate_days', { dayNumbers: [1] }],
+      ['edit_day', { dayNumber: 1, operation: 'set_title', values: ['Arrival'] }],
+    ];
+
+    for (const [tool, args] of cases) {
+      mockGenerateStructured.mockResolvedValue({ tool, args: { ...args, message: 'On it.' } });
+
+      const res = await request(app)
+        .post('/api/v1/assistant/turn')
+        .send(pageBody({ messages: [assistantMsg(`${tool} please`)] }));
+
+      expect(res.status, `${tool} should dispatch`).toBe(200);
+      expect(res.body.data.serverResult.action.tool).toBe(tool);
+      expect(res.body.data.serverResult.revision).toBe('planner');
+    }
+  });
+
+  it('drops a day the trip does not have before the page ever sees it', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'regenerate_days',
+      args: { dayNumbers: [2, 31], message: 'Redoing those.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(pageBody({ messages: [assistantMsg('redo days 2 and 31')] }));
+
+    expect(res.body.data.serverResult.action).toEqual({ tool: 'regenerate_days', dayNumbers: [2] });
+  });
+
+  it('answers a page action that carries no model message with its own line', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'generate_itinerary', args: {} });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(pageBody({ messages: [assistantMsg('build the itinerary')] }));
+
+    expect(res.body.data.message).toBe('Building your day-by-day plan.');
+    expect(res.body.data.serverResult.action).toEqual({ tool: 'generate_itinerary' });
+  });
+
+  it('refuses a page action the browser did not register, answering with capability copy', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'generate_itinerary',
+      args: { message: 'Building it.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('build the itinerary')],
+          capabilities: { version: 1, surface: 'planner', actions: [] },
+          pageContext: PAGE_CONTEXT,
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall).toEqual({
+      tool: 'respond_conversationally',
+      args: { mode: 'capability' },
+    });
+    expect(res.body.data.serverResult).toEqual({ mode: 'capability', source: 'resolver' });
+    expect(res.body.data.message).not.toContain('Building it.');
+  });
+
+  it('refuses a page action reported against a different surface than the capabilities', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'edit_day',
+      args: { dayNumber: 1, operation: 'set_title', values: ['Arrival'], message: 'Updating.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(
+        baseBody({
+          messages: [assistantMsg('change day 1')],
+          capabilities: CAPABILITIES,
+          pageContext: { ...PAGE_CONTEXT, surface: 'customize', revision: 'customize:p1' },
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall.tool).toBe('respond_conversationally');
+    expect(res.body.data.message).not.toContain('Updating.');
+  });
+
+  it('does not offer a page action when the client sends no manifest at all', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'navigate', args: { route: 'packages', message: 'Here.' } });
+
+    const res = await request(app).post('/api/v1/assistant/turn').send(baseBody());
+
+    expect(res.status).toBe(200);
+    // The prompt's enum is the contract; the assertion here is that a turn with
+    // no manifest is still an ordinary turn.
+    expect(mockGenerateStructured).toHaveBeenCalledTimes(1);
+    expect(res.body.data.toolCall.tool).toBe('navigate');
+  });
+});
+
+describe('POST /api/v1/assistant/turn — grounded travel search', () => {
+  const searchTurn = (message) => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'search_travel_info',
+      args: { query: 'best time to visit Kandy', message: 'Looking that up.' },
+    });
+    return request(app).post('/api/v1/assistant/turn').send(baseBody({ messages: [assistantMsg(message)] }));
+  };
+
+  it('answers a travel question from the search, with its sources and the advisory line', async () => {
+    mockGenerateGrounded.mockResolvedValue({
+      text: 'December to March is the driest stretch.',
+      citations: [{ title: 'example.com', uri: 'https://example.com/kandy-weather' }],
+    });
+
+    const res = await searchTurn('what is the best time of year to visit Kandy');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult).toEqual({
+      searched: true,
+      query: 'best time to visit Kandy',
+      citations: [{ title: 'example.com', uri: 'https://example.com/kandy-weather' }],
+    });
+    expect(res.body.data.message).toContain('December to March is the driest stretch.');
+    expect(res.body.data.message).toContain("Check your government's official travel advisory");
+    // The model's own line never states anything about conditions.
+    expect(res.body.data.message).not.toContain('Looking that up');
+  });
+
+  it('refuses a query outside the travel domain without searching', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'search_travel_info',
+      args: { query: 'write me a python script for that' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('write me a python script for that')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult).toBeNull();
+    expect(res.body.data.message).toContain('I only look up travel information');
+    expect(mockGenerateGrounded).not.toHaveBeenCalled();
+  });
+
+  it('does not search when the deployment switched grounded search off', async () => {
+    process.env.ASSISTANT_TRAVEL_SEARCH_ENABLED = 'false';
+
+    const res = await searchTurn('what is the best time of year to visit Kandy');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).toContain('I cannot search the web in this chat right now');
+    expect(mockGenerateGrounded).not.toHaveBeenCalled();
+  });
+
+  it('degrades to copy when the search itself fails, never to the model\u2019s own prose', async () => {
+    mockGenerateGrounded.mockRejectedValue(new Error('provider down'));
+
+    const res = await searchTurn('what is the best time of year to visit Kandy');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).toContain('The web lookup did not go through just now');
+    expect(res.body.data.message).not.toContain('Looking that up');
+    expect(res.body.data.serverResult).toBeNull();
   });
 });

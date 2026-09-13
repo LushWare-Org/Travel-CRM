@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { AssistantPageCapabilities, AssistantPageContext } from '@travel-crm/contracts';
+import { ASSISTANT_TOOLS } from '../ai/prompts/assistantTurn.v1.js';
 
 // ─── Assistant turn ───────────────────────────────────────────
 // Wire shape mirrors wizard-turn's WizardTurnMessage/WizardTurnRequest
@@ -49,6 +51,15 @@ export const assistantTurnSchema = z.object({
   // strips unknown keys. Its only effect is whether a card is drawn: it gates
   // no data and no permission.
   shownPackageIds: z.array(z.string().max(64)).max(200).optional(),
+  // What the browser says it can execute this turn, and what its page looks
+  // like right now. Both are untrusted input — `pageContext` is interpolated
+  // into the prompt as data and `capabilities.actions` gates which actions may
+  // be returned — so both are the shared contract's own bounded schemas rather
+  // than anything restated here. Declared for the reason every field on this
+  // schema is: it validates the request body and zod strips what it does not
+  // know, so an undeclared field would silently never reach the controller.
+  capabilities: AssistantPageCapabilities.optional(),
+  pageContext: AssistantPageContext.optional(),
 });
 
 // ─── Telemetry events ─────────────────────────────────────────
@@ -62,18 +73,10 @@ export const recordEventSchema = z
     sessionId: z.string().min(1).max(255),
     turnId: z.string().min(1).max(255).nullable().optional(),
     eventType: z.enum(ASSISTANT_EVENT_TYPES),
-    tool: z
-      .enum([
-        'navigate',
-        'answer_faq_policy',
-        'answer_packages',
-        'hand_off',
-        'request_booking',
-        'respond_conversationally',
-        'redirect_off_topic',
-      ])
-      .nullable()
-      .optional(),
+    // Derived from the one tool list rather than restated: this enum is
+    // `.strict()`, so a tool missing here drops the whole telemetry event with
+    // only a logged parse error to show for it.
+    tool: z.enum(ASSISTANT_TOOLS).nullable().optional(),
     route: z.string().max(255).nullable().optional(),
   })
   .strict();

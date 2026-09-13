@@ -1,13 +1,17 @@
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import logger from '../config/logger.js';
-import { generateStructured } from '../ai/geminiClient.js';
+import { generateStructured, isAIConfigured } from '../ai/geminiClient.js';
 import {
   buildAssistantTurnPrompt,
+  buildAssistantTurnResponseJsonSchema,
   canonicalizeAssistantTurnResponse,
   assistantTurnResponseSchema,
-  assistantTurnResponseJsonSchema,
 } from '../ai/prompts/assistantTurn.v1.js';
+import { ASSISTANT_PAGE_ACTIONS } from '@travel-crm/contracts';
+import { generateGrounded, GROUNDING_TIMEOUT_MS } from '../ai/groundedSearch.js';
+import { buildTravelSearchPrompt } from '../ai/prompts/travelSearch.v1.js';
+import { isTravelDomainQuery, sanitizeSearchQuery, toSearchPhrase } from '../ai/travelDomain.js';
 import { fetchPolicyDocuments, retrieveSnippets, FALLBACK_POLICY_MESSAGE } from '@travel-crm/policy-retrieval';
 import { BAD_GATEWAY } from '../constants/httpStatus.js';
 import { recordAssistantResolution } from '../telemetry/assistantEvents.js';
@@ -34,6 +38,12 @@ import {
 const ROUTE_DECLINED_MESSAGE =
   "I can't take you there directly — try asking for a specific page, like packages or destinations.";
 const NO_MESSAGE_FALLBACK = "Sorry, I didn't quite catch that — could you rephrase?";
+// The visitor named a place we do not cover. A destination is checked against the
+// client's own list, and a value matching nothing used to be dropped silently —
+// leaving the whole catalogue presented as the answer, which is what "do you
+// have any tokyo packages" got, and what every rephrasing of it got again.
+const NO_SUCH_PLACE_MESSAGE =
+  "I don't have a trip for that place — this is everything we offer. Tell me and I can help you build a custom trip for it instead.";
 // Matches content.max(2000) on both wire schemas (assistant.schema.js,
 // assistantTurn.ts). Enforce the cap server-side as the single source of
 // truth before a response enters the client's resent conversation window.
@@ -41,16 +51,73 @@ const MAX_MESSAGE_LENGTH = 2000;
 const ASSISTANT_TURN_DEADLINE_MS = 27_000;
 const ASSISTANT_RESOLVER_TIMEOUT_MS = 20_000;
 const SOCIAL_MESSAGES = {
-  greeting: 'Hi! I can help you explore destinations, find packages, navigate the site, or answer LushWare policy questions.',
+  greeting: 'Hi! I can help you explore destinations, find packages, build a custom trip with AI, or answer LushWare policy questions.',
   thanks: "You're welcome! If you need anything else for your trip, just ask.",
   farewell: 'Safe travels! Come back anytime you need help planning your trip.',
   repair: "No problem. Tell me what you're trying to do, and I'll help you find the right travel option or page.",
 };
 // Server-authored, so it can neither be invented by the model nor drift from
-// what the assistant can actually do. Extend it in the same change as any new
-// capability.
-const CAPABILITIES_MESSAGE =
-  'I can take you to any page on the site, filter the packages list by destination, budget, trip length and rating, and answer questions about LushWare policies. Try "packages in Dubai under 1000" or "what is your cancellation policy".';
+// what the assistant can actually do. A function of what this turn offered,
+// because the answer to "what can you do" is false in both directions when it
+// promises an ability the caller did not register.
+function capabilitiesMessage({ pageActionsOffered, travelSearchEnabled, routesOffered }) {
+  const base =
+    'I can take you to any page on the site, find and filter packages by destination, budget, trip length and rating, and answer questions about LushWare policies.';
+  // Said only when the client offered the planner this turn: the planner is where a
+  // trip we do not list gets built with AI, and promising it to a caller that did
+  // not register the route is the same falsehood as promising a page action.
+  const custom = routesOffered.includes('planner')
+    ? ' For a trip we do not have, I can take you to the planner, where AI drafts a day-by-day itinerary from your destination and dates, and you can shape it with me right there — our specialists review it before you book.'
+    : '';
+  const customize = routesOffered.includes('customize')
+    ? ' Name a package and I can open its customization page, where you tailor that trip.'
+    : '';
+  const page = pageActionsOffered
+    ? ' On this page I can also change your trip details, build or redo the day-by-day plan, and edit individual days for you.'
+    : '';
+  const search = travelSearchEnabled
+    ? ' I can look up travel information for a destination — entry rules, timing, costs, getting around, safety notes — with its sources.'
+    : '';
+  return `${base}${custom}${customize}${page}${search} Try "build me a custom trip to Japan", "packages in Dubai under 1000" or "what is your cancellation policy".`;
+}
+
+// A page action is one the browser executes, so an empty model-authored line
+// would otherwise be replaced by NO_MESSAGE_FALLBACK — telling the visitor
+// "Sorry, I didn't quite catch that" about an action that is about to run.
+// One per name in ASSISTANT_PAGE_ACTIONS: a page action that runs still needs a
+// sentence, and without one here the turn's finalisation answers a successful
+// action with NO_MESSAGE_FALLBACK ("Sorry, I didn't quite catch that") — which
+// reads as failure. Only the model's own line takes precedence.
+const PAGE_ACTION_MESSAGE_DEFAULTS = {
+  set_destination: 'Setting your destination on the page now.',
+  set_travellers: 'Setting the traveller count on the page now.',
+  set_preferences: 'Saving your preferences now.',
+  set_contact_details: 'Saving that on the page now.',
+  go_to_step: 'Taking you there.',
+  generate_itinerary: 'Building your day-by-day plan.',
+  regenerate_days: 'Redoing those days now.',
+  edit_day: 'Updating that day now.',
+};
+
+const SEARCH_DISABLED_MESSAGE =
+  'I cannot search the web in this chat right now. Tell me the destination and I will help from what I know about your trip.';
+const OFF_DOMAIN_SEARCH_MESSAGE =
+  "I only look up travel information — a destination's entry rules, the best time to visit, costs, getting around, and safety notes. Ask me about a place and I will check.";
+const SEARCH_FAILED_MESSAGE =
+  "The web lookup did not go through just now. Ask me again in a moment, or check the destination's official travel advisory.";
+// Appended to a grounded answer rather than baked into it, so it survives any
+// wording the model chooses. The answer describes a condition that changes; a
+// traveller acting on it needs the authority's own page, not our summary.
+const SEARCH_ADVISORY_SUFFIX = "\n\nCheck your government's official travel advisory before you book.";
+// Smallest slice of the turn's remaining budget worth starting a search on. The
+// call itself needs a few seconds, and the turn still has to persist, record
+// telemetry and respond inside its own deadline.
+const MIN_SEARCH_BUDGET_MS = 3_000;
+// Two attempts at most. Measured: a single grounded call searches on most travel
+// questions but not all, so one retry is the difference between "usually works"
+// and "works", and it cannot double the turn's cost because each attempt is
+// bounded by what is left of the same deadline.
+const SEARCH_ATTEMPTS = 2;
 const OFF_TOPIC_MESSAGE =
   "I’m here to help with travel and LushWare trips. I can help you explore destinations, find packages, navigate the site, or answer a company-policy question.";
 const SENSITIVE_MESSAGE =
@@ -128,6 +195,20 @@ function declaredValues(route, paramName) {
 
 function conversationalOutcomesEnabled() {
   return process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED === 'true';
+}
+
+// On by default, with an explicit opt-out: a deployment that wants no billed
+// search sets the flag to 'false'. A missing API key disables it independently,
+// so the tool is never offered when there is nothing to call it with.
+function travelSearchEnabled() {
+  return process.env.ASSISTANT_TRAVEL_SEARCH_ENABLED !== 'false' && isAIConfigured();
+}
+
+// The page actions the browser registered this turn, intersected with the closed
+// list. Used for the schema enum, the prompt and the dispatch guard, so all three
+// cannot disagree about what was offered.
+function offeredPageActions(capabilities) {
+  return (capabilities?.actions ?? []).filter((name) => ASSISTANT_PAGE_ACTIONS.includes(name));
 }
 
 function latestUserTurn(messages) {
@@ -222,8 +303,12 @@ function bookingSummary(draft, title) {
 // keep the pre-session behaviour rather than failing the turn.
 export const assistantTurn = asyncHandler(async (req, res) => {
   const startedAt = Date.now();
-  const { sessionId, messages, availableRoutes, shownPackageIds } = req.body;
+  const { sessionId, messages, availableRoutes, shownPackageIds, capabilities, pageContext } = req.body;
   const outcomesEnabled = conversationalOutcomesEnabled();
+  // What this turn may offer and execute. Resolved once, here, so the response
+  // schema, the prompt and the dispatch guard all read the same pair.
+  const offeredActions = offeredPageActions(capabilities);
+  const searchEnabled = travelSearchEnabled();
   const latestTurn = latestUserTurn(messages);
   const turnId = latestTurn?.id;
 
@@ -332,14 +417,44 @@ export const assistantTurn = asyncHandler(async (req, res) => {
       routerHint: routerIntent,
       packages,
       packageDetail,
+      pageCapabilities: capabilities,
+      pageContext,
+      travelSearchEnabled: searchEnabled,
     });
     const stageTwoStartedAt = Date.now();
     const raw = await generateStructured({
       prompt,
-      schema: assistantTurnResponseJsonSchema,
-      maxOutputTokens: 1024,
+      // The tool enum is per turn: the model cannot name a tool this turn did
+      // not offer, which is what makes an unoffered page action a shape error
+      // rather than something the dispatch guard has to catch.
+      schema: buildAssistantTurnResponseJsonSchema({
+        conversationalOutcomesEnabled: outcomesEnabled,
+        capabilityActions: offeredActions,
+        travelSearchEnabled: searchEnabled,
+      }),
+      // One tool call, and the arguments of one tool: 1024 was enough for the
+      // seven-tool vocabulary, but the model occasionally enumerates synonyms
+      // across the wider flat argument space, and a truncated response is a
+      // failed turn rather than a partial action (see geminiClient's MAX_TOKENS
+      // policy). The extra room covers the verbose case without changing what a
+      // well-behaved turn costs.
+      maxOutputTokens: 2048,
       timeoutMs: Math.min(ASSISTANT_RESOLVER_TIMEOUT_MS, remainingBudgetMs),
-      maxAttempts: 1,
+      // A partial answer that still parses is usable here, and far better than the
+      // 502 it used to produce: the canonicalizer narrows it and the strict
+      // per-tool union validates it, so a cut-off argument is dropped rather than
+      // acted on, and everything it names (a route, a package id, a day) is
+      // resolved against real records downstream.
+      allowTruncated: true,
+      // Two attempts, both inside the turn's own deadline. One was the original
+      // setting — a resolver call is not worth retrying on the turn's clock — but
+      // measured against the live provider, this model has a rare runaway mode
+      // where it enumerates synonyms across the flat argument space (8k tokens and
+      // still truncating, roughly one call in six) while the same prompt normally
+      // answers in under 70. A truncation retry re-samples, and `deadlineMs` keeps
+      // the second attempt — and its backoff — inside what is left of the turn.
+      maxAttempts: 2,
+      deadlineMs: remainingBudgetMs,
     });
 
     const canonical = canonicalizeAssistantTurnResponse(raw, {
@@ -353,6 +468,19 @@ export const assistantTurn = asyncHandler(async (req, res) => {
     if (routerIntent === 'sensitive') {
       tool = 'answer_faq_policy';
       args = { question: '', selectedSnippetIds: [], message: '' };
+    }
+
+    // Belt and braces to the schema's per-turn enum, and the place a mismatch
+    // between the two halves of the client's manifest is caught: the actions come
+    // from `capabilities.actions`, but the page they describe comes from
+    // `pageContext`. A turn that names a page action for a page the browser did
+    // not report is answered with copy, never executed and never a 502 — the
+    // browser is the only thing that knows what it mounted.
+    const surfaceMismatch = Boolean(capabilities && pageContext && capabilities.surface !== pageContext.surface);
+    if (ASSISTANT_PAGE_ACTIONS.includes(tool) && (surfaceMismatch || !offeredActions.includes(tool))) {
+      logger.warn({ sessionId, tool, surfaceMismatch }, 'assistant named a page action this turn did not offer');
+      tool = 'respond_conversationally';
+      args = { mode: 'capability' };
     }
 
     // The confirmation question is the server's, so the server makes sure it can
@@ -390,6 +518,29 @@ export const assistantTurn = asyncHandler(async (req, res) => {
         const routeName = typeof args.route === 'string' ? args.route : '';
         const offered = (availableRoutes || []).find((route) => route.name === routeName);
         if (offered) {
+          // WHICH package is a server decision, never the model's. The customize
+          // target is a path template the client owns ('/package/:id/customize'),
+          // and the visitor is about to be sent to a real page for a real record,
+          // so the id comes from a package the server loaded — an id the model
+          // named cannot become a URL.
+          if (offered.name === 'customize') {
+            const subject = namedPackage ?? lastShownPackage(packages, shownPackageIds);
+            if (subject) {
+              serverResult = {
+                route: 'customize',
+                path: offered.path.replace(':id', encodeURIComponent(subject.id)),
+              };
+              message = `Opening the customization page for ${subject.title}.`;
+            } else {
+              const packagesRoute = (availableRoutes || []).find((route) => route.name === 'packages');
+              serverResult = packagesRoute
+                ? { route: 'packages', path: packagesRoute.path }
+                : { route: null, path: null };
+              message =
+                'Which package would you like to customise? This is all of ours — open one and choose Customize Package.';
+            }
+            break;
+          }
           // The client executes this path verbatim, so appending the query here
           // is the whole of "navigate to a filtered view". buildRouteQuery only
           // honours keys the offered route declared, and drops any value it
@@ -442,12 +593,37 @@ export const assistantTurn = asyncHandler(async (req, res) => {
 
           if (preview && preview.total !== null) {
             serverResult = { ...serverResult, total: preview.total };
-            message = countSentenceWithNames(
+            const intendedDestination = typeof args.destination === 'string' && args.destination;
+            // The place the model read out of the visitor's words could not be
+            // applied — it is not one of the destinations the page lists, so the
+            // link is unfiltered and a count would describe the whole catalogue as
+            // if it answered a question about that place. This is what returned the
+            // same 25-package list for "do you have any tokyo packages" and for
+            // every rephrasing of it. The test is the resolved filter and not
+            // `matched`: when the model reads a city as its country ("tokyo" ->
+            // "japan") the value survives, the count is the Japan count, and the
+            // model's own "we have no Tokyo trip" clause is kept below.
+            const droppedPlace = Boolean(intendedDestination) && !destination;
+            const answer = countSentenceWithNames(
               preview.total,
               countFilters,
               catalogueCurrency,
               preview.packages.map((pkg) => pkg.title),
             );
+            // The model's own clause is the only part of a navigate answer the
+            // server did not write, so it is kept exactly as answer_packages keeps
+            // its prose: only while every number in it resolves to a record. It
+            // was being discarded outright, which threw away the one clause that
+            // said "we have no Tokyo trip — these are our Japan trips".
+            const authored = safeGeneratedMessage(args.message);
+            const unsupported = authored
+              ? unresolvedNumericTokens(authored, { factValues: packageFactValues(preview.packages, null) })
+              : [];
+            message = droppedPlace
+              ? NO_SUCH_PLACE_MESSAGE
+              : authored && !unsupported.length
+                ? `${authored} ${answer}`
+                : answer;
           }
           if (!message) message = 'Sure — heading there now.';
         } else {
@@ -716,7 +892,11 @@ export const assistantTurn = asyncHandler(async (req, res) => {
           // Entirely server-authored copy, so unlike travel_general there is
           // nothing here for the router hint to qualify.
           serverResult = { mode: 'capability', source: 'resolver' };
-          message = CAPABILITIES_MESSAGE;
+          message = capabilitiesMessage({
+            pageActionsOffered: offeredActions.length > 0,
+            travelSearchEnabled: searchEnabled,
+            routesOffered: (availableRoutes ?? []).map((route) => route.name),
+          });
         } else if (args.mode === 'travel_general' && (routerIntent === 'travel_general' || routerIntent === null)) {
           // The canonicalizer lets this mode through unchanged when the router
           // did not run, so this gate has to agree with it: `null` is a router
@@ -750,6 +930,77 @@ export const assistantTurn = asyncHandler(async (req, res) => {
         serverResult = { redirected: true, source: 'resolver' };
         message = OFF_TOPIC_MESSAGE;
         break;
+      // ── Client-executed page actions ────────────────────────────────────
+      // The server's part is to name the action, hand over the arguments it
+      // validated, and stamp which page they belong to. Execution, and every
+      // judgement about whether the named thing exists, belongs to the page.
+      case 'set_destination':
+      case 'set_travellers':
+      case 'set_preferences':
+      case 'set_contact_details':
+      case 'go_to_step':
+      case 'generate_itinerary':
+      case 'regenerate_days':
+      case 'edit_day': {
+        const { message: actionMessage, ...actionArgs } = args;
+        serverResult = {
+          action: { tool, ...actionArgs },
+          revision: typeof pageContext?.revision === 'string' ? pageContext.revision : null,
+          surface: typeof capabilities?.surface === 'string' ? capabilities.surface : null,
+        };
+        // An empty line here would be replaced by the "I didn't quite catch
+        // that" fallback about an action that is about to run.
+        if (!actionMessage) message = PAGE_ACTION_MESSAGE_DEFAULTS[tool];
+        break;
+      }
+      // ── Server-executed grounded travel answer ──────────────────────────
+      case 'search_travel_info': {
+        if (!searchEnabled) {
+          message = SEARCH_DISABLED_MESSAGE;
+          break;
+        }
+        const query = sanitizeSearchQuery(args.query);
+        if (!isTravelDomainQuery(query)) {
+          logger.info({ sessionId, query }, 'assistant search refused: outside the travel domain');
+          message = OFF_DOMAIN_SEARCH_MESSAGE;
+          break;
+        }
+        // The gate reads the visitor's words; the provider gets them as a search
+        // phrase. The model often words its query as a question, and a question
+        // in that slot makes the grounded call answer from memory instead of
+        // searching — measured, not assumed.
+        const searchPhrase = toSearchPhrase(query);
+        // Up to two attempts, each bounded by what is left of the turn. Whether
+        // the provider searches is the model's decision and there is no setting to
+        // force it, so a call can come back as prose with no sources; asking once
+        // more is the only lever, and it stays inside the same deadline.
+        let grounded = null;
+        for (let attempt = 1; attempt <= SEARCH_ATTEMPTS && !grounded; attempt += 1) {
+          const searchBudgetMs = remainingBudgetMs - 1_000;
+          if (searchBudgetMs < MIN_SEARCH_BUDGET_MS) break;
+          try {
+            grounded = await generateGrounded({
+              prompt: buildTravelSearchPrompt(searchPhrase),
+              timeoutMs: Math.min(GROUNDING_TIMEOUT_MS, searchBudgetMs),
+            });
+          } catch (err) {
+            logger.warn({ err, sessionId, attempt }, 'Grounded travel search failed');
+            // Only a source-less answer is worth asking again for: a provider
+            // error or a timeout will not turn into a search on the retry.
+            if (err?.groundingMissing !== true) break;
+          }
+        }
+
+        if (grounded) {
+          serverResult = { searched: true, query, citations: grounded.citations };
+          // The model's own line is discarded: prose about current conditions is
+          // exactly the failure this tool replaces.
+          message = `${grounded.text}${SEARCH_ADVISORY_SUFFIX}`;
+        } else {
+          message = SEARCH_FAILED_MESSAGE;
+        }
+        break;
+      }
       default:
         throw new AppError('AI returned an unrecognized tool', BAD_GATEWAY);
     }
