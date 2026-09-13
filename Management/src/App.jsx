@@ -1,15 +1,21 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/toast";
 import Sidebar from "./pages/Sidebar";
-import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import LeadManagement from "./pages/LeadManagement";
 import ItineraryGeneration from "./pages/ItineraryGeneration";
+import FlightSearch from "./pages/FlightSearch";
+import HotelSearch from "./pages/HotelSearch";
 import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
+import CareerManagement from "./pages/CareerManagement";
+import OrganizationSettings from "./pages/OrganizationSettings";
 import Login from "./pages/Login";
+import SalesRepLogin from "./pages/SalesRepLogin";
+import SalesRepLoginOTP from "./pages/SalesRepLoginOTP";
 import ResetPassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
+import HomeRoute from "./components/HomeRoute";
 import { useAuth } from "./contexts/AuthContext";
 
 function AppContent() {
@@ -50,22 +56,53 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/sales-rep-login" element={<SalesRepLogin />} />
+      <Route path="/sales-rep-login-otp" element={<SalesRepLoginOTP />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       
       <Route
         path="/*"
         element={
           isAuthenticated ? (
-            <div className="flex h-screen bg-gray-50">
+            <div className="flex h-screen bg-background">
               <Sidebar />
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto min-w-0">
+                <div className="md:hidden h-0" /> {/* Spacer for mobile hamburger */}
                 <Routes>
-                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/" element={<HomeRoute />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/leads" element={<LeadManagement />} />
-                  <Route path="/itineraries" element={<ItineraryGeneration />} />
+                  <Route path="/packages" element={<ItineraryGeneration />} />
+                  <Route path="/flights" element={<FlightSearch />} />
+                  <Route path="/hotels" element={<HotelSearch />} />
                   <Route path="/billing" element={<BillingInvoicing />} />
-                  <Route path="/users" element={<UserManagement />} />
+                  <Route
+                    path="/users"
+                    element={
+                      <ProtectedRoute requiredRoles={["admin", "superAdmin"]}>
+                        <UserManagement />
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Admin-gated to match career-service: /vacancies/admin/all
+                      sits behind the admin role, so a non-admin reaching this
+                      page would render a list that 403s. */}
+                  <Route
+                    path="/career"
+                    element={
+                      <ProtectedRoute requiredRoles={["admin", "superAdmin"]}>
+                        <CareerManagement />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <ProtectedRoute requiredRoles={["admin", "superAdmin"]}>
+                        <OrganizationSettings />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </div>
@@ -90,18 +127,7 @@ function App() {
       >
         <AppContent />
       </Router>
-      <Toaster
-        position="top-right"
-        reverseOrder={false}
-        gutter={8}
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-        }}
-      />
+      <Toaster timeout={4000} />
     </>
   );
 }

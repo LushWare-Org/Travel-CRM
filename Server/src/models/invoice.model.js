@@ -32,7 +32,6 @@ const invoiceSchema = new mongoose.Schema(
       },
       phone: {
         type: String,
-        required: true,
       },
       address: String,
       gstNumber: String,
@@ -246,11 +245,8 @@ invoiceSchema.pre('save', async function (next) {
       this.discountAmount = this.discountValue;
     }
 
-    // Calculate service charge
-    this.serviceChargeAmount = (this.subtotal * this.serviceChargeRate) / 100;
-
     // Calculate tax
-    const taxableAmount = this.subtotal - this.discountAmount + this.serviceChargeAmount;
+    const taxableAmount = this.subtotal - this.discountAmount;
     this.taxAmount = (taxableAmount * this.taxRate) / 100;
 
     // Calculate total

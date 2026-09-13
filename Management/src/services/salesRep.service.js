@@ -1,4 +1,5 @@
 import api from './api';
+import { apiErrorMessage } from '../lib/apiErrorMessage';
 
 /**
  * Sales Representative Service
@@ -25,7 +26,7 @@ class SalesRepService {
    * @param {string} params.search - Search query (name, email, phone)
    * @param {boolean} params.isActive - Filter by active status
    * @param {string} params.fields - Specific fields to return
-   * @returns {Promise<Object>} Sales reps list with pagination info
+   * @returns {Promise<any>} Sales reps list with pagination info
    */
   async getAllSalesReps(params = {}) {
     try {
@@ -40,7 +41,7 @@ class SalesRepService {
   /**
    * Get single sales rep by ID
    * @param {string} salesRepId - Sales rep ID (MongoDB ObjectId)
-   * @returns {Promise<Object>} Sales rep data
+   * @returns {Promise<any>} Sales rep data
    */
   async getSalesRepById(salesRepId) {
     try {
@@ -60,7 +61,7 @@ class SalesRepService {
    * @param {string} salesRepData.phone - Sales rep phone in E.164 format (required)
    * @param {string} salesRepData.phoneCountry - Country code for phone (required)
    * @param {number} salesRepData.commissionRate - Commission rate (0-100, default: 10)
-   * @returns {Promise<Object>} Created sales rep
+   * @returns {Promise<any>} Created sales rep
    */
   async createSalesRep(salesRepData) {
     try {
@@ -81,7 +82,7 @@ class SalesRepService {
    * @param {string} updateData.phone - Phone number in E.164 format
    * @param {string} updateData.phoneCountry - Country code for phone
    * @param {number} updateData.commissionRate - Commission rate
-   * @returns {Promise<Object>} Updated sales rep
+   * @returns {Promise<any>} Updated sales rep
    */
   async updateSalesRep(salesRepId, updateData) {
     try {
@@ -97,7 +98,7 @@ class SalesRepService {
    * Update commission rate for sales rep
    * @param {string} salesRepId - Sales rep ID
    * @param {number} commissionRate - New commission rate (0-100)
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async updateCommissionRate(salesRepId, commissionRate) {
     try {
@@ -116,7 +117,7 @@ class SalesRepService {
    * Toggle sales rep active status (soft deactivate)
    * @param {string} salesRepId - Sales rep ID
    * @param {boolean} isActive - Active status
-   * @returns {Promise<Object>} Updated status
+   * @returns {Promise<any>} Updated status
    */
   async toggleSalesRepStatus(salesRepId, isActive) {
     try {
@@ -134,7 +135,7 @@ class SalesRepService {
   /**
    * Force password reset for sales rep
    * @param {string} salesRepId - Sales rep ID
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async resetSalesRepPassword(salesRepId) {
     try {
@@ -150,7 +151,7 @@ class SalesRepService {
 
   /**
    * Get sales rep statistics
-   * @returns {Promise<Object>} Statistics data (total, active, inactive, verified)
+   * @returns {Promise<any>} Statistics data (total, active, inactive, verified)
    */
   async getSalesRepStats() {
     try {
@@ -165,7 +166,7 @@ class SalesRepService {
   /**
    * Get sales rep performance metrics
    * @param {string} salesRepId - Sales rep ID
-   * @returns {Promise<Object>} Performance data
+   * @returns {Promise<any>} Performance data
    */
   async getSalesRepPerformance(salesRepId) {
     try {
@@ -180,7 +181,7 @@ class SalesRepService {
   /**
    * Delete sales rep permanently
    * @param {string} salesRepId - Sales rep ID
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async deleteSalesRep(salesRepId) {
     try {
@@ -188,6 +189,24 @@ class SalesRepService {
       return response;
     } catch (error) {
       console.error(`Error deleting sales rep ${salesRepId}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get online status of all sales representatives
+   * @returns {Promise<any>} Online status data
+   * @returns {any} response.data.onlineStatus - Object mapping rep IDs to online status (boolean)
+   * @returns {Array} response.data.onlineReps - Array of currently online reps with details
+   * @returns {number} response.data.onlineCount - Count of online reps
+   * @returns {number} response.data.totalCount - Total count of sales reps
+   */
+  async getOnlineStatus() {
+    try {
+      const response = await this.api.get(`${this.endpoint}/online-status`);
+      return response;
+    } catch (error) {
+      console.error('Error fetching online status:', error);
       throw this.handleError(error);
     }
   }
@@ -240,7 +259,7 @@ class SalesRepService {
   /**
    * Handle API errors with user-friendly messages
    * @param {Object} error - Axios error object
-   * @returns {Object} Formatted error object
+   * @returns {any} Formatted error object
    */
   handleError(error) {
     const errorMessage = {
@@ -276,16 +295,19 @@ class SalesRepService {
           errorMessage.userMessage = 'Server error. Please try again later.';
           break;
         default:
-          errorMessage.userMessage = error.response.data?.message || 'An error occurred.';
+          errorMessage.userMessage = apiErrorMessage({
+            data: error.response.data,
+            status: error.response.status,
+          });
       }
     } else if (error.request) {
       // Request made but no response received
-      errorMessage.message = 'No response from server. Please check your connection.';
-      errorMessage.userMessage = 'Network error. Please check your internet connection.';
+      errorMessage.message = apiErrorMessage({ isNetworkError: true });
+      errorMessage.userMessage = apiErrorMessage({ isNetworkError: true });
     } else {
-      // Error in setting up request
-      errorMessage.message = error.message || 'Unknown error occurred';
-      errorMessage.userMessage = 'An unexpected error occurred.';
+      // Error in setting up request. The mapper never returns error.message.
+      errorMessage.message = apiErrorMessage(error);
+      errorMessage.userMessage = apiErrorMessage(error);
     }
 
     return errorMessage;
@@ -294,7 +316,7 @@ class SalesRepService {
   /**
    * Validate sales rep form data
    * @param {Object} data - Form data to validate
-   * @returns {Object} Validation result with errors (if any)
+   * @returns {any} Validation result with errors (if any)
    */
   validateSalesRepData(data) {
     const errors = {};
@@ -315,7 +337,7 @@ class SalesRepService {
 
     if (!data.phone) {
       errors.phone = 'Phone is required';
-    } else if (!/^[\+]?[0-9]{7,15}$/.test(data.phone.replace(/\D/g, '') === '' ? '+' + data.phone : data.phone)) {
+    } else if (!/^[+]?[0-9]{7,15}$/.test(data.phone.replace(/\D/g, '') === '' ? '+' + data.phone : data.phone)) {
       errors.phone = 'Phone number must be between 7-15 digits (can include + prefix)';
     }
 

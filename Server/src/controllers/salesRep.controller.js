@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import User from '../models/user.model.js';
+import Lead from '../models/lead.model.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import emailService from '../utils/emailService.js';
@@ -64,10 +65,13 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
     }
 
     // Build select object for field limiting
-    let selectFields = '-__v -password'; // Exclude sensitive fields by default
+    let selectFields;
     if (req.query.fields) {
       const fields = req.query.fields.split(',').map(f => f.trim());
-      selectFields = fields.join(' ');
+      selectFields = fields.join(' ') + ' lastLogin'; // Include lastLogin with custom fields
+    } else {
+      // Use inclusion fields instead of exclusion to include lastLogin
+      selectFields = 'name email phone phoneCountry role isActive isEmailVerified commissionRate targetLeads createdAt lastLogin';
     }
 
     // Execute query with optimizations
@@ -83,17 +87,44 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
       User.countDocuments(filter),
     ]);
 
+    // Enrich sales reps data with lead metrics
+    const enrichedSalesReps = await Promise.all(
+      salesReps.map(async (rep) => {
+        // Count leads assigned to this sales rep
+        const leadsAssigned = await Lead.countDocuments({ assignedTo: rep._id });
+
+        // Count converted leads (status = 'converted')
+        const leadsConverted = await Lead.countDocuments({
+          assignedTo: rep._id,
+          status: 'converted',
+        });
+
+        // Get last login date
+        const lastLogin = rep.lastLogin ? new Date(rep.lastLogin).toISOString().split('T')[0] : null;
+
+        return {
+          ...rep,
+          id: rep._id,
+          leadsAssigned,
+          leadsConverted,
+          status: rep.isActive ? 'active' : 'inactive',
+          accountStatus: rep.isEmailVerified ? (rep.mustChangePassword ? 'pending_password_reset' : 'verified') : 'pending_email_verification',
+          lastLogin,
+        };
+      }),
+    );
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalSalesReps / limit);
 
     logger.debug(
-      `Retrieved ${salesReps.length} sales reps (page ${page}, total ${totalSalesReps})`,
+      `Retrieved ${enrichedSalesReps.length} sales reps (page ${page}, total ${totalSalesReps})`,
     );
 
     res.status(200).json({
       status: 'success',
       data: {
-        salesReps,
+        salesReps: enrichedSalesReps,
         pagination: {
           currentPage: page,
           totalPages,
@@ -177,6 +208,7 @@ export const createSalesRep = asyncHandler(async (req, res, next) => {
       phoneCountry: req.body.phoneCountry || 'US',
       password: tempPassword,
       role: 'salesRep',
+      permissions: ['manage_leads', 'view_billing'], // Sales reps can manage leads and view billing
       createdBy: req.user.id,
       isEmailVerified: true, // Auto-verify sales reps
       isTempPassword: true,
@@ -429,7 +461,7 @@ export const resetSalesRepPassword = asyncHandler(async (req, res, next) => {
 
     // Send password reset email
     try {
-      await emailService.sendPasswordReset(salesRep, tempPassword);
+      await emailService.sendStaffCredentials(salesRep, tempPassword, 'salesRep');
       logger.info(`Password reset email sent to ${salesRep.email} by ${req.user.email}`);
     } catch (emailError) {
       logger.error(
@@ -472,6 +504,23 @@ export const getSalesRepStats = asyncHandler(async (req, res, next) => {
       isEmailVerified: true,
     });
 
+    // Get total leads assigned to all sales reps
+    const leadStats = await Lead.aggregate([
+      { $match: { assignedTo: { $exists: true, $ne: null } } },
+      {
+        $group: {
+          _id: null,
+          totalLeads: { $sum: 1 },
+          convertedLeads: {
+            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const totalLeads = leadStats[0]?.totalLeads || 0;
+    const convertedLeads = leadStats[0]?.convertedLeads || 0;
+
     res.status(200).json({
       status: 'success',
       data: {
@@ -479,6 +528,9 @@ export const getSalesRepStats = asyncHandler(async (req, res, next) => {
         active: activeSalesReps,
         inactive: inactiveSalesReps,
         verified: verifiedSalesReps,
+        totalLeads,
+        convertedLeads,
+        conversionRate: totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : 0,
       },
     });
   } catch (error) {
@@ -564,6 +616,59 @@ export const deleteSalesRep = asyncHandler(async (req, res, next) => {
   } catch (error) {
     logger.error(`Error deleting sales rep ${id}: ${error.message}`);
     return next(new AppError('Error deleting sales representative', 500));
+  }
+});
+
+/**
+ * @desc    Get online status of all sales representatives
+ * @route   GET /api/v1/sales-reps/online-status
+ * @access  Private/Admin
+ * @returns Object mapping sales rep IDs to their online status (boolean)
+ */
+export const getOnlineSalesReps = asyncHandler(async (req, res, next) => {
+  try {
+    // Consider a sales rep online if they had activity in the last 5 minutes
+    const onlineThresholdMinutes = 5;
+    const thresholdTime = new Date(Date.now() - onlineThresholdMinutes * 60 * 1000);
+
+    // Get all active sales reps
+    const salesReps = await User.find({
+      role: 'salesRep',
+      isActive: true,
+    })
+      .select('_id name email lastActivity')
+      .lean();
+
+    // Build online status map
+    const onlineStatus = {};
+    salesReps.forEach((rep) => {
+      // Rep is online if lastActivity exists and is within threshold
+      onlineStatus[rep._id.toString()] = rep.lastActivity && rep.lastActivity >= thresholdTime;
+    });
+
+    // Also return list of online reps with details for easier frontend consumption
+    const onlineReps = salesReps
+      .filter((rep) => rep.lastActivity && rep.lastActivity >= thresholdTime)
+      .map((rep) => ({
+        id: rep._id,
+        name: rep.name,
+        email: rep.email,
+        lastActivity: rep.lastActivity,
+      }));
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        onlineStatus, // Object: { repId: true/false }
+        onlineReps, // Array of online rep details
+        onlineCount: onlineReps.length,
+        totalCount: salesReps.length,
+        thresholdMinutes: onlineThresholdMinutes,
+      },
+    });
+  } catch (error) {
+    logger.error(`Error getting online sales reps: ${error.message}`);
+    return next(new AppError('Error retrieving online status', 500));
   }
 });
 

@@ -24,7 +24,6 @@ const quotationSchema = new mongoose.Schema(
       },
       phone: {
         type: String,
-        required: true,
       },
       address: String,
       gstNumber: String,
@@ -42,6 +41,10 @@ const quotationSchema = new mongoose.Schema(
     package: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Package',
+    },
+    itinerary: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ManualItinerary',
     },
     items: {
       type: [
@@ -126,7 +129,6 @@ const quotationSchema = new mongoose.Schema(
       type: String,
       enum: ['draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'],
       default: 'draft',
-      index: true,
     },
     issueDate: {
       type: Date,
@@ -145,6 +147,11 @@ const quotationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Invoice',
     },
+    coverImage: String, // Legacy field - kept for backward compatibility
+    images: [{
+      url: String,
+      isCover: { type: Boolean, default: false }
+    }], // Multiple images for manual/custom quotations
     pdfUrl: String,
     sentAt: Date,
     emailSent: {
@@ -222,11 +229,8 @@ quotationSchema.pre('save', async function (next) {
     this.discountAmount = this.discountValue;
   }
 
-  // Calculate service charge
-  this.serviceChargeAmount = (this.subtotal * this.serviceChargeRate) / 100;
-
   // Calculate tax
-  const taxableAmount = this.subtotal - this.discountAmount + this.serviceChargeAmount;
+  const taxableAmount = this.subtotal - this.discountAmount;
   this.taxAmount = (taxableAmount * this.taxRate) / 100;
 
   // Calculate total

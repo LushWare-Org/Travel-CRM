@@ -11,8 +11,8 @@ const grantAdminPermissions = async () => {
     logger.info('MongoDB Connected');
 
     // Find admin user by email
-    const adminEmail = process.argv[2] || 'admin@tripskyway.com';
-    
+    const adminEmail = process.argv[2] || 'admin@example.com';
+
     const admin = await User.findOne({ email: adminEmail, role: 'admin' });
 
     if (!admin) {

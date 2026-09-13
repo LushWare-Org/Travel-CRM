@@ -9,7 +9,7 @@ const packageAIApi = {
   /**
    * Generate AI content from title only (no package ID needed)
    * @param {object} data - { title, destination?, duration?, category? }
-   * @returns {Promise<object>} Generated content
+   * @returns {Promise<any>} Generated content
    */
   generateFromTitle: async (data) => {
     try {
@@ -23,7 +23,7 @@ const packageAIApi = {
   /**
    * Generate AI content for a package
    * @param {string} packageId - Package ID
-   * @returns {Promise<object>} Generated content
+   * @returns {Promise<any>} Generated content
    */
   generateContent: async (packageId) => {
     try {
@@ -37,7 +37,7 @@ const packageAIApi = {
   /**
    * Preview AI content without saving
    * @param {string} packageId - Package ID
-   * @returns {Promise<object>} Preview content
+   * @returns {Promise<any>} Preview content
    */
   previewContent: async (packageId) => {
     return apiService.get(`/packages/${packageId}/preview-ai-content`);
@@ -49,8 +49,9 @@ const packageAIApi = {
    * @returns {Promise<Blob>} PDF blob
    */
   downloadPDF: async (packageId) => {
+    const baseURL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
     const response = await fetch(
-      `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/v1/packages/${packageId}/ai-pdf`,
+      `${baseURL}/packages/${packageId}/ai-pdf`,
       {
         method: 'GET',
         headers: {

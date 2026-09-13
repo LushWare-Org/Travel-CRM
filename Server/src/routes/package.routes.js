@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
+import { generateAIPackage } from '../controllers/aiPackageGeneration.controller.js';
 import {
   createPackage,
   getPackages,
@@ -13,6 +14,7 @@ import {
   incrementBookings,
   updatePackageRating,
 } from '../controllers/package.controller.js';
+import { apiLimiter } from '../config/rateLimiter.js';
 import {
   createPackageValidator,
   updatePackageValidator,
@@ -26,16 +28,16 @@ const router = express.Router();
  * Public Routes
  */
 // Get featured packages
-router.get('/featured/all', getFeaturedPackages);
+router.get('/featured/all', apiLimiter, getFeaturedPackages);
 
 // Get package statistics
-router.get('/stats/all', getPackageStats);
+router.get('/stats/all', apiLimiter, getPackageStats);
 
 // Search packages
-router.get('/search/query', searchPackages);
+router.get('/search/query', apiLimiter, searchPackages);
 
 // Get packages by category
-router.get('/category/:category', getPackagesByCategory);
+router.get('/category/:category', apiLimiter, getPackagesByCategory);
 
 /**
  * Protected Routes (Require Authentication)
@@ -60,6 +62,9 @@ router.get('/', getPackagesValidator, getPackages);
 /**
  * Protected Routes (Admin/Staff only)
  */
+
+// Generate AI package (admin and staff only)
+router.post('/generate-ai', protect, authorize('admin', 'staff'), generateAIPackage);
 
 // Create a new package (admin and staff only)
 router.post('/', protect, authorize('admin', 'staff'), createPackageValidator, createPackage);

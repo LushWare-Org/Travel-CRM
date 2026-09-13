@@ -31,6 +31,20 @@ router.use(protect);
 // Lead routes
 router.route('/').post(authorize('admin', 'salesRep'), createLead).get(authorize('admin', 'salesRep'), getLeads);
 
+// Static paths MUST be above /:id
+// Search
+router.route('/search').get(authorize('admin', 'salesRep'), searchLeads);
+
+// My leads (assigned to current user)
+router.route('/my-leads').get(authorize('salesRep'), getMyLeads);
+
+// Stats
+router.route('/stats').get(authorize('admin', 'salesRep'), getLeadStats);
+
+// Status routes
+router.route('/status/:status').get(authorize('admin', 'salesRep'), getLeadsByStatus);
+
+// Parameterized tracking routes below:
 router
   .route('/:id')
   .get(authorize('admin', 'salesRep'), getLead)
@@ -44,9 +58,6 @@ router.route('/:id/remarks').post(authorize('admin', 'salesRep'), addRemark).get
 router.route('/:id/assign').patch(authorize('admin'), assignLead);
 router.route('/:id/unassign').patch(authorize('admin'), unassignLead);
 
-// Status routes
-router.route('/status/:status').get(authorize('admin', 'salesRep'), getLeadsByStatus);
-
 // Itinerary routes
 router.route('/:id/itinerary')
   .get(authorize('admin', 'salesRep'), getLeadItinerary)
@@ -54,14 +65,5 @@ router.route('/:id/itinerary')
 
 router.route('/:id/itinerary/pdf')
   .get(authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
-
-// My leads (assigned to current user)
-router.route('/my-leads').get(authorize('salesRep'), getMyLeads);
-
-// Stats (admin only)
-router.route('/stats').get(authorize('admin'), getLeadStats);
-
-// Search
-router.route('/search').get(authorize('admin', 'salesRep'), searchLeads);
 
 export default router;

@@ -360,6 +360,17 @@ npm run test:watch
 npm run test -- tests/auth.test.js
 ```
 
+### **Management E2E tests — run manually, not CI-gated**
+
+`Management/e2e/` (Playwright) and `Services/e2e-tests/` (backend API E2E)
+are **not** run by CI — `.github/workflows/microservices-ci.yml`'s
+`management` job only runs lint + the Vitest/RTL unit suite. It's easy to
+forget these exist. **Run `npm run test:e2e` in `Management/` locally before
+merging any PR that touches Login, Sidebar, or Lead Management** — those are
+the only areas this suite currently covers. See `Management/e2e/README.md`
+and `Services/e2e-tests/README.md` for setup (both require the full backend
+stack running locally via `cd Services && npm run dev`).
+
 ---
 
 ## 📚 Documentation

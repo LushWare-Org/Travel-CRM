@@ -3,6 +3,13 @@ import ApiService from './api.js';
 class AnalyticsService {
   /**
    * Get Package Analytics Overview
+   * Fetches analytics for published packages including:
+   * - Inquiries: Leads created from booking/customization requests on published packages
+   * - Conversions: Leads with status='converted' for published packages
+   * - Trends showing inquiry and conversion counts over time
+   * 
+   * Note: Website contact form leads (without package reference) are excluded.
+   * Only published packages (status='published') are tracked in these metrics.
    */
   static async getPackageAnalyticsOverview(timeRange = 'monthly') {
     try {
@@ -102,6 +109,27 @@ class AnalyticsService {
       return response.data;
     } catch (error) {
       console.error('Error fetching salesrep performance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get All Sales Reps Performance (admin only)
+   */
+  static async getAllSalesRepsPerformance(timeRange = 'monthly') {
+    try {
+      const response = await ApiService.fetch(
+        `/analytics/salesreps/performance?timeRange=${timeRange}`,
+        { method: 'GET' }
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch sales rep performance');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all sales reps performance:', error);
       throw error;
     }
   }

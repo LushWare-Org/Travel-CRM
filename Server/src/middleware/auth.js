@@ -37,6 +37,14 @@ export const protect = asyncHandler(async (req, res, next) => {
       throw new AppError('Password was recently changed. Please login again.', 401);
     }
 
+    // Update last activity timestamp for online status tracking
+    // Use updateOne to avoid triggering validation and save hooks
+    await User.updateOne(
+      { _id: req.user._id },
+      { $set: { lastActivity: new Date() } },
+      { timestamps: false }
+    );
+
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {

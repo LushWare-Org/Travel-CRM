@@ -1,0 +1,88 @@
+import { z } from 'zod';
+import { AssistantCurrentView, AssistantPageCapabilities, AssistantPageContext } from '@travel-crm/contracts';
+import { ASSISTANT_TOOLS } from '../ai/prompts/assistantTurn.v1.js';
+
+// ─── Assistant turn ───────────────────────────────────────────
+// Wire shape mirrors wizard-turn's WizardTurnMessage/WizardTurnRequest
+// (Client/src/services/api/wizardTurn.ts) for id/role/content/at, with
+// sessionId REQUIRED (every assistant session is anonymous but distinct)
+// plus the client-owned navigation allowlist sent per request — the single
+// source of truth for which routes the model may name (never a
+// server-held route table).
+
+export const assistantMessageSchema = z.object({
+  id: z.string().min(1).max(255),
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1).max(2000),
+  at: z.string().datetime(),
+});
+
+export const availableRouteSchema = z.object({
+  name: z.string().min(1).max(255),
+  path: z.string().min(1).max(500),
+  // Query keys this page honours, declared client-side and sent per turn. The
+  // server holds no copy of that list, which is what stops the two drifting —
+  // and it MUST be declared here, because this schema validates the request
+  // body and zod strips unknown keys, so an undeclared field would never reach
+  // the controller and every navigation would silently go unfiltered.
+  params: z.array(z.string().max(40)).max(20).optional(),
+  // The closed set of values each filter may take — the destinations that
+  // actually exist, as `{ value, label }` pairs. The label is what a person
+  // would say, the value is what the URL takes, so the server can match the
+  // visitor's words without the client having to guess how the model phrases
+  // things. Declared here for the same reason `params` is: this schema
+  // validates the request body, and zod strips what it does not know.
+  paramValues: z
+    .record(
+      z.string().max(40),
+      z.array(z.object({ value: z.string().min(1).max(60), label: z.string().max(120) })).max(200),
+    )
+    .optional(),
+});
+
+export const assistantTurnSchema = z.object({
+  sessionId: z.string().min(1).max(255),
+  messages: z.array(assistantMessageSchema).min(1).max(20),
+  availableRoutes: z.array(availableRouteSchema).max(100),
+  // Which package cards the client has already drawn. The server is stateless,
+  // so this is the only way it can tell a package the visitor is hearing about
+  // for the first time from one it has already been shown — and it MUST be
+  // declared here, because this schema validates the request body and zod
+  // strips unknown keys. Its only effect is whether a card is drawn: it gates
+  // no data and no permission.
+  shownPackageIds: z.array(z.string().max(64)).max(200).optional(),
+  // What the browser says it can execute this turn, and what its page looks
+  // like right now. Both are untrusted input — `pageContext` is interpolated
+  // into the prompt as data and `capabilities.actions` gates which actions may
+  // be returned — so both are the shared contract's own bounded schemas rather
+  // than anything restated here. Declared for the reason every field on this
+  // schema is: it validates the request body and zod strips what it does not
+  // know, so an undeclared field would silently never reach the controller.
+  capabilities: AssistantPageCapabilities.optional(),
+  pageContext: AssistantPageContext.optional(),
+  // What the page says is on screen, and the only place a number about the screen
+  // may come from. Untrusted like the pair above, so it is the shared contract's
+  // own bounded schema, and declared here because zod strips what this schema does
+  // not name — an undeclared `currentView` would never reach the controller and
+  // the assistant would keep answering about a page the visitor had left.
+  currentView: AssistantCurrentView.optional(),
+});
+
+// ─── Telemetry events ─────────────────────────────────────────
+// Fire-and-forget from the client; eventType is a plain string enum here
+// (NOT a Postgres enum) so new event types can be added without a migration.
+
+export const ASSISTANT_EVENT_TYPES = ['impression', 'opened', 'turn', 'response', 'nav_click', 'error'];
+
+export const recordEventSchema = z
+  .object({
+    sessionId: z.string().min(1).max(255),
+    turnId: z.string().min(1).max(255).nullable().optional(),
+    eventType: z.enum(ASSISTANT_EVENT_TYPES),
+    // Derived from the one tool list rather than restated: this enum is
+    // `.strict()`, so a tool missing here drops the whole telemetry event with
+    // only a logged parse error to show for it.
+    tool: z.enum(ASSISTANT_TOOLS).nullable().optional(),
+    route: z.string().max(255).nullable().optional(),
+  })
+  .strict();

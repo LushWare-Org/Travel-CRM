@@ -76,6 +76,8 @@ const manualItinerarySchema = new mongoose.Schema(
         transport: {
           type: String,
           enum: ['flight', 'train', 'bus', 'car', 'boat', 'walk', 'other'],
+          required: false,
+          default: undefined,
         },
         places: [
           {
@@ -182,6 +184,11 @@ manualItinerarySchema.pre('save', function calculateMetadata(next) {
     let dinnerCount = 0;
 
     this.days.forEach((day) => {
+      // Remove empty string transport values (convert to undefined)
+      if (day.transport === '' || day.transport === null) {
+        day.transport = undefined;
+      }
+      
       totalActivities += day.activities?.length || 0;
       totalLocations += day.locations?.length || 0;
       totalPlaces += day.places?.length || 0;

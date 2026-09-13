@@ -1,0 +1,304 @@
+import axios from 'axios';
+import AppError from '../../utils/appError.js';
+import logger from '../../config/logger.js';
+import { BAD_REQUEST, SERVICE_UNAVAILABLE } from '../../constants/httpStatus.js';
+import {
+  HOTEL_ID_REQUIRED,
+  OFFER_ID_REQUIRED,
+  PREBOOK_ID_REQUIRED,
+  BOOKING_ID_REQUIRED,
+  GUESTS_REQUIRED,
+  CONTACT_EMAIL_REQUIRED,
+  HOTELS_NOT_CONFIGURED,
+  hotelProviderFailure,
+} from '../../constants/errorMessages.js';
+
+/**
+ * @implements {import('./interface.js').HotelApiClient}
+ *
+ * LiteAPI hotel booking integration.
+ * Auth: x-api-key header (API key)
+ * Search/Data: https://api.liteapi.travel/v3.0 (search, hotel details)
+ * Booking:     https://book.liteapi.travel/v3.0 (prebook, book, cancel)
+ */
+export class LiteApiClient {
+  constructor() {
+    this.#ensureConfig();
+    console.info('[package-service] Using LiteApiClient — real hotel API integration.');
+  }
+
+  /** @param {import('./interface.js').HotelSearchParams} params */
+  async searchHotels(params) {
+    try {
+      // LiteAPI expects children as array of ages (e.g. [5, 8]), not a count
+      const occupancies = (params.occupancies || [{ adults: 1 }]).map((o) => ({
+        adults: o.adults || 1,
+        children: Array.isArray(o.children)
+          ? o.children
+          : o.children > 0
+            ? Array(o.children).fill(8) // default age 8 when count is given
+            : [],
+      }));
+
+      const body = {
+        checkin: params.checkin,
+        checkout: params.checkout,
+        currency: params.currency || 'USD',
+        guestNationality: params.guestNationality || 'US',
+        occupancies,
+        limit: params.limit || 20,
+        maxRatesPerHotel: 1,
+        includeHotelData: true,
+      };
+
+      // Location: pick one method based on what's provided
+      if (params.city) {
+        body.cityName = params.city;
+        body.countryCode = params.country || 'LK';
+      } else if (params.latitude != null && params.longitude != null) {
+        body.latitude = params.latitude;
+        body.longitude = params.longitude;
+        body.radius = params.radius || 10;
+      } else if (params.iataCode) {
+        body.iataCode = params.iataCode;
+      }
+
+      const { data } = await this.#client().post('/hotels/rates', body);
+      return this.#normalizeOffers(data.data || []);
+    } catch (err) {
+      this.#unwrapError(err, 'search');
+    }
+  }
+
+  /** @param {string} hotelId */
+  async getHotelDetails(hotelId) {
+    if (!hotelId) throw new AppError(HOTEL_ID_REQUIRED, BAD_REQUEST);
+    try {
+      const { data } = await this.#client().get('/data/hotel', { params: { id: hotelId } });
+      return this.#normalizeDetails(data.data);
+    } catch (err) {
+      this.#unwrapError(err, 'details');
+    }
+  }
+
+  /** @param {string[]} hotelIds */
+  async getHotelsByIds(hotelIds) {
+    if (!hotelIds?.length) return [];
+    try {
+      const { data } = await this.#client().get('/data/hotels', { params: { hotelIds: hotelIds.join(',') } });
+      const list = Array.isArray(data.data) ? data.data : [];
+      return list.map((h) => this.#normalizeDetails(h));
+    } catch (err) {
+      this.#unwrapError(err, 'details');
+    }
+  }
+
+  /** @param {import('./interface.js').PrebookParams} params */
+  async prebook(params) {
+    if (!params.offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
+    try {
+      const { data } = await this.#bookClient().post('/rates/prebook', {
+        offerId: params.offerId,
+        usePaymentSdk: true,
+      });
+      const d = data.data;
+      return { prebookId: d.prebookId || d.id, status: d.status || 'valid', expiresAt: d.expiresAt };
+    } catch (err) {
+      this.#unwrapError(err, 'book');
+    }
+  }
+
+  /** @param {import('./interface.js').BookParams} params */
+  async book(params) {
+    if (!params.prebookId) throw new AppError(PREBOOK_ID_REQUIRED, BAD_REQUEST);
+    if (!params.guests?.length) throw new AppError(GUESTS_REQUIRED, BAD_REQUEST);
+    if (!params.contact?.email) throw new AppError(CONTACT_EMAIL_REQUIRED, BAD_REQUEST);
+
+    const contactName = (params.contact.name || `${params.guests[0].firstName} ${params.guests[0].lastName}`).split(' ');
+
+    const body = {
+      prebookId: params.prebookId,
+      holder: {
+        firstName: params.holder?.firstName || contactName[0] || 'Guest',
+        lastName: params.holder?.lastName || contactName.slice(1).join(' ') || 'User',
+        email: params.contact.email,
+      },
+      guests: params.guests.map((g, i) => ({
+        occupancyNumber: g.occupancyNumber || 1,
+        email: g.email || params.contact.email,
+        firstName: g.firstName,
+        lastName: g.lastName,
+        title: g.title || 'Mr',
+      })),
+      payment: { method: params.paymentMethod || 'ACC_CREDIT_CARD' },
+    };
+
+    try {
+      const { data } = await this.#bookClient().post('/rates/book', body);
+      return this.#normalizeBooking(data.data);
+    } catch (err) {
+      this.#unwrapError(err, 'book');
+    }
+  }
+
+  /** @param {import('./interface.js').ListBookingsParams} params */
+  async listBookings(params = {}) {
+    try {
+      const { data } = await this.#bookClient().get('/bookings');
+      const bookings = Array.isArray(data.data) ? data.data : [];
+      return bookings.map((b) => this.#normalizeBooking(b));
+    } catch (err) {
+      this.#unwrapError(err, 'list');
+    }
+  }
+
+  /** @param {string} bookingId */
+  async getBooking(bookingId) {
+    if (!bookingId) throw new AppError(BOOKING_ID_REQUIRED, BAD_REQUEST);
+    try {
+      const { data } = await this.#bookClient().get(`/bookings/${bookingId}`);
+      return this.#normalizeBooking(data.data);
+    } catch (err) {
+      this.#unwrapError(err, 'retrieve');
+    }
+  }
+
+  /** @param {string} bookingId @param {string} [reason] */
+  async cancelBooking(bookingId, reason) {
+    if (!bookingId) throw new AppError(BOOKING_ID_REQUIRED, BAD_REQUEST);
+    try {
+      await this.#bookClient().put(`/bookings/${bookingId}`);
+      return { bookingId, status: 'cancelled' };
+    } catch (err) {
+      this.#unwrapError(err, 'cancel');
+    }
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────
+
+  #ensureConfig() {
+    if (!process.env.LITEAPI_API_KEY) {
+      throw new AppError(HOTELS_NOT_CONFIGURED, SERVICE_UNAVAILABLE, { code: 'PROVIDER_UNAVAILABLE' });
+    }
+    this._apiKey = process.env.LITEAPI_API_KEY;
+  }
+
+  #client() {
+    return axios.create({
+      baseURL: 'https://api.liteapi.travel/v3.0',
+      headers: {
+        'x-api-key': this._apiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  #bookClient() {
+    return axios.create({
+      baseURL: 'https://book.liteapi.travel/v3.0',
+      headers: {
+        'x-api-key': this._apiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  #normalizeOffers(offers) {
+    if (!Array.isArray(offers)) return [];
+    return offers.map((hotel) => {
+      // LiteAPI v3.0 shape: { hotelId, roomTypes: [{ rates: [{ rateId, boardType, retailRate, ... }] }] }
+      // hotel details (name, photos, starRating) are NOT in search response — use /data/hotel to fetch
+      const firstRate = hotel.roomTypes?.[0]?.rates?.[0] || {};
+      const retail = firstRate.retailRate || {};
+
+      // total/currency are arrays of objects: [{ amount: 233.24, currency: "USD" }]
+      const totalItem = Array.isArray(retail.total) ? retail.total[0] : retail.total;
+      const taxItem = Array.isArray(retail.taxesAndFees) ? retail.taxesAndFees[0] : retail.taxesAndFees;
+
+      return {
+        hotelId: hotel.hotelId,
+        name: hotel.name || hotel.hotel?.name || 'Unknown',
+        address: hotel.address || hotel.hotel?.address || null,
+        starRating: hotel.starRating || hotel.hotel?.starRating || 0,
+        images: hotel.photos || hotel.hotel?.photos || [],
+        distance: hotel.distance || null,
+        latitude: hotel.latitude || hotel.hotel?.location?.latitude || null,
+        longitude: hotel.longitude || hotel.hotel?.location?.longitude || null,
+        cheapestRate: {
+          roomType: firstRate.name || firstRate.roomTypeId || 'Standard',
+          boardType: firstRate.boardType || firstRate.boardName || 'RO',
+          currency: totalItem?.currency || hotel.currency || 'USD',
+          totalAmount: parseFloat(totalItem?.amount || 0) || 0,
+          taxes: parseFloat(taxItem?.amount || 0) || 0,
+          refundable: firstRate.cancellationPolicies
+            ? (Array.isArray(firstRate.cancellationPolicies)
+                ? !firstRate.cancellationPolicies.some((p) => p?.nonRefundable)
+                : !firstRate.cancellationPolicies?.nonRefundable)
+            : true,
+          offerId: hotel.roomTypes?.[0]?.offerId || null,
+        },
+      };
+    });
+  }
+
+  #normalizeDetails(d) {
+    if (!d) return null;
+    const images = d.hotelImages?.map((img) => img.url || img.urlHd).filter(Boolean) || [];
+    if (d.main_photo) images.unshift(d.main_photo);
+    return {
+      hotelId: d.hotelId || d.id,
+      name: d.name || 'Unknown',
+      address: d.address || null,
+      starRating: d.starRating || 0,
+      images: [...new Set(images)],
+      amenities: d.hotelFacilities || d.facilities || [],
+      checkinTime: d.checkinCheckoutTimes?.checkIn || d.checkInTime || null,
+      checkoutTime: d.checkinCheckoutTimes?.checkOut || d.checkOutTime || null,
+      description: d.hotelDescription || d.description || null,
+      policies: d.policies || [],
+      latitude: d.location?.latitude || d.latitude || null,
+      longitude: d.location?.longitude || d.longitude || null,
+    };
+  }
+
+  #normalizeBooking(b) {
+    return {
+      bookingId: b.bookingId || b.id,
+      pnr: b.pnr || b.confirmationCode || null,
+      status: (b.status || 'confirmed').toLowerCase(),
+      hotelName: b.hotelName || b.hotel?.name || 'Unknown',
+      checkin: b.checkin || b.checkIn || null,
+      checkout: b.checkout || b.checkOut || null,
+      totalAmount: parseFloat(b.totalAmount || b.total || 0),
+      currency: b.currency || 'USD',
+      cancelledAt: b.cancelledAt || null,
+      cancellationReason: b.cancellationReason || null,
+    };
+  }
+
+  /**
+   * Turns a provider failure into a user-facing AppError.
+   *
+   * LiteAPI returns its error body as an object, which used to be JSON.stringify'd
+   * into the message a user read. The payload is logged here instead, and what
+   * reaches the caller is a sentence written for a traveller plus a status that
+   * matches the situation — previously every provider failure surfaced as a 500,
+   * including a hotel that simply no longer exists.
+   *
+   * @param {unknown} err
+   * @param {'search'|'details'|'book'|'retrieve'|'list'|'cancel'} operation
+   */
+  #unwrapError(err, operation) {
+    if (err instanceof AppError) throw err;
+
+    logger.error(
+      { status: err.response?.status, data: err.response?.data, operation },
+      'LiteAPI error details',
+    );
+
+    const { statusCode, code, message } = hotelProviderFailure(operation, err.response?.status);
+    throw new AppError(message, statusCode, { code });
+  }
+}

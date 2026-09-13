@@ -1,0 +1,54 @@
+import httpClient from '../http/client';
+
+// Fire-and-forget telemetry for the site-wide assistant (the design doc's
+// Telemetry Contract). The client never blocks a model turn on these and
+// never surfaces an event failure to the user — impression/opened/turn/
+// response/nav_click/error are best-effort signals into assistant-service's
+// ingest endpoint, so every failure is swallowed here (and only logged during
+// local development, where it is a useful integration warning). The response
+// is a trivial { success } envelope, so no zod round-trip validation.
+//
+// 401s must not bounce the visitor to /login either — this endpoint is
+// public and unauthenticated, but if the http client's interceptor ever
+// treats it as an auth attempt this helper still must not throw.
+export type AssistantEventType = 'impression' | 'opened' | 'turn' | 'response' | 'nav_click' | 'error';
+export type AssistantEventTool =
+  | 'navigate'
+  | 'answer_faq_policy'
+  | 'answer_packages'
+  | 'hand_off'
+  | 'request_booking'
+  | 'respond_conversationally'
+  | 'redirect_off_topic'
+  | 'set_destination'
+  | 'set_travellers'
+  | 'set_preferences'
+  | 'set_contact_details'
+  | 'go_to_step'
+  | 'generate_itinerary'
+  | 'regenerate_days'
+  | 'edit_day'
+  | 'search_travel_info'
+  | 'answer_current_view'
+  | 'prefill_form'
+  | null;
+
+export interface AssistantEventPayload {
+  sessionId: string;
+  turnId: string | null;
+  eventType: AssistantEventType;
+  tool: AssistantEventTool;
+  route: string | null;
+}
+
+export const sendAssistantEvent = async (payload: AssistantEventPayload): Promise<void> => {
+  try {
+    await httpClient.post('/assistant/events', payload);
+  } catch (err) {
+    // Telemetry must never visibly break anything: no throw, and no console
+    // noise outside local development.
+    if (import.meta.env.DEV) {
+      console.warn('[assistant-events] failed to send event', err);
+    }
+  }
+};

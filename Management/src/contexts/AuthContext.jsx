@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const AuthContext = createContext();
 
@@ -10,22 +11,33 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [token, setToken] = useState(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
+  const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
 
   // Initialize auth from localStorage
   useEffect(() => {
     const initializeAuth = () => {
-      const savedToken = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
+      const savedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      const lastActivity = sessionStorage.getItem('lastActivity');
 
       if (savedToken) {
-        setToken(savedToken);
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
+        const now = Date.now();
+        if (lastActivity && now - Number(lastActivity) > INACTIVITY_LIMIT_MS) {
+          // Session expired due to inactivity
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          sessionStorage.removeItem('lastActivity');
+        } else {
+          setToken(savedToken);
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          }
+          setIsAuthenticated(true);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
         }
-        setIsAuthenticated(true);
-        // Set default authorization header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
       }
       setLoading(false);
     };
@@ -43,6 +55,15 @@ export const AuthProvider = ({ children }) => {
           password,
         });
 
+        // Check if OTP is required (for sales representatives)
+        if (response.data.data?.requiresOTP) {
+          // Store temporary data for OTP verification
+          localStorage.setItem('otpTempToken', response.data.data.tempToken);
+          localStorage.setItem('otpMaskedEmail', response.data.data.maskedEmail);
+          toast.success('OTP sent to your email. Please verify to continue.');
+          return 'otp-required';
+        }
+
         // Check if password change is required (for first-time login with temporary password)
         if (response.data.data?.mustChangePassword) {
           // Store temporary credentials for password reset
@@ -57,6 +78,8 @@ export const AuthProvider = ({ children }) => {
         // Save to localStorage
         localStorage.setItem('token', authToken);
         localStorage.setItem('user', JSON.stringify(userData));
+        sessionStorage.setItem('token', authToken);
+        sessionStorage.setItem('user', JSON.stringify(userData));
 
         // Update state
         setToken(authToken);
@@ -68,7 +91,7 @@ export const AuthProvider = ({ children }) => {
 
         return true;
       } catch (error) {
-        const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
+        const errorMessage = apiErrorMessage({ data: error.response?.data, status: error.response?.status });
         toast.error(errorMessage);
         console.error('Login error:', error);
         return false;
@@ -80,7 +103,7 @@ export const AuthProvider = ({ children }) => {
   );
 
   // Logout function
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (opts = {}) => {
     try {
       // Only call logout endpoint if we have a valid token
       if (token) {
@@ -99,6 +122,9 @@ export const AuthProvider = ({ children }) => {
       // Clear localStorage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('lastActivity');
 
       // Clear state
       setToken(null);
@@ -107,10 +133,67 @@ export const AuthProvider = ({ children }) => {
 
       // Clear authorization header
       delete axios.defaults.headers.common['Authorization'];
-
-      toast.success('Logged out successfully');
+      const { silent = false } = opts || {};
+      if (!silent) {
+        toast.success('Logged out successfully');
+      }
     }
   }, [API_URL, token]);
+
+  const inactivityTimerRef = useRef(null);
+
+  useEffect(() => {
+    const resetTimer = () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = setTimeout(() => {
+        try {
+          toast('You have been logged out due to inactivity');
+        } catch (e) {
+        }
+        logout({ silent: true });
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    const updateLastActivity = () => {
+      try {
+        sessionStorage.setItem('lastActivity', Date.now().toString());
+      } catch (e) {
+      }
+      resetTimer();
+    };
+
+    const visibilityListener = () => {
+      try {
+        const last = sessionStorage.getItem('lastActivity');
+        if (last && Date.now() - Number(last) > INACTIVITY_LIMIT_MS) {
+          logout({ silent: true });
+        } else {
+          resetTimer();
+        }
+      } catch (e) {
+      }
+    };
+
+    if (isAuthenticated) {
+      updateLastActivity();
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+      events.forEach((ev) => window.addEventListener(ev, updateLastActivity));
+      document.addEventListener('visibilitychange', visibilityListener);
+      window.addEventListener('focus', visibilityListener);
+    }
+
+    return () => {
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+      events.forEach((ev) => window.removeEventListener(ev, updateLastActivity));
+      document.removeEventListener('visibilitychange', visibilityListener);
+      window.removeEventListener('focus', visibilityListener);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [isAuthenticated, logout]);
 
   // Update profile function
   const updateProfile = useCallback(
@@ -126,7 +209,7 @@ export const AuthProvider = ({ children }) => {
         toast.success('Profile updated successfully');
         return true;
       } catch (error) {
-        const errorMessage = error.response?.data?.message || 'Failed to update profile';
+        const errorMessage = apiErrorMessage({ data: error.response?.data, status: error.response?.status });
         toast.error(errorMessage);
         console.error('Update profile error:', error);
         return false;
@@ -151,7 +234,7 @@ export const AuthProvider = ({ children }) => {
         toast.success('Password changed successfully');
         return true;
       } catch (error) {
-        const errorMessage = error.response?.data?.message || 'Failed to change password';
+        const errorMessage = apiErrorMessage({ data: error.response?.data, status: error.response?.status });
         toast.error(errorMessage);
         console.error('Change password error:', error);
         return false;
@@ -171,7 +254,7 @@ export const AuthProvider = ({ children }) => {
     return user.role === requiredRole;
   }, [user]);
 
-  const value = {
+  const value = React.useMemo(() => ({
     user,
     loading,
     isAuthenticated,
@@ -181,7 +264,7 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     changePassword,
     hasRole,
-  };
+  }), [user, loading, isAuthenticated, token, login, logout, updateProfile, changePassword, hasRole]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -193,3 +276,9 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// Same context, without the provider requirement. Used by chrome that must
+// still render (in its unauthenticated, non-persisting form) outside a
+// provider — e.g. the copilot shell keying its stored preferences on the
+// authenticated operator's stable internal id.
+export const useOptionalAuth = () => useContext(AuthContext) || null;

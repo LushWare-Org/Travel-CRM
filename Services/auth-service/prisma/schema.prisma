@@ -1,0 +1,45 @@
+// =============================================================
+// auth-service — PostgreSQL schema: "auth"
+// Shared DB, isolated namespace. All cross-service refs are
+// plain UUID strings (no FK constraints across schemas).
+// =============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_auth"]
+}
+
+enum OtpType {
+  login
+  passwordReset
+  emailVerification
+
+  @@schema("crm_auth")
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  userId    String   // cross-schema ref → users.User.id
+  code      String   @db.VarChar(6)
+  type      OtpType  @default(login)
+  email     String
+  isUsed    Boolean  @default(false)
+  attempts  Int      @default(0)
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime // service layer runs a cleanup job (replaces MongoDB TTL index)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, type])
+  @@index([email])
+  @@index([expiresAt])
+  @@schema("crm_auth")
+}

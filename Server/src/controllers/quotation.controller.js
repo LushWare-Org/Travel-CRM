@@ -30,7 +30,7 @@ const formatQuotationForResponse = (quotationDoc) => {
 export const getAllQuotations = asyncHandler(async (req, res) => {
   // Build base query - filter by lead assignedTo for sales reps
   let baseQuery = Quotation.find();
-  
+
   // If user is a sales rep, only show quotations for leads assigned to them
   if (req.user.role === 'salesRep') {
     const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
@@ -48,9 +48,25 @@ export const getAllQuotations = asyncHandler(async (req, res) => {
     .limitFields()
     .paginate();
 
-  const quotationDocs = await features.query;
+  // Apply date range filter after APIFeatures processes the query
+  if (req.query.startDate || req.query.endDate) {
+    const dateFilter = {};
+    if (req.query.startDate) {
+      dateFilter.$gte = new Date(req.query.startDate);
+    }
+    if (req.query.endDate) {
+      const endDate = new Date(req.query.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.$lte = endDate;
+    }
+    if (Object.keys(dateFilter).length > 0) {
+      features.query = features.query.and({ issueDate: dateFilter });
+    }
+  }
+
+  const quotationDocs = await features.query.lean();
   const quotations = quotationDocs.map((quotation) => formatQuotationForResponse(quotation));
-  
+
   // Get total count with same filter
   let countQuery = Quotation.find();
   if (req.user.role === 'salesRep') {
@@ -58,6 +74,23 @@ export const getAllQuotations = asyncHandler(async (req, res) => {
     const leadIds = assignedLeadIds.map((lead) => lead._id);
     countQuery = countQuery.where('lead').in(leadIds);
   }
+
+  // Apply date range filter to count query
+  if (req.query.startDate || req.query.endDate) {
+    const dateFilter = {};
+    if (req.query.startDate) {
+      dateFilter.$gte = new Date(req.query.startDate);
+    }
+    if (req.query.endDate) {
+      const endDate = new Date(req.query.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.$lte = endDate;
+    }
+    if (Object.keys(dateFilter).length > 0) {
+      countQuery = countQuery.find({ issueDate: dateFilter });
+    }
+  }
+
   const total = await countQuery.countDocuments();
 
   res.status(200).json({
@@ -250,7 +283,7 @@ export const sendQuotation = asyncHandler(async (req, res, next) => {
       pdfPath,
     });
 
-    await fs.promises.unlink(pdfPath).catch(() => {});
+    await fs.promises.unlink(pdfPath).catch(() => { });
   } catch (error) {
     return next(new AppError(`Error sending quotation email: ${error.message}`, 500));
   }
@@ -412,8 +445,52 @@ export const getQuotationStats = asyncHandler(async (req, res) => {
  */
 export const downloadQuotationPDF = asyncHandler(async (req, res, next) => {
   const quotation = await Quotation.findById(req.params.id)
-    .populate('lead')
-    .populate('package')
+    .populate({
+      path: 'lead',
+      populate: [
+        {
+          path: 'assignedTo',
+          select: 'name email phone mobile',
+        },
+        {
+          path: 'package',
+          select: 'name description destination duration price images coverImage inclusions exclusions highlights itinerary',
+          populate: { path: 'itinerary', select: 'days' }
+        },
+        {
+          path: 'customizedPackage',
+          select: 'name description destination duration price images coverImage inclusions exclusions highlights days itinerary originalPackage',
+          populate: [
+            {
+              path: 'originalPackage',
+              select: 'name images coverImage inclusions exclusions highlights',
+            },
+            {
+              path: 'itinerary',
+              select: 'days',
+            },
+          ],
+        },
+        {
+          path: 'manualItinerary',
+          select: 'days title description',
+        },
+      ],
+    })
+    .populate({
+      path: 'package',
+      select: 'name description destination duration price images coverImage inclusions exclusions highlights itinerary',
+      populate: [
+        {
+          path: 'originalPackage',
+          select: 'name images coverImage inclusions exclusions highlights',
+        },
+        {
+          path: 'itinerary',     
+          select: 'days',        
+        }
+      ],
+    })
     .populate('createdBy');
 
   if (!quotation) {
@@ -426,7 +503,7 @@ export const downloadQuotationPDF = asyncHandler(async (req, res, next) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="quotation-${quotation.quotationNumber || quotation._id}.pdf"`);
-    
+
     const fileStream = fs.createReadStream(pdfPath);
     fileStream.pipe(res);
 

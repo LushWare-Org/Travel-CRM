@@ -29,11 +29,11 @@ const resetAdminPassword = async () => {
     console.log('✓ Connected to MongoDB\n');
 
     console.log('🔍 Finding admin user...');
-    const admin = await User.findOne({ email: 'admin@tripskyway.com' });
-    
+    const admin = await User.findOne({ email: 'admin@example.com' });
+
     if (!admin) {
       console.error('❌ Admin user not found!');
-      console.error('   Email: admin@tripskyway.com\n');
+      console.error('   Email: admin@example.com\n');
       process.exit(1);
     }
 
@@ -45,14 +45,14 @@ const resetAdminPassword = async () => {
     admin.isTempPassword = false;
     admin.mustChangePassword = false;
     admin.passwordChangedAt = Date.now();
-    
+
     await admin.save();
 
     console.log('✅ Admin password reset successfully!\n');
     console.log('═══════════════════════════════════════════');
     console.log('  LOGIN CREDENTIALS');
     console.log('═══════════════════════════════════════════');
-    console.log('📧 Email:    admin@tripskyway.com');
+    console.log('📧 Email:    admin@example.com');
     console.log('🔑 Password: Admin@123456');
     console.log('═══════════════════════════════════════════\n');
     console.log('✓ You can now log in to the admin panel at:');

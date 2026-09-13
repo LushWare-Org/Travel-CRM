@@ -12,6 +12,7 @@ import {
   resetSalesRepPassword,
   getSalesRepPerformance,
   updateSalesRepCommission,
+  getOnlineSalesReps,
 } from '../controllers/salesRep.controller.js';
 import {
   createSalesRepSchema,
@@ -52,6 +53,13 @@ router.post('/', validateRequest(createSalesRepSchema), createSalesRep);
  * @access  Private/Admin
  */
 router.get('/stats', getSalesRepStats);
+
+/**
+ * @route   GET /api/v1/sales-reps/online-status
+ * @desc    Get online status of all sales representatives
+ * @access  Private/Admin
+ */
+router.get('/online-status', getOnlineSalesReps);
 
 /**
  * @route   GET /api/v1/sales-reps/:id

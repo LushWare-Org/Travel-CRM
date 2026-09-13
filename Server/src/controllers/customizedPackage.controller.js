@@ -178,7 +178,7 @@ const normalizeListField = (value, fallback = []) => {
 const normalizePhone = (rawPhone) => {
   if (!rawPhone) return undefined;
   const digits = String(rawPhone).replace(/\D/g, '');
-  if (digits.length === 10) return digits;
+  if (digits.length > 0) return Number(digits);
   return undefined;
 };
 
@@ -290,8 +290,8 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
     throw new AppError('travelers must be a positive number', 400);
   }
   const parsedTravelDate = travelDate ? new Date(travelDate) : null;
-  if (!parsedTravelDate || Number.isNaN(parsedTravelDate.getTime())) {
-    throw new AppError('A valid travelDate is required', 400);
+  if (travelDate && (!parsedTravelDate || Number.isNaN(parsedTravelDate.getTime()))) {
+    throw new AppError('If provided, travelDate must be a valid date', 400);
   }
 
   let user = await User.findOne({ email: sanitizedEmail });
@@ -335,7 +335,7 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
     numberOfTravelers: parsedTravelers,
     budget: budget || (pkg.price ? `${pkg.price}` : undefined),
     message: message?.trim() || undefined,
-    status: 'interested',
+    status: 'new',
     assignmentMode: 'auto',
     tags: ['website-customization'],
     remarks: message?.trim()

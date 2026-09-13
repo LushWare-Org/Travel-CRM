@@ -32,7 +32,6 @@ const paymentReceiptSchema = new mongoose.Schema(
       },
       phone: {
         type: String,
-        required: true,
       },
       address: String,
     },

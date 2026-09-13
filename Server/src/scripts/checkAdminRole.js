@@ -14,8 +14,8 @@ const checkAdminRole = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✓ Connected to MongoDB\n');
 
-    const admin = await User.findOne({ email: 'admin@tripskyway.com' }).select('email role name permissions');
-    
+    const admin = await User.findOne({ email: 'admin@example.com' }).select('email role name permissions');
+
     if (!admin) {
       console.error('❌ Admin user not found!');
       process.exit(1);

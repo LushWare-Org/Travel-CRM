@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 
 const PermissionContext = createContext();
 
@@ -14,6 +14,7 @@ export const PERMISSION_LIST = {
   MANAGE_ADMINS: 'manage_admins',
   VIEW_REPORTS: 'view_reports',
   MANAGE_BILLING: 'manage_billing',
+  VIEW_BILLING: 'view_billing',
   MANAGE_LEADS: 'manage_leads',
   MANAGE_PACKAGES: 'manage_packages',
 };
@@ -58,6 +59,12 @@ export const PERMISSION_METADATA = {
     category: 'Finance',
     description: 'Handle billing and payment operations',
   },
+  [PERMISSION_LIST.VIEW_BILLING]: {
+    id: 'view_billing',
+    label: 'View Billing',
+    category: 'Finance',
+    description: 'View billing documents for assigned leads (read-only)',
+  },
   [PERMISSION_LIST.MANAGE_LEADS]: {
     id: 'manage_leads',
     label: 'Manage Leads',
@@ -78,7 +85,6 @@ export const PermissionProvider = ({ children }) => {
   const [availablePermissions, setAvailablePermissions] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
   /**
    * Fetch available permissions from backend
@@ -90,14 +96,14 @@ export const PermissionProvider = ({ children }) => {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/admin/permissions/available`);
-      if (response.data?.data?.permissions) {
-        setAvailablePermissions(response.data.data.permissions);
+      const response = await api.get('/admin/permissions/available');
+      if (response?.data?.permissions) {
+        setAvailablePermissions(response.data.permissions);
       }
     } catch (error) {
       console.error('Failed to fetch available permissions:', error);
     }
-  }, [API_URL, user?.role]);
+  }, [user?.role]);
 
   /**
    * Load user's permissions on mount or when user changes
@@ -125,8 +131,8 @@ export const PermissionProvider = ({ children }) => {
    */
   const hasPermission = useCallback(
     (permissionId) => {
-      // SuperAdmins have all permissions
-      if (user?.role === 'superAdmin') {
+      // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+      if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
         return true;
       }
 
@@ -147,8 +153,8 @@ export const PermissionProvider = ({ children }) => {
         return false;
       }
 
-      // SuperAdmins have all permissions
-      if (user?.role === 'superAdmin') {
+      // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+      if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
         return true;
       }
 
@@ -168,8 +174,8 @@ export const PermissionProvider = ({ children }) => {
         return false;
       }
 
-      // SuperAdmins have all permissions
-      if (user?.role === 'superAdmin') {
+      // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+      if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
         return true;
       }
 
@@ -183,8 +189,8 @@ export const PermissionProvider = ({ children }) => {
    * @returns {string[]} Array of role names user can manage
    */
   const getAccessibleRoles = useCallback(() => {
-    // SuperAdmins can manage all roles
-    if (user?.role === 'superAdmin') {
+    // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+    if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
       return ['customer', 'salesRep', 'vendor', 'admin'];
     }
 

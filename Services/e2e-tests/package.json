@@ -1,0 +1,15 @@
+{
+  "name": "@travel-crm/e2e-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.js",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@travel-crm/contracts": "file:../shared/contracts",
+    "dotenv": "^16.4.5",
+    "vitest": "^2.1.9"
+  }
+}

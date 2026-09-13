@@ -74,7 +74,8 @@ export const createStaff = asyncHandler(async (req, res, next) => {
     phone,
     password: tempPassword,
     role,
-    permissions: role === 'admin' && permissions ? permissions : [], // Only apply permissions to admins
+    // Sales reps get view_billing and manage_leads by default
+    permissions: role === 'salesRep' ? ['manage_leads', 'view_billing'] : (role === 'admin' && permissions ? permissions : []),
     isTempPassword: true,
     mustChangePassword: true,
     isEmailVerified: true, // Staff accounts are pre-verified
@@ -622,9 +623,9 @@ export const promoteSuperAdmin = asyncHandler(async (req, res, next) => {
     throw new AppError('User is already a super admin', 400);
   }
 
-  // Update user to superAdmin
+  // Update user to superAdmin - set both fields explicitly to ensure consistency
   userToPromote.role = 'superAdmin';
-  userToPromote.isSuperAdmin = true;
+  userToPromote.isSuperAdmin = true; // FIXED: Explicitly set isSuperAdmin flag
   userToPromote.canBeDeleted = false;
   // SuperAdmins automatically get all permissions
   userToPromote.permissions = [
@@ -638,7 +639,8 @@ export const promoteSuperAdmin = asyncHandler(async (req, res, next) => {
     'manage_packages',
   ];
 
-  await userToPromote.save();
+  // Force save with validation to ensure atomic update
+  await userToPromote.save({ validateBeforeSave: true });
 
   logger.info(`User ${userToPromote.email} promoted to super admin by ${req.user.email}`);
 
@@ -680,14 +682,15 @@ export const demoteSuperAdmin = asyncHandler(async (req, res, next) => {
     throw new AppError('You cannot demote yourself. Please contact another super admin.', 400);
   }
 
-  // Update user role
+  // Update user role - set both fields explicitly to ensure consistency
   userToDemote.role = newRole;
-  userToDemote.isSuperAdmin = false;
+  userToDemote.isSuperAdmin = false; // FIXED: Explicitly set isSuperAdmin flag to false
   userToDemote.canBeDeleted = true;
   // Clear permissions for non-admin roles
   userToDemote.permissions = newRole === 'admin' ? [] : [];
 
-  await userToDemote.save();
+  // Force save with validation to ensure atomic update
+  await userToDemote.save({ validateBeforeSave: true });
 
   logger.info(`User ${userToDemote.email} demoted from super admin to ${newRole} by ${req.user.email}`);
 

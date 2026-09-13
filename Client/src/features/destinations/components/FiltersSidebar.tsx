@@ -1,0 +1,165 @@
+import { Search, Filter, X, Globe, ChevronRight, Banknote, Star } from 'lucide-react';
+import { getPriceRangeOptions } from '../../../lib/currency';
+import FilterPanelShell from '../../../components/shared/FilterPanelShell';
+import RangeFilterGroup from '../../../components/shared/RangeFilterGroup';
+
+export interface PriceRange {
+  label: string;
+  min: number;
+  max: number;
+}
+
+const PRICE_RANGE_OPTIONS = getPriceRangeOptions();
+
+const filterOptions = {
+  regions: ['All', 'Asia', 'Europe', 'Middle East', 'Oceania', 'Africa', 'Americas'],
+  ratings: [5, 4, 3],
+};
+
+interface FiltersSidebarProps {
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  selectedRegions: string[];
+  onToggleRegion: (region: string) => void;
+  countriesByRegion: Record<string, string[]>;
+  selectedCountries: string[];
+  onToggleCountry: (country: string) => void;
+  selectedPriceRange: PriceRange | null;
+  onPriceRangeChange: (range: PriceRange | null) => void;
+  minRating: number;
+  onMinRatingChange: (rating: number) => void;
+  onClose: () => void;
+}
+
+export default function FiltersSidebar({
+  searchQuery,
+  onSearchChange,
+  selectedRegions,
+  onToggleRegion,
+  countriesByRegion,
+  selectedCountries,
+  onToggleCountry,
+  selectedPriceRange,
+  onPriceRangeChange,
+  minRating,
+  onMinRatingChange,
+  onClose,
+}: FiltersSidebarProps) {
+  return (
+    <FilterPanelShell onClose={onClose}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold flex items-center gap-2">
+          <Filter className="w-5 h-5 text-brand-600" />
+        </h3>
+        <button
+          onClick={onClose}
+          aria-label="Close filters"
+          className="lg:hidden p-1 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-600 hover:text-gray-900" />
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search destinations, countries..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-gray-900 placeholder-gray-400 transition-all duration-200"
+          />
+        </div>
+      </div>
+
+      {/* Region */}
+      <div className="mb-6">
+        <h4 className="font-semibold mb-3 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-gray-600" />
+          <span className="text-gray-900">Region</span>
+        </h4>
+        <div className="space-y-1">
+          {filterOptions.regions.map((region) => (
+            <div key={region}>
+              <button
+                onClick={() => onToggleRegion(region)}
+                className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center justify-between group cursor-pointer border border-gray-200 hover:border-brand-300 hover:shadow-sm ${selectedRegions.includes(region)
+                    ? 'bg-gradient-to-r from-brand-50 via-brand-accent-50 to-brand-100 text-brand-800 border-brand-300 shadow-sm'
+                    : 'bg-white hover:bg-gray-50 text-gray-700'
+                  }`}
+              >
+                <span className="font-medium">{region}</span>
+                <ChevronRight
+                  className={`w-4 h-4 transition-transform ${selectedRegions.includes(region)
+                      ? 'text-brand-600'
+                      : 'text-gray-400 group-hover:text-brand-500'
+                    }`}
+                />
+              </button>
+              {region !== 'All' && selectedRegions.includes(region) && countriesByRegion[region] && (
+                <div className="mt-2 ml-4 space-y-1 pl-2 border-l-2 border-brand-200">
+                  {countriesByRegion[region].map((country) => (
+                    <label key={country} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedCountries.includes(country)}
+                        onChange={() => onToggleCountry(country)}
+                        className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
+                      />
+                      <span className="text-gray-700">{country}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Price Range */}
+      <RangeFilterGroup
+        label="Budget"
+        icon={<Banknote />}
+        options={PRICE_RANGE_OPTIONS}
+        selected={selectedPriceRange}
+        onChange={onPriceRangeChange}
+      />
+
+      {/* Hotel Rating */}
+      <div className="mb-6">
+        <h4 className="font-semibold mb-3 flex items-center gap-2">
+          <Star className="w-4 h-4 text-gray-600" />
+          <span className="text-gray-900">Hotel Rating</span>
+        </h4>
+        <div className="space-y-2">
+          {filterOptions.ratings.map((starCount) => (
+            <label
+              key={starCount}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"
+            >
+              <input
+                type="checkbox"
+                checked={minRating === starCount}
+                onChange={() => onMinRatingChange(minRating === starCount ? 0 : starCount)}
+                className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
+              />
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-4 h-4 ${i < starCount ? 'fill-brand-accent-400 text-brand-accent-400' : 'text-gray-300'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-gray-700 font-medium text-sm">{starCount} Star{starCount !== 1 ? 's' : ''}</span>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+    </FilterPanelShell>
+  );
+}

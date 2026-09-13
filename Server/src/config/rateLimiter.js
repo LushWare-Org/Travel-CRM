@@ -12,15 +12,15 @@ const createLimiter = (options) => (isRateLimitingDisabled ? noopMiddleware : ra
 
 export const limiter = createLimiter({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100, // Limit each IP
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 300, // Limit each IP
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   handler: (req, res, next, options) => {
     const windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
-    const maxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100;
+    const maxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 300;
     const retryAfter = Math.ceil(windowMs / 1000); // Convert to seconds
-    
+
     res.setHeader('Retry-After', retryAfter);
     res.status(429).json({
       success: false,
@@ -45,7 +45,7 @@ export const authLimiter = createLimiter({
     const maxAttempts = parseInt(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS, 10) || 10;
     const windowMinutes = Math.round(windowMs / (60 * 1000));
     const retryAfter = Math.ceil(windowMs / 1000); // Convert to seconds
-    
+
     res.setHeader('Retry-After', retryAfter);
     res.status(429).json({
       success: false,
@@ -66,7 +66,7 @@ export const apiLimiter = createLimiter({
   legacyHeaders: false,
   handler: (req, res, next, options) => {
     const retryAfter = 60; // 1 minute in seconds
-    
+
     res.setHeader('Retry-After', retryAfter);
     res.status(429).json({
       success: false,
@@ -75,6 +75,43 @@ export const apiLimiter = createLimiter({
       retryAfter: retryAfter, // seconds until retry is allowed
       limit: 60,
       window: 1, // window in minutes
+    });
+  },
+});
+// Stricter limiter for expensive AI generation calls
+export const aiLimiter = createLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // Only 10 AI calls per minute
+  message: 'Too many AI requests. Please wait a minute before generating more content.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    res.status(429).json({
+      success: false,
+      message: 'AI generation limit reached. Please wait a minute and try again.',
+      error: 'AI Rate limit exceeded',
+      retryAfter: 60,
+      limit: 10,
+      window: 1,
+    });
+  },
+});
+
+// Limiter for public form submissions (Bookings, Enquiries, Contact Forms)
+export const formLimiter = createLimiter({
+  windowMs: 30 * 60 * 1000, // 30 minutes
+  max: 5, // 5 submissions per 30 minutes
+  message: 'Too many submissions from this IP. Please try again after 30 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    res.status(429).json({
+      success: false,
+      message: 'Submission limit reached. To prevent spam, we only allow 5 submissions per 30 minutes.',
+      error: 'Form Rate limit exceeded',
+      retryAfter: 1800,
+      limit: 5,
+      window: 30,
     });
   },
 });

@@ -45,12 +45,18 @@ import notificationRoutes from './routes/notification.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
+import careerRoutes from './routes/career.routes.js';
+import vacancyRoutes from './routes/vacancy.routes.js';
 
 // Billing Module Routes
 import quotationRoutes from './routes/quotation.routes.js';
 import paymentReceiptRoutes from './routes/paymentReceipt.routes.js';
 import creditNoteRoutes from './routes/creditNote.routes.js';
 import billingRoutes from './routes/billing.routes.js';
+import voucherRoutes from './routes/voucher.routes.js';
+import paymentHistoryRoutes from './routes/paymentHistory.routes.js';
+import hotelSuggestionRoutes from './routes/hotelSuggestion.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
 
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
@@ -67,8 +73,8 @@ app.set('request timeout', 45000);
 app.use(helmet()); // Security headers
 app.use(cors(corsOptions)); // CORS
 app.use(compression()); // Compress responses
-app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-encoded bodies
+app.use(express.json({ limit: '50mb' })); // Parse JSON bodies - increased for large chart images
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded bodies
 app.use(cookieParser()); // Parse cookies
 app.use(mongoSanitize()); // Sanitize data against NoSQL injection
 app.use(xss()); // Prevent XSS attacks
@@ -122,12 +128,20 @@ app.use(`/api/${API_VERSION}/notifications`, notificationRoutes);
 app.use(`/api/${API_VERSION}/dashboard`, dashboardRoutes);
 app.use(`/api/${API_VERSION}/upload`, uploadRoutes);
 app.use(`/api/${API_VERSION}/analytics`, analyticsRoutes);
+app.use(`/api/${API_VERSION}/careers`, careerRoutes);
+app.use(`/api/${API_VERSION}/vacancies`, vacancyRoutes);
 
 // Billing Module Routes
 app.use(`/api/${API_VERSION}/billing/quotations`, quotationRoutes);
 app.use(`/api/${API_VERSION}/billing/receipts`, paymentReceiptRoutes);
 app.use(`/api/${API_VERSION}/billing/credit-notes`, creditNoteRoutes);
+app.use(`/api/${API_VERSION}/billing/vouchers`, voucherRoutes);
+app.use(`/api/${API_VERSION}/billing/payment-history`, paymentHistoryRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
+app.use(`/api/${API_VERSION}/hotels`, hotelSuggestionRoutes);
+
+// Webhook routes (public endpoints for external services)
+app.use(`/api/${API_VERSION}/webhooks`, webhookRoutes);
 
 // Error handling
 app.use(notFound);
@@ -147,15 +161,16 @@ const connectDB = async () => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
+const HOST = '0.0.0.0';
 
 const startServer = async () => {
   await connectDB();
 
-  const server = app.listen(PORT, async () => {
-    logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-    console.log(`🚀 Server is running on http://localhost:${PORT}`);
-    console.log(`📚 API Documentation: http://localhost:${PORT}/api/${API_VERSION}`);
-    
+  const server = app.listen(PORT, HOST, async () => {
+    logger.info(`Server running in ${process.env.NODE_ENV} mode on ${HOST}:${PORT}`);
+    console.log(`🚀 Server is running on http://${HOST}:${PORT}`);
+    console.log(`📚 API Documentation: http://${HOST}:${PORT}/api/${API_VERSION}`);
+
     // Verify email service after server starts
     await emailService.verifyConnection();
   });

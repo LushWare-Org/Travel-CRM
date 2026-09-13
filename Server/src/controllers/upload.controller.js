@@ -149,11 +149,11 @@ export const uploadProfileImage = asyncHandler(async (req, res, next) => {
 
 /**
  * Delete image
- * @route DELETE /api/v1/upload/:publicId
+ * @route DELETE /api/v1/upload?publicId=folder/image
  * @access Private
  */
 export const deleteImage = asyncHandler(async (req, res, next) => {
-  const { publicId } = req.params;
+  const { publicId } = req.query;
 
   if (!publicId) {
     return next(new AppError('Public ID is required', 400));

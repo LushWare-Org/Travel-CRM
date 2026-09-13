@@ -61,6 +61,7 @@ const hasPermission = (role, resource, action, userPermissions = []) => {
       'admin:delete': 'manage_admins',
       'reports:view': 'view_reports',
       'billing:manage': 'manage_billing',
+      'billing:view': 'view_billing',
       'leads:manage': 'manage_leads',
       'leads:create': 'manage_leads',
       'leads:update': 'manage_leads',

@@ -11,6 +11,9 @@ import {
   verifyEmail,
   resendVerification,
   updateProfile,
+  loginStep1,
+  loginStep2,
+  resendOTP,
 } from '../controllers/auth.controller.js';
 import { protect } from '../middleware/auth.js';
 import { authLimiter } from '../config/rateLimiter.js';
@@ -23,12 +26,23 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
 } from '../validators/auth.validator.js';
+import {
+  loginStep1Schema,
+  loginStep2Schema,
+  resendOTPSchema,
+} from '../validators/otp.validator.js';
 
 const router = express.Router();
 
 // Public routes (with rate limiting)
 router.post('/register', authLimiter, validate(registerSchema), register);
 router.post('/login', authLimiter, validate(loginSchema), login);
+
+// OTP Authentication Routes (for Sales Reps)
+router.post('/login-step1', authLimiter, validate(loginStep1Schema), loginStep1);
+router.post('/login-step2', authLimiter, validate(loginStep2Schema), loginStep2);
+router.post('/resend-otp', authLimiter, validate(resendOTPSchema), resendOTP);
+
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), forgotPassword);
 router.put('/reset-password/:token', authLimiter, validate(resetPasswordSchema), resetPassword);
 router.post('/reset-temp-password', authLimiter, resetTempPassword);
