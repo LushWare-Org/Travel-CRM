@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -8,8 +8,8 @@ import { MemoryRouter } from 'react-router-dom';
 // config + component fresh via vi.resetModules() (see
 // config/__tests__/pages.test.ts for the same pattern — dynamic import is
 // intentional here for the same reason). The launcher reads the route via
-// useLocation (launcher visibility scope + assistant availability), so every
-// render needs a Router ancestor.
+// useLocation (the assistant-excluded gate), so every render needs a Router
+// ancestor.
 const renderStack = async (path = '/') => {
   const { default: FloatingActionStack } = await import('../FloatingActionStack');
   render(
@@ -19,18 +19,6 @@ const renderStack = async (path = '/') => {
   );
 };
 
-// jsdom's window.scrollY is a fixed 0; the launcher's reveal-on-scroll and
-// ScrollTop's own listener both read it, so tests override the property and
-// dispatch a scroll event to wake every listener.
-const setWindowScrollY = (y: number) => {
-  Object.defineProperty(window, 'scrollY', { value: y, configurable: true, writable: true });
-  fireEvent.scroll(window);
-};
-
-const resetWindowScrollY = () => {
-  Reflect.deleteProperty(window, 'scrollY');
-};
-
 const anchor = () => screen.getByRole('button', { name: 'Contact options' });
 const launcherContainer = () => anchor().parentElement as HTMLElement;
 
@@ -38,11 +26,9 @@ describe('FloatingActionStack', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
-    resetWindowScrollY();
   });
 
   it('renders exactly one collapsed launcher anchor on a marketing route', async () => {
-    setWindowScrollY(600);
     await renderStack('/');
 
     expect(screen.getAllByRole('button', { name: 'Contact options' })).toHaveLength(1);
@@ -53,7 +39,6 @@ describe('FloatingActionStack', () => {
   });
 
   it('expands into Call, WhatsApp and Travel assistant actions with correct deep links', async () => {
-    setWindowScrollY(600);
     await renderStack('/');
     const user = userEvent.setup();
 
@@ -68,41 +53,34 @@ describe('FloatingActionStack', () => {
     expect(screen.getByRole('button', { name: 'Travel assistant' })).toBeInTheDocument();
   });
 
-  it('is hidden above the hero on a marketing route and fades in past the scroll threshold', async () => {
-    await renderStack('/');
+  it.each([
+    '/',
+    '/about',
+    '/packages',
+    '/package/123',
+    '/contact',
+    '/career',
+    '/destinations-international',
+    '/reset-password/abc',
+  ])('renders the launcher immediately, with no scroll gate, on %s', async (path) => {
+    await renderStack(path);
 
-    expect(launcherContainer()).toHaveClass('opacity-0');
-    expect(launcherContainer()).toHaveClass('pointer-events-none');
-
-    setWindowScrollY(600);
-
+    expect(anchor()).toBeInTheDocument();
     expect(launcherContainer()).not.toHaveClass('opacity-0');
     expect(launcherContainer()).not.toHaveClass('pointer-events-none');
   });
 
   it.each(['/planner', '/planner/', '/package/123/customize', '/login', '/my-account'])(
-    'is always visible immediately on the app route %s (no scroll gating)',
+    'renders no launcher at all on the assistant-excluded route %s',
     async (path) => {
       await renderStack(path);
 
-      expect(launcherContainer()).not.toHaveClass('opacity-0');
-      expect(launcherContainer()).not.toHaveClass('pointer-events-none');
+      expect(screen.queryByRole('button', { name: 'Contact options' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Scroll to top' })).toBeInTheDocument();
     },
   );
 
-  it('omits the Travel assistant action on a route where the assistant is excluded', async () => {
-    await renderStack('/planner');
-    const user = userEvent.setup();
-
-    await user.click(anchor());
-
-    expect(screen.getByRole('link', { name: 'Call us' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Chat on WhatsApp' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Travel assistant' })).not.toBeInTheDocument();
-  });
-
   it('closes the menu when an action is chosen', async () => {
-    setWindowScrollY(600);
     await renderStack('/');
     const user = userEvent.setup();
 
@@ -114,23 +92,8 @@ describe('FloatingActionStack', () => {
     expect(anchor()).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('collapses the open menu when the user scrolls back above the threshold', async () => {
-    setWindowScrollY(600);
-    await renderStack('/');
-    const user = userEvent.setup();
-
-    await user.click(anchor());
-    expect(screen.getByRole('link', { name: 'Call us' })).toBeInTheDocument();
-
-    setWindowScrollY(0);
-
-    expect(screen.queryByRole('link', { name: 'Call us' })).not.toBeInTheDocument();
-    expect(launcherContainer()).toHaveClass('opacity-0');
-  });
-
   it('keeps the remaining actions when one contact channel is disabled', async () => {
     vi.stubEnv('VITE_FEATURE_CALL_BUTTON', 'false');
-    setWindowScrollY(600);
     await renderStack('/');
     const user = userEvent.setup();
 
@@ -141,7 +104,20 @@ describe('FloatingActionStack', () => {
     expect(screen.getByRole('button', { name: 'Travel assistant' })).toBeInTheDocument();
   });
 
-  it('renders nothing when every toggle is disabled on a route with no assistant', async () => {
+  it('still renders the launcher when both contact channels are disabled, because the assistant row remains', async () => {
+    vi.stubEnv('VITE_FEATURE_WHATSAPP_BUTTON', 'false');
+    vi.stubEnv('VITE_FEATURE_CALL_BUTTON', 'false');
+    await renderStack('/');
+    const user = userEvent.setup();
+
+    await user.click(anchor());
+
+    expect(screen.queryByRole('link', { name: 'Call us' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Chat on WhatsApp' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Travel assistant' })).toBeInTheDocument();
+  });
+
+  it('renders neither the launcher nor ScrollTop on an excluded route when every toggle is disabled', async () => {
     vi.stubEnv('VITE_FEATURE_WHATSAPP_BUTTON', 'false');
     vi.stubEnv('VITE_FEATURE_CALL_BUTTON', 'false');
     vi.stubEnv('VITE_FEATURE_SCROLL_TOP', 'false');

@@ -17,19 +17,22 @@ export const FLOATING_ACTIONS_CONFIG = {
 //
 // Bottom edge of the launcher anchor and the ScrollTop affordance.
 export const FLOATING_ACTION_BASE_OFFSET_PX = 16;
-// Anchor diameter (56px — h-14). The expanded action menu and the assistant
+// Header/rail right inset shared by the launcher anchor and the ScrollTop chip.
+export const FLOATING_ACTION_RIGHT_OFFSET_PX = 12;
+// Anchor diameter (64px — h-16). The expanded action menu and the assistant
 // panel sit exactly one anchor-height + gap above the anchor.
-export const FLOATING_ACTION_ANCHOR_SIZE_PX = 56;
+export const FLOATING_ACTION_ANCHOR_SIZE_PX = 64;
 export const FLOATING_ACTION_GAP_PX = 12;
+// ScrollTop chip sits to the anchor's left, one anchor + gap further in.
+export const FLOATING_ACTION_SCROLL_TOP_RIGHT_OFFSET_PX =
+  FLOATING_ACTION_RIGHT_OFFSET_PX + FLOATING_ACTION_ANCHOR_SIZE_PX + FLOATING_ACTION_GAP_PX; // 88
 // Bottom offset for the assistant panel so it floats just above the anchor
 // instead of covering it.
 export const ASSISTANT_PANEL_BOTTOM_OFFSET_PX =
   FLOATING_ACTION_BASE_OFFSET_PX + FLOATING_ACTION_ANCHOR_SIZE_PX + FLOATING_ACTION_GAP_PX;
 
-// Marketing pages keep the launcher out of the hero's first viewport: it
-// fades in only once the window has scrolled past this depth. App pages
-// (see isLauncherAlwaysVisiblePath in config/assistantRoutes.ts) render it
-// immediately. Same threshold the ScrollTop affordance already used before
-// Phase 1 — one shared constant so the two scroll-gated controls never
-// disagree about what "past the hero" means.
+// Scroll depth at which the ScrollTop affordance fades in — it is now the
+// only scroll-gated floating control. The launcher renders immediately on
+// every route where the assistant is available (see isAssistantExcludedPath
+// in config/assistantRoutes.ts), with no reveal animation.
 export const FLOATING_ACTION_SCROLL_THRESHOLD_PX = 400;

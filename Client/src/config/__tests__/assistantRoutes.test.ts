@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // fresh via vi.resetModules(), same convention as config/__tests__/pages.test.ts.
 const importAssistantRoutes = async () => (await import('../assistantRoutes')).ASSISTANT_ROUTES;
 const loadEnabledRoutes = async () => (await import('../assistantRoutes')).getEnabledAssistantRoutes();
+const loadExcludedPath = async () => (await import('../assistantRoutes')).isAssistantExcludedPath;
 
 const EXPECTED_TARGETS = [
   { name: 'home', path: '/' },
@@ -86,5 +87,23 @@ describe('getEnabledAssistantRoutes', () => {
     vi.stubEnv('VITE_FEATURE_PLANNER', 'false');
     const enabled = await loadEnabledRoutes();
     expect(enabled).toContainEqual(expect.objectContaining({ name: 'home', path: '/' }));
+  });
+});
+
+describe('isAssistantExcludedPath', () => {
+  it('excludes exactly the four assistant-free routes, tolerating a trailing slash', async () => {
+    const isAssistantExcludedPath = await loadExcludedPath();
+
+    expect(isAssistantExcludedPath('/planner')).toBe(true);
+    expect(isAssistantExcludedPath('/planner/')).toBe(true);
+    expect(isAssistantExcludedPath('/package/123/customize')).toBe(true);
+    expect(isAssistantExcludedPath('/login')).toBe(true);
+    expect(isAssistantExcludedPath('/my-account')).toBe(true);
+
+    expect(isAssistantExcludedPath('/')).toBe(false);
+    expect(isAssistantExcludedPath('/about')).toBe(false);
+    expect(isAssistantExcludedPath('/packages')).toBe(false);
+    expect(isAssistantExcludedPath('/package/123')).toBe(false);
+    expect(isAssistantExcludedPath('/package/123/customize/extra')).toBe(false);
   });
 });
