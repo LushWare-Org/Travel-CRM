@@ -27,6 +27,9 @@ test.describe('copilot smoke — the counting question', () => {
   test('the /leads panel renders a ranked list that explains itself', async ({ adminPage: page }) => {
     await page.goto('/leads');
 
+    // The panel is closed by default; open it from the floating trigger.
+    await page.getByRole('button', { name: /open copilot/i }).click();
+
     const dock = page.locator(DOCK);
     await expect(dock).toBeVisible({ timeout: 30_000 });
 

@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 
-// Keyed by page key as well as actor. The design decision is "auto-open once per
-// page key per operator, then honour the persisted collapsed state": a record
-// scope has a notion of a first visit, a collection scope does not, so an
-// actor-global key would auto-open exactly once ever and nine pages would never
-// announce that the insights exist there. Collapsing on one page therefore no
-// longer silences the others — that is the intended discovery behaviour, not a
-// regression.
+// Keyed by page key as well as actor, so an operator can keep the copilot open
+// on one page and collapsed on another. Nothing auto-opens: the panel starts
+// collapsed, and the stored value is the only thing that opens it on load — an
+// explicit Open from the rail or the floating trigger, or a persisted `open`
+// from an earlier visit. This is the same "honour the persisted state" contract
+// as before, without the first-visit discovery pass that used to precede it.
 //
 // Changing the key shape orphans any previously stored value, so every operator
-// sees one extra discovery pass. Harmless (the entries are a few bytes) and not
+// loses a stored choice once. Harmless (the entries are a few bytes) and not
 // worth a migration.
 export const COPILOT_STORAGE_PREFIX = "management-copilot:v1";
 
@@ -42,7 +41,7 @@ function write(key: string, value: string) {
 export type UseCopilotVisibility = {
   /** False until the authenticated identity is known: nothing is read or written. */
   ready: boolean;
-  /** The stored preference, or null before the first discovery. */
+  /** The stored preference, or null until the operator makes one. */
   visibility: CopilotVisibility | null;
   cueDismissed: boolean;
   setVisibility: (value: CopilotVisibility) => void;

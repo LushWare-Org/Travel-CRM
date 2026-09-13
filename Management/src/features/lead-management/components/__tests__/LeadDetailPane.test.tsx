@@ -74,6 +74,7 @@ vi.mock('../../../../features/lead-management/components/EditLeadDialog', () => 
 import { AuthProvider } from '../../../../contexts/AuthContext';
 import LeadManagement from '../../../../pages/LeadManagement';
 import { setViewport } from '../../../copilot/__tests__/copilotTestUtils';
+import { visibilityKey } from '../../../copilot/useCopilotVisibility';
 
 const lead = {
   _id: 'lead-a',
@@ -89,6 +90,9 @@ const lead = {
 function renderPage() {
   localStorage.setItem('token', 'test-token');
   localStorage.setItem('user', JSON.stringify({ _id: 'actor-1', name: 'Ops' }));
+  // The panel is closed by default; these tests exercise the record-scope
+  // insights, so mount with the operator's stored preference already open.
+  localStorage.setItem(visibilityKey('actor-1', 'leads'), 'open');
   return render(
     <AuthProvider>
       <LeadManagement />

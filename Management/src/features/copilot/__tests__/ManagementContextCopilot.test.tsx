@@ -60,7 +60,13 @@ function StubSections({ api: sectionApi }: { api: CopilotSectionApi }) {
   );
 }
 
-function renderShell({ scope = { leadId: 'a' } as CopilotScope | null, withAuth = true } = {}) {
+function renderShell({
+  scope = { leadId: 'a' } as CopilotScope | null,
+  withAuth = true,
+  /** The operator's stored preference before mount. Default is a first visit. */
+  stored = null as 'open' | 'collapsed' | null,
+} = {}) {
+  if (stored) localStorage.setItem(visibilityKey(ACTOR, PAGE), stored);
   const tree = (
     <ManagementContextCopilot pageKey="leads" scope={scope} scopeLabel="Alice Traveller">
       {(sectionApi) => <StubSections api={sectionApi} />}
@@ -138,15 +144,24 @@ afterEach(() => {
 });
 
 describe('ManagementContextCopilot — desktop visibility', () => {
-  it('auto-opens once for the first valid lead and persists open under the operator id', async () => {
+  it('stays closed on a first visit and opens only on an explicit open, persisting that choice', async () => {
+    const user = userEvent.setup();
     renderShell();
+
+    // No first-visit auto-open: the dock starts collapsed behind the rail and the
+    // floating trigger, and no preference is written until the operator acts.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open copilot' })).toBeInTheDocument());
+    expect(screen.queryByTestId('surface-open')).not.toBeInTheDocument();
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Open copilot' }));
 
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
     expect(screen.getByTestId('claims')).toHaveTextContent('Insights a');
     expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('open');
   });
 
-  it('does not count a no-lead visit as discovery', async () => {
+  it('renders closed and reads nothing for a no-lead visit', async () => {
     renderShell({ scope: null });
 
     await act(async () => {});
@@ -157,7 +172,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
   it('persists a collapse and never reopens on later leads or reloads', async () => {
     const user = userEvent.setup();
-    const { rerender } = renderShell();
+    const { rerender } = renderShell({ stored: 'open' });
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
 
     await user.click(screen.getByRole('button', { name: 'collapse' }));
@@ -192,11 +207,10 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     expect(localStorage.getItem(visibilityKey('actor-2', PAGE))).toBe('collapsed');
   });
 
-  it('keys the preference per page, so collapsing one page does not silence the others', async () => {
-    // The operator collapsed the copilot on `leads` and has never opened
-    // `overview`. Under the previous actor-global key, `overview` would have
-    // inherited that collapse and never announced that the insights exist there;
-    // the decided behaviour is one discovery moment per page key.
+  it('keys the preference per page, so opening one page leaves another page choice untouched', async () => {
+    // The preference is per actor AND page: opening the copilot on `overview`
+    // must not disturb the collapsed choice stored for `leads`.
+    const user = userEvent.setup();
     localStorage.setItem(visibilityKey(ACTOR, 'leads'), 'collapsed');
 
     render(
@@ -207,6 +221,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
       </AuthProvider>
     );
 
+    await user.click(await screen.findByRole('button', { name: 'Open copilot' }));
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
     expect(localStorage.getItem(visibilityKey(ACTOR, 'overview'))).toBe('open');
     // And it did not overwrite the choice made on the other page.
@@ -224,7 +239,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
   it('collapses to the labeled floating trigger beside the rail, never an icon-only control', async () => {
     const user = userEvent.setup();
-    renderShell();
+    renderShell({ stored: 'open' });
     await waitFor(() => expect(document.querySelector('[data-copilot-surface="dock"]')).not.toBeNull());
 
     await user.click(screen.getByRole('button', { name: 'collapse' }));
@@ -244,9 +259,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
   it('activates the desktop trigger into the panel and moves focus to the tab that names it', async () => {
     const user = userEvent.setup();
     renderShell();
-    await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
 
-    await user.click(screen.getByRole('button', { name: 'collapse' }));
     await user.click(screen.getByRole('button', { name: 'Open copilot' }));
 
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
@@ -276,7 +289,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
       })
     );
 
-    renderShell();
+    renderShell({ stored: 'open' });
     await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('The deposit is overdue.'));
 
     await user.click(screen.getByRole('button', { name: 'collapse' }));
@@ -357,7 +370,7 @@ describe('ManagementContextCopilot — below xl', () => {
 describe('ManagementContextCopilot — conversation', () => {
   it('keeps a suggested question paired with its successful answer', async () => {
     const user = userEvent.setup();
-    renderShell();
+    renderShell({ stored: 'open' });
     await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     await user.click(screen.getByRole('button', { name: 'ask-suggested' }));
@@ -372,7 +385,7 @@ describe('ManagementContextCopilot — conversation', () => {
   it('keeps a typed question paired with a failed answer and retries that turn', async () => {
     const user = userEvent.setup();
     api.copilotAsk.mockRejectedValueOnce(new Error('assistant offline'));
-    renderShell();
+    renderShell({ stored: 'open' });
     await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
     await user.click(screen.getByRole('button', { name: 'type' }));
@@ -391,7 +404,7 @@ describe('ManagementContextCopilot — conversation', () => {
   it('answers a question with verified blocks while the insights themselves are partial', async () => {
     const user = userEvent.setup();
     api.copilotInsights.mockRejectedValueOnce(new Error('model offline'));
-    renderShell();
+    renderShell({ stored: 'open' });
 
     await waitFor(() => expect(screen.getByTestId('model')).toHaveTextContent('partial'));
     expect(screen.getByTestId('claims')).toHaveTextContent('Deterministic a');
@@ -406,7 +419,7 @@ describe('ManagementContextCopilot — conversation', () => {
 
 describe('ManagementContextCopilot — conversation on every scope', () => {
   it('renders the shell conversation for a collection scope and drops it without a scope', async () => {
-    const { rerender } = renderShell({ scope: {} });
+    const { rerender } = renderShell({ scope: {}, stored: 'open' });
 
     // The shell owns the conversation, so a collection page (no leadId) has the
     // composer the record insights used to own. What changed with the tab split:
@@ -436,7 +449,7 @@ describe('ManagementContextCopilot — conversation on every scope', () => {
 
 describe('ManagementContextCopilot — scope lifecycle', () => {
   it('drops the previous lead insights when the selection is cleared', async () => {
-    const { rerender } = renderShell();
+    const { rerender } = renderShell({ stored: 'open' });
 
     await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
 
