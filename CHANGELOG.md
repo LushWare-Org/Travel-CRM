@@ -8,10 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - The marketing Landing page now deploys to Firebase Hosting as its own site (`lush-ware-landing-dev`). It ships both by hand (`scripts/deploy-landing.sh`) and automatically from CI's `deploy-hosting` job on every push to `microservices`. Its links to the Client and Management portals are set per environment at build time, so a dev deploy no longer points visitors at production.
+- The site assistant works on the trip planner and on a package's customization page, not only on browsing pages: it can set the destination, travellers, preferences and contact details on the page you are on, build or redo the day-by-day plan, and rework a single day. The page says what changed and offers Undo, and the assistant never claims a page change it did not make.
+- Ask the assistant a travel question whose answer is not on this site — entry rules, the best time to visit, costs, getting around, safety notes — and it looks it up and answers with its sources.
+- Asked for a trip we do not sell, the assistant takes you to where one gets built: the planner, where AI drafts the day-by-day itinerary, or the customization page of the package you were discussing, instead of handing you to the contact form.
 
 ### Fixed
 - A destination that groups several countries, such as "Europe (UK, France, Netherlands, Italy)", is no longer cut in half by the comma inside its own parentheses. The Destinations menu showed it as "Europe (UK", an opening bracket with nothing closing it; it now reads "Europe", the destination pages read "Europe, UK, France, Netherlands, Italy", and the link still resolves to that package.
 - A destination named on its own with no country no longer repeats itself on the destination cards and the package pages — "Japan, Japan" now reads "Japan, Asia".
+- Asked about a place we do not cover ("do you have any tokyo packages"), the assistant no longer answers by showing the entire catalogue. It says what we do not have, filters to the country that place belongs to, and offers to build the trip instead.
+- A follow-up asking for something different in the same place ("i need one different than this but in tokyo city") is answered as the same question rather than repeating a list.
 
 ## [0.6.0.0] - 2026-09-11
 
