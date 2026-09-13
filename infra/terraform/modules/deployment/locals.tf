@@ -170,7 +170,15 @@ locals {
         MANAGEMENT_COPILOT_ENABLED                = var.management_copilot_enabled
         MANAGEMENT_COPILOT_PAGE_KEYS              = var.management_copilot_page_keys
         ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = "true"
-        GEMINI_ROUTER_MODEL                       = "gemini-3.5-flash"
+        # The briefing and the ask loop both run on this one model. The flash tier
+        # thinks: measured at ~1000 thinking tokens and 5.7s on a prompt far
+        # smaller than a real briefing, which overran the generation deadline
+        # and reached operators as "I could not generate an answer just now".
+        # The lite tier does no thinking and returns the same structured answer.
+        GEMINI_MODEL                              = "gemini-3.5-flash-lite"
+        # Classified inside a 1.5s budget (assistantRouter.js), which the
+        # thinking default can never meet.
+        GEMINI_ROUTER_MODEL                       = "gemini-3.5-flash-lite"
         ASSISTANT_ROUTER_SOCIAL_ENABLED           = "false"
         ASSISTANT_ROUTER_OFF_TOPIC_ENABLED        = "false"
         ASSISTANT_ROUTER_SOCIAL_THRESHOLD         = "0.95"
