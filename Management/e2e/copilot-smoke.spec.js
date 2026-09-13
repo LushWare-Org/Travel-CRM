@@ -70,7 +70,9 @@ test.describe('copilot smoke — the counting question', () => {
   test('a counting question gets an answer that carries the number @requires-model', async ({ adminPage: page }) => {
     await page.goto('/leads');
 
-    const surface = page.locator(SURFACE_SELECTOR);
+    // The tab panel that is not showing stays mounted, so its surface is in the
+    // DOM too — scope to the visible one rather than matching both.
+    const surface = page.locator(`${SURFACE_SELECTOR}:visible`);
     await expect(surface).toBeVisible({ timeout: 30_000 });
 
     const composer = surface.getByRole('textbox', { name: /^Ask about / });
