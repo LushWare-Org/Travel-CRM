@@ -32,6 +32,24 @@ describe('normalizeDestination', () => {
   it('is case-insensitive when matching the region lookup', () => {
     expect(normalizeDestination('DUBAI').region).toBe('Middle East');
   });
+
+  it('keeps a grouped destination whole instead of splitting on the countries inside it', () => {
+    const result = normalizeDestination('Europe (UK, France, Netherlands, Italy)');
+
+    expect(result.name).toBe('Europe');
+    expect(result.country).toBe('UK, France, Netherlands, Italy');
+    expect(result.region).toBe('Europe');
+    expect(result.slug).toBe('europe');
+  });
+
+  it('leaves the country empty for a bare destination name', () => {
+    const result = normalizeDestination('Japan');
+
+    expect(result.name).toBe('Japan');
+    expect(result.country).toBe('');
+    expect(result.region).toBe('Asia');
+    expect(result.slug).toBe('japan');
+  });
 });
 
 describe('createSlug', () => {

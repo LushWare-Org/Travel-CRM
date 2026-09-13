@@ -505,7 +505,8 @@ export default function CustomizePackageContainer() {
               </div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-1 sm:mb-3 line-clamp-2 sm:line-clamp-none">{pkg.title}</h1>
               <p className="text-white/90 text-xs sm:text-sm md:text-base lg:text-lg mb-3 sm:mb-6 w-full break-words">
-                {pkg.destination?.name || pkg.destinationRaw}, {pkg.destination?.country}
+                {pkg.destination?.name || pkg.destinationRaw}
+                {pkg.destination?.country && `, ${pkg.destination.country}`}
               </p>
 
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 lg:gap-6 mt-2 sm:mt-4">

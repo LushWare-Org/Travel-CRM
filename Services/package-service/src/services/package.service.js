@@ -423,25 +423,81 @@ export function destinationSlug(value = '') {
 }
 
 /**
+ * Splits on a separator that sits outside parentheses, so a grouped
+ * destination like "Europe (UK, France, Netherlands, Italy)" stays one
+ * segment. Mirrors the client's packages.transform splitTopLevel.
+ */
+const splitTopLevel = (value, separator) => {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+
+  for (const char of value) {
+    if (char === '(') depth += 1;
+    if (char === separator && depth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    if (char === ')') depth = Math.max(0, depth - 1);
+    current += char;
+  }
+  parts.push(current);
+
+  return parts.map((part) => part.trim()).filter(Boolean);
+};
+
+/**
+ * "Europe (UK, France)" → { name: 'Europe', country: 'UK, France' }. Mirrors
+ * the client's packages.transform splitGroupedName.
+ */
+const splitGroupedName = (segment) => {
+  const grouped = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(segment);
+  if (!grouped) return { name: segment, country: '' };
+  return { name: grouped[1].trim() || segment, country: grouped[2].trim() };
+};
+
+/**
  * Every slug a raw destination display string answers to.
  *
  * The `destination` column holds a denormalized display string such as
  * "Bali, Indonesia". The page addresses destinations by slug, and the client's
- * normalizeDestination derives four per package: the first segment, the last
- * segment, and a primary slug that prefers the country. Reproduced here so the
- * server matches the same space the page links in.
+ * normalizeDestination derives its name slug and country slug from the same
+ * segments — a grouped destination takes its primary slug from its name. That
+ * is reproduced here so the server matches the same space the page links in.
+ *
+ * A comma-separated display string used to answer to its first segment's slug
+ * no matter what followed, so those naive slugs stay as aliases: a link minted
+ * before grouped destinations were parsed as one still resolves.
  */
 export function destinationSlugSet(raw = '') {
   const trimmed = `${raw || ''}`.trim();
   const slugs = new Set();
   if (!trimmed) return slugs;
 
-  const parts = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
-  const nameSlug = destinationSlug(parts[0] || trimmed);
-  const countrySlug = parts.length > 1 ? destinationSlug(parts[parts.length - 1]) : '';
-  const primary = countrySlug || nameSlug;
+  const segments = splitTopLevel(trimmed, ',');
+  const primarySegment = segments[0] || trimmed;
+  const grouped = splitGroupedName(primarySegment);
+  const country = segments.length > 1 ? segments[segments.length - 1] : grouped.country;
+  const countryParts = splitTopLevel(country, ',');
+  const nameSlug = destinationSlug(grouped.name);
+  const countrySlug = destinationSlug(country);
+  const primary = (countryParts.length > 1 ? nameSlug : countrySlug) || nameSlug || countrySlug;
 
-  [primary, nameSlug, countrySlug, destinationSlug(trimmed)].forEach((slug) => {
+  const naiveParts = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
+  const naiveNameSlug = destinationSlug(naiveParts[0] || trimmed);
+  const naiveCountrySlug = naiveParts.length > 1 ? destinationSlug(naiveParts[naiveParts.length - 1]) : '';
+
+  [
+    primary,
+    nameSlug,
+    countrySlug,
+    ...countryParts.map((part) => destinationSlug(part)),
+    destinationSlug(primarySegment),
+    naiveNameSlug,
+    naiveCountrySlug,
+    destinationSlug(trimmed),
+  ].forEach((slug) => {
     if (slug) slugs.add(slug);
   });
   return slugs;
