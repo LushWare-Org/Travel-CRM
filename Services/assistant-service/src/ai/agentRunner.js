@@ -5,7 +5,7 @@ import {
   managementSingleShotResponseJsonSchema,
 } from './prompts/managementAnswer.v2.js';
 import { executeTool, resolveTools } from '../tools/toolRegistry.js';
-import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../constants/managementCopilot.js';
+import { MANAGEMENT_GENERATION_DEADLINE_MS, MANAGEMENT_MIN_CALL_TIMEOUT_MS } from '../constants/managementCopilot.js';
 import logger from '../config/logger.js';
 
 // Three rounds, not four. Each round is one generation plus one tool read, and at
@@ -22,22 +22,21 @@ const MAX_TOOL_CALLS = 3;
 // answer. Reserving time is what turns "the loop ran out" into an answer.
 const ANSWER_RESERVE_MS = 6_000;
 
-// ONE overall budget for the whole ask, not one per call. It is the server's
-// existing generation deadline (MANAGEMENT_GENERATION_DEADLINE_MS) and it sits
-// inside the Management client's 20s abort. The loop used to pass this same
-// 17s deadline to every iteration, so a four-step ask could bill 68s of
-// generation while the client had already given up at 20s — the two list tools
-// make a multi-step ask reachable, which is what turned that arithmetic into a
-// real failure.
+// ONE overall budget for the whole ask, not one per call, handed in as what is
+// LEFT of the turn's deadline (MANAGEMENT_GENERATION_DEADLINE_MS) after the
+// evidence-bundle load the caller already paid for — see `remainingTurnBudgetMs`
+// in managementCopilot.controller.js. It sits inside the Management client's 20s
+// abort, which wraps the whole turn. The loop used to pass a fresh 17s deadline
+// to every iteration, so a four-step ask could bill 68s of generation while the
+// client had already given up at 20s — the two list tools make a multi-step ask
+// reachable, which is what turned that arithmetic into a real failure.
 // The budget bounds generation AND tool I/O: each tool read is given what
 // remains of it as an AbortSignal, so a stalled lead or billing read cannot run
-// unbounded past the deadline. The evidence-bundle load that happens BEFORE the
-// loop is outside this budget (see managementCopilot.controller.js).
-
-// A call with less than this left cannot produce a usable answer, so the loop
-// stops instead of spending the remainder on a call that is certain to be
-// aborted. It is also what keeps every derived timeout strictly positive.
-const MIN_CALL_TIMEOUT_MS = 1_000;
+// unbounded past the deadline. What the caller spends before the loop is charged
+// to the turn instead. A call with less than MANAGEMENT_MIN_CALL_TIMEOUT_MS left
+// cannot produce a usable answer, so the loop stops rather than spending the
+// remainder on a call that is certain to be aborted — which is also what keeps
+// every derived timeout strictly positive.
 
 // Bounded agent loop for ask mode. The model may call up to four of the RESOLVED
 // domain tools to gather data, then must emit final_answer. Every tool executes
@@ -73,9 +72,15 @@ export async function runAgentLoop({
   // is an instruction.
   priorClaims = [],
   conversation = [],
+  budgetMs = MANAGEMENT_GENERATION_DEADLINE_MS,
 }) {
   const toolDescriptions = resolveTools(tools);
   const history = [];
+
+  if (budgetMs < MANAGEMENT_MIN_CALL_TIMEOUT_MS) {
+    logger.warn({ budgetMs }, 'ask arrived with less than the minimum call budget');
+    return { answerBlocks: [], toolEvidence: [], reason: 'budget-exhausted' };
+  }
 
   // A page that declares no tools runs single-shot: one structured call, a
   // `final_answer`-only schema with no `tool` field, and no tool block in the
@@ -96,7 +101,7 @@ export async function runAgentLoop({
         schema: managementSingleShotResponseJsonSchema,
         temperature: 0.2,
         maxOutputTokens: 8192,
-        timeoutMs: MANAGEMENT_GENERATION_DEADLINE_MS,
+        timeoutMs: budgetMs,
         maxAttempts: 1,
       });
     } catch (err) {
@@ -117,7 +122,7 @@ export async function runAgentLoop({
     return { answerBlocks: raw.claims, toolEvidence: [], reason: 'answered' };
   }
 
-  const deadline = Date.now() + MANAGEMENT_GENERATION_DEADLINE_MS;
+  const deadline = Date.now() + budgetMs;
   // Tool rounds stop here, so the answer always has the remainder.
   const toolDeadline = deadline - ANSWER_RESERVE_MS;
 
@@ -127,7 +132,7 @@ export async function runAgentLoop({
     // little remains, stop with the answer-shaped empty payload rather than
     // start another call.
     const remainingMs = toolDeadline - Date.now();
-    if (remainingMs < MIN_CALL_TIMEOUT_MS) {
+    if (remainingMs < MANAGEMENT_MIN_CALL_TIMEOUT_MS) {
       logger.warn({ call, remainingMs }, 'ask ran out of generation budget before answering');
       return { answerBlocks: [], toolEvidence: historyToEvidence(history), reason: 'budget-exhausted' };
     }
@@ -180,7 +185,7 @@ export async function runAgentLoop({
     // timeout stays strictly positive; an abort reaches the model as the
     // existing `{ unavailable: true }` (executeTool catches it), never a new
     // error shape.
-    const toolRemainingMs = Math.max(toolDeadline - Date.now(), MIN_CALL_TIMEOUT_MS);
+    const toolRemainingMs = Math.max(toolDeadline - Date.now(), MANAGEMENT_MIN_CALL_TIMEOUT_MS);
     const result = await executeTool(tool, args, ctx, tools, AbortSignal.timeout(toolRemainingMs));
     // A rejected call — an unknown tool name, or args that fail the tool's own
     // schema — never reaches a service and so leaves no trace anywhere else. The
@@ -198,7 +203,7 @@ export async function runAgentLoop({
   // "the loop ran out" into either a grounded answer or an honest statement of
   // what this scope cannot show.
   const finalMs = deadline - Date.now();
-  if (finalMs >= MIN_CALL_TIMEOUT_MS) {
+  if (finalMs >= MANAGEMENT_MIN_CALL_TIMEOUT_MS) {
     try {
       const raw = await generateStructured({
         prompt: buildManagementFinalAnswerPrompt({ scopeLabel, question, evidence, history, priorClaims, conversation }),
