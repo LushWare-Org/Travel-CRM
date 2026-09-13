@@ -167,20 +167,17 @@ export function ProducerLine({
 }
 
 /**
- * Up to three server-supplied questions, submitted through the same session
- * action as a typed question. Renders nothing when the scope has none.
+ * Up to three server-supplied questions. A click sends one, exactly as if the
+ * operator had typed it — the block is a shortcut past the wording, not a draft
+ * of it. Renders nothing when the scope has none.
  */
 export function SuggestedQuestions({
   session,
   onAsk,
 }: {
   session: CopilotSession;
-  /**
-   * Where the question goes. Defaults to submitting in place; the tabbed shell
-   * passes a handler that also brings the conversation forward, so a question
-   * asked from the findings list is never answered on a tab nobody is reading.
-   */
-  onAsk?: (question: string) => void;
+  /** Send the question as the operator's own turn. */
+  onAsk: (question: string) => void;
 }) {
   if (session.suggestedQuestions.length === 0) return null;
 
@@ -196,7 +193,7 @@ export function SuggestedQuestions({
             variant="ghost"
             size="sm"
             className="h-auto justify-start whitespace-normal text-left text-sm text-primary"
-            onClick={() => (onAsk ?? session.submit)(question)}
+            onClick={() => onAsk(question)}
           >
             {question}
           </Button>

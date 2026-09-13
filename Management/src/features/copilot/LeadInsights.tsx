@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import InsightRow from "./InsightRow";
-import { ProducerLine, SuggestedQuestions, sectionBuckets } from "./insightShared";
+import { ProducerLine, sectionBuckets } from "./insightShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
 import type { ClaimSection, CopilotClaim, CopilotSession, RenderedInsights } from "./types";
 
@@ -13,7 +13,7 @@ type LeadInsightsProps = {
   leadId?: string | null;
   /** Collapses the persistent desktop dock. Omitted below `xl`. */
   onCollapse?: () => void;
-  /** Bring the conversation forward after a suggested question is submitted. */
+  /** Bring the conversation forward when a finding is attached. */
   onShowConversation?: () => void;
 };
 
@@ -225,8 +225,6 @@ export default function LeadInsights({
               </Button>
             </div>
           )}
-
-          <SuggestedQuestions session={session} onAsk={onShowConversation} />
         </div>
       )}
     </div>

@@ -298,3 +298,63 @@ describe('CopilotConversation — detaching the attachment', () => {
     expect(buttons[0].closest('[data-copilot-quote="above-composer"]')).not.toBeNull();
   });
 });
+
+describe('CopilotConversation — suggested questions', () => {
+  it('sends the question as if the operator had typed it', async () => {
+    const user = userEvent.setup();
+    const setInput = vi.fn();
+    const submit = vi.fn();
+    render(
+      <CopilotConversation
+        session={makeSession({ suggestedQuestions: ['Who is the most overdue?'], setInput, submit })}
+        scopeLabel="Billing"
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Who is the most overdue?' }));
+
+    expect(submit).toHaveBeenCalledWith('Who is the most overdue?');
+    // Sent directly, not parked in the input first: the turn is the point, and
+    // routing it through the box would flash text the operator never typed.
+    // No focus assertion: the browser blurs a disabled element, and `submit`
+    // disables the composer for the turn, so typing and pressing Enter leaves
+    // focus in the same place this click does.
+    expect(setInput).not.toHaveBeenCalled();
+  });
+
+  it('shows at most three, and nothing when the scope has none', () => {
+    const { rerender } = render(
+      <CopilotConversation
+        session={makeSession({ suggestedQuestions: ['One?', 'Two?', 'Three?', 'Four?'] })}
+        scopeLabel="Billing"
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'One?' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Four?' })).not.toBeInTheDocument();
+
+    rerender(<CopilotConversation session={makeSession({ suggestedQuestions: [] })} scopeLabel="Billing" />);
+    expect(screen.queryByRole('region', { name: 'Suggested questions' })).not.toBeInTheDocument();
+  });
+
+  it('offers them only while the transcript is empty, and brings them back when it is cleared', () => {
+    const prompts = { suggestedQuestions: ['One?'] };
+    const { rerender } = render(
+      <CopilotConversation session={makeSession({ turns: [], ...prompts })} scopeLabel="Billing" />
+    );
+    expect(screen.getByRole('region', { name: 'Suggested questions' })).toBeInTheDocument();
+
+    // Asked: the prompts have done their job and the transcript is the reading.
+    rerender(
+      <CopilotConversation
+        session={makeSession({ turns: [turn({ status: 'answered', answer: [] })], ...prompts })}
+        scopeLabel="Billing"
+      />
+    );
+    expect(screen.queryByRole('region', { name: 'Suggested questions' })).not.toBeInTheDocument();
+
+    // Cleared: empty again, so they are the way back in.
+    rerender(<CopilotConversation session={makeSession({ turns: [], ...prompts })} scopeLabel="Billing" />);
+    expect(screen.getByRole('region', { name: 'Suggested questions' })).toBeInTheDocument();
+  });
+});

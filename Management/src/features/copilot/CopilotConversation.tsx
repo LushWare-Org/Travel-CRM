@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import ClaimItem from "./ClaimItem";
 import { LiveStatus, useAnnouncer } from "./Announcer";
+import { SuggestedQuestions } from "./insightShared";
 import type { CopilotSession, PriorClaimContext } from "./types";
 
 /** The composer's id, so an attachment can put the cursor in it. */
@@ -105,7 +106,7 @@ type CopilotConversationProps = {
  * It is its own tab, inside its own `CopilotSurface`:
  *
  * -- CopilotTabs ------------------------------------------------+
- * |  [ Insights ][ Copilot ]   line variant, 32px, 44px targets   |
+ * |  [ Insights ][ Copilot ]   title bar, default variant, 40px  |
  * +--------------------------+-----------------------------------+
  * |  Insights panel          |  Copilot panel                    |
  * |  CopilotSurface (scroll) |  CopilotSurface (scroll)          |
@@ -115,8 +116,8 @@ type CopilotConversationProps = {
  * |      changed >           |        (sticky bottom-0 to THIS   |
  * |      current state >     |         scrollport, never         |
  * |      attention >         |         position: fixed)          |
- * |      experienced view >  |                                   |
- * |      suggested questions |                                   |
+ * |      experienced view >  |      suggested questions          |
+ * |                          |        (empty transcript only)    |
  * +--------------------------+-----------------------------------+
  *
  * In the transcript, side and fill carry the speaker: right-aligned accent
@@ -149,7 +150,7 @@ type CopilotConversationProps = {
  * | Surface      | Loading                        | Empty                                    | Error                                | Success                       | Partial                       |
  * |--------------|--------------------------------|------------------------------------------|--------------------------------------|-------------------------------|-------------------------------|
  * | Insights     | skeletons, then deterministic  | "No verified insights…" / examined count | full error + Retry, no stale claims  | scope order + evidence actions| claims kept + partial + Retry |
- * | Conversation | pending copy on the submitted turn | no transcript region before the first question; composer stays | turn keeps its question, concise failure + Retry | paired user turn + grounded blocks | verified blocks, no invented text |
+ * | Conversation | pending copy on the submitted turn | no transcript region before the first question; suggested questions then composer | turn keeps its question, concise failure + Retry | paired user turn + grounded blocks | verified blocks, no invented text |
  * | Collection ask | same neutral pending copy, single-shot on a page declaring no tools | an empty list is still askable: composer enabled, transcript empty until asked | same per-turn error + Retry          | same paired turn shape        | same                          |
  * | Composer     | present but disabled until the deterministic phase is ready | present (empty is not no-access) | disabled                             | enabled                       | enabled                       |
  *
@@ -178,6 +179,19 @@ export default function CopilotConversation({ session, scopeLabel }: CopilotConv
     document.getElementById(COMPOSER_ID)?.focus();
     announce("Finding attached. Ask your question about it.");
   }, [session.pendingContext, announce]);
+
+  /**
+   * A suggested question is SENT — exactly what typing it and pressing Enter
+   * would do. The click is the send, so the operator skips the wording rather
+   * than being handed a draft of it.
+   *
+   * No focus call: `submit` flips the composer to disabled for the turn, and a
+   * browser blurs a disabled element, so any focus taken here is dropped again.
+   * That is the same place typing and pressing Enter leaves focus.
+   */
+  const askSuggested = (question: string) => {
+    session.submit(question);
+  };
 
   const [confirmingClear, setConfirmingClear] = useState(false);
   const wasConfirmingClear = useRef(false);
@@ -330,6 +344,14 @@ export default function CopilotConversation({ session, scopeLabel }: CopilotConv
           )}
         </div>
       )}
+
+      {/*
+        Only while the transcript is empty. The prompts are a way in, not a part of
+        the conversation: once something has been asked the transcript is the thing
+        to read, and they return when it is cleared — the only other empty state
+        this panel has.
+      */}
+      {showComposer && !hasTurns && <SuggestedQuestions session={session} onAsk={askSuggested} />}
 
       {showComposer && (
         <form

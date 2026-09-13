@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe('LeadInsights — hierarchy', () => {
-  it('renders the changed row, current state, attention before the experienced view, and the suggested questions', () => {
+  it('renders the changed row, current state, attention before the experienced view', () => {
     const session = makeSession({
       claims: [
         claim({ id: 'changed-1', section: 'changed', text: 'Budget was updated yesterday.' }),
@@ -34,7 +34,6 @@ describe('LeadInsights — hierarchy', () => {
         claim({ id: 'attention-1', section: 'attention', severity: 'warning', text: 'Deposit is outstanding.' }),
         claim({ id: 'experienced-1', section: 'experienced_view', text: 'Trips to Lisbon usually book early.' }),
       ],
-      suggestedQuestions: ['What is the deposit status?', 'When is the travel date?', 'Who is assigned?', 'A fourth question?'],
     });
 
     render(<LeadInsights session={session} scopeLabel="Alice Traveller" leadId="a" />);
@@ -49,10 +48,6 @@ describe('LeadInsights — hierarchy', () => {
     const attention = screen.getByText('Needs attention');
     const experienced = screen.getByText('Experienced view');
     expect(attention.compareDocumentPosition(experienced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    // At most three suggested questions.
-    expect(screen.getByRole('button', { name: 'What is the deposit status?' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'A fourth question?' })).not.toBeInTheDocument();
   });
 
   it('omits the changed row when nothing changed', () => {

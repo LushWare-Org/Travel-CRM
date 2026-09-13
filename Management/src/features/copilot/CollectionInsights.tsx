@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import InsightList from "./InsightList";
-import { ProducerLine, SuggestedQuestions, sectionBuckets } from "./insightShared";
+import { ProducerLine, sectionBuckets } from "./insightShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
 import type { ClaimSection, CopilotClaim, CopilotSession, RenderedInsights } from "./types";
 
@@ -10,7 +10,7 @@ type CollectionInsightsProps = {
   session: CopilotSession;
   scopeLabel: string;
   onCollapse?: () => void;
-  /** Bring the conversation forward after a suggested question is submitted. */
+  /** Bring the conversation forward when a finding is attached. */
   onShowConversation?: () => void;
 };
 
@@ -278,8 +278,6 @@ export default function CollectionInsights({
               {session.suppressedCriticals.length === 1 ? " is" : " are"} not shown
             </p>
           )}
-
-          <SuggestedQuestions session={session} onAsk={onShowConversation} />
         </>
       )}
     </div>
