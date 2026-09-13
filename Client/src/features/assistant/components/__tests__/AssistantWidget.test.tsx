@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { formatCurrency } from '../../../../lib/currency';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
@@ -34,10 +35,14 @@ vi.mock('../../assistantParamValues', () => ({
 // without rendering a page: `mockPageRegistration.current` is what the hook's
 // getter returns.
 const mockPageRegistration = vi.hoisted(() => ({ current: null as unknown }));
+// What the mounted page reported is on screen, for the same reason: a getter the
+// test can point at a page that counts, or at nothing.
+const mockCurrentView = vi.hoisted(() => ({ current: null as unknown }));
 
 vi.mock('../../capabilities/AssistantCapabilityProvider', () => ({
   useAssistantCapabilities: () => () => mockPageRegistration.current,
   useAssistantPageRegistration: vi.fn(),
+  useAssistantCurrentView: () => () => mockCurrentView.current,
 }));
 
 // The search string is included because a handoff lands on
@@ -120,6 +125,7 @@ const input = () => screen.getByPlaceholderText('Ask about travel, pages, or pol
 beforeEach(() => {
   mockSendAssistantTurn.mockReset();
   mockSendAssistantEvent.mockReset();
+  mockCurrentView.current = null;
   mockLoadAssistantParamValues.mockReset();
   mockLoadAssistantParamValues.mockResolvedValue({
     packages: { destination: [{ value: 'uae', label: 'Dubai' }] },
@@ -250,6 +256,54 @@ describe('AssistantWidget', () => {
     expect(
       await screen.findByText('I can only change the trip on the trip planner and the customize pages — open one and ask me there.'),
     ).toBeInTheDocument();
+  });
+
+  it('renders the page\u2019s own count and its filters under a view answer', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'answer_current_view', args: {} },
+      serverResult: {
+        view: {
+          path: '/packages',
+          params: { destination: 'uae', priceMax: '1500' },
+          filteredCount: 3,
+          renderedCount: 2,
+          catalogueTotal: 25,
+        },
+      },
+      message: 'There are 3 trips matching the filters on this page. 2 are shown so far.',
+    });
+
+    renderWidget('/packages?destination=uae&priceMax=1500');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'how many are showing?');
+    await user.click(sendButton());
+
+    // The figure is the page's count, not the rendered page size — and the
+    // qualifier says so rather than letting 3 read as "and that is all".
+    expect(await screen.findByText('3')).toBeInTheDocument();
+    expect(screen.getByText('Destination: uae')).toBeInTheDocument();
+    // Through the site's own formatter, so the assertion cannot pin a currency
+    // the app formats differently.
+    expect(screen.getByText(`Under ${formatCurrency(1500)}`)).toBeInTheDocument();
+    expect(screen.getByText('2 shown so far')).toBeInTheDocument();
+  });
+
+  it('renders no summary block when the answer carried no numbers and no filters', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'answer_current_view', args: {} },
+      serverResult: { view: null },
+      message: "I can't see the page you're on right now.",
+    });
+
+    renderWidget('/packages');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'what am I looking at?');
+    await user.click(sendButton());
+
+    expect(await screen.findByText("I can't see the page you're on right now.")).toBeInTheDocument();
+    expect(screen.queryByText('shown so far')).not.toBeInTheDocument();
   });
 
   it('renders a grounded answer\u2019s sources as links and refuses a non-link citation', async () => {

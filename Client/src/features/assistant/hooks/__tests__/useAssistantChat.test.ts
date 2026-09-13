@@ -7,10 +7,15 @@ const mockSendAssistantEvent = vi.hoisted(() => vi.fn());
 // hook can be exercised with and without a page, which is the difference that
 // decides whether a turn carries a capability manifest at all.
 const mockPageRegistration = vi.hoisted(() => ({ current: null as unknown }));
+// What the mounted page reported is on screen. Mocked for the same reason the
+// registration is: a test can then exercise a page that counts, a page that only
+// knows where it is, and no page at all.
+const mockCurrentView = vi.hoisted(() => ({ current: null as unknown }));
 
 vi.mock('../../capabilities/AssistantCapabilityProvider', () => ({
   useAssistantCapabilities: () => () => mockPageRegistration.current,
   useAssistantPageRegistration: vi.fn(),
+  useAssistantCurrentView: () => () => mockCurrentView.current,
 }));
 const mockLoadAssistantParamValues = vi.hoisted(() => vi.fn());
 
@@ -45,6 +50,7 @@ beforeEach(() => {
   // No page mounted unless a test says so — the state every pre-existing case in
   // this file was written against.
   mockPageRegistration.current = null;
+  mockCurrentView.current = null;
   mockLoadAssistantParamValues.mockReset();
   mockLoadAssistantParamValues.mockResolvedValue({
     packages: { destination: [{ value: 'uae', label: 'Dubai' }] },
@@ -66,6 +72,97 @@ describe('useAssistantChat', () => {
     unmount();
     const remounted = renderHook(() => useAssistantChat());
     expect(remounted.result.current.sessionId).toBe(firstId);
+  });
+
+  it('reports where the browser is on every turn, even with no page reporting counts', async () => {
+    mockSendAssistantTurn.mockResolvedValue(NAVIGATE_RESULT);
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('Take me to the packages page');
+    });
+
+    // The baseline every page contributes: without it the assistant has no idea
+    // what the visitor is looking at, which is the state this channel exists for.
+    expect(mockSendAssistantTurn.mock.calls[0][0].currentView).toEqual({ path: '/' });
+  });
+
+  it('sends the counts a page reported, sanitised to what the wire accepts', async () => {
+    mockSendAssistantTurn.mockResolvedValue(NAVIGATE_RESULT);
+    mockCurrentView.current = {
+      path: '/packages',
+      params: { destination: 'uae', 'not a key': 'x', priceMax: '1500' },
+      filteredCount: 3,
+      // Fractional and absurd values must not reach a request field the schema
+      // rejects: a rejected request costs the visitor the whole turn, not one
+      // number.
+      renderedCount: 2.7,
+      catalogueTotal: 10 ** 9,
+    };
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('how many are showing?');
+    });
+
+    expect(mockSendAssistantTurn.mock.calls[0][0].currentView).toEqual({
+      path: '/packages',
+      params: { destination: 'uae', priceMax: '1500' },
+      filteredCount: 3,
+      renderedCount: 2,
+      catalogueTotal: 100000,
+    });
+  });
+
+  it('maps a view answer onto the summary data, relaying the page\u2019s own numbers', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'answer_current_view', args: {} },
+      serverResult: {
+        view: {
+          path: '/packages',
+          params: { destination: 'uae', priceMax: '1500' },
+          filteredCount: 3,
+          renderedCount: 2,
+          catalogueTotal: 25,
+        },
+      },
+      message: 'There are 3 trips matching the filters on this page. 2 are shown so far.',
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('how many are showing?');
+    });
+
+    expect(result.current.turns[0].data).toEqual({
+      tool: 'answer_current_view',
+      view: {
+        count: 3,
+        renderedCount: 2,
+        params: [
+          { key: 'destination', value: 'uae' },
+          { key: 'priceMax', value: '1500' },
+        ],
+      },
+    });
+  });
+
+  it('renders no summary data when the answer carries no report at all', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'answer_current_view', args: {} },
+      serverResult: { view: null },
+      message: "I can't see the page you're on right now.",
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('what am I looking at?');
+    });
+
+    expect(result.current.turns[0].data).toEqual({
+      tool: 'answer_current_view',
+      view: { count: null, renderedCount: null, params: [] },
+    });
   });
 
   it('falls back to a fresh in-memory id (never throws) when localStorage is unavailable', () => {

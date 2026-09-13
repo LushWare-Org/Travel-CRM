@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AssistantPageCapabilities, AssistantPageContext } from '@travel-crm/contracts';
+import { AssistantCurrentView, AssistantPageCapabilities, AssistantPageContext } from '@travel-crm/contracts';
 import httpClient from '../http/client';
 import { parseEnvelope } from '../http/envelope';
 
@@ -30,6 +30,10 @@ export const AssistantTurnTool = z.enum([
   'regenerate_days',
   'edit_day',
   'search_travel_info',
+  // Server-composed, and the only outcome whose sentence the server writes from
+  // the request rather than from model args: the page reports what is on screen
+  // and the assistant relays its numbers.
+  'answer_current_view',
 ]);
 
 // Identical shape to WizardTurnMessage: `id`/`at` are required so the
@@ -84,6 +88,11 @@ export const AssistantTurnRequest = z.object({
   // leave the browser.
   capabilities: AssistantPageCapabilities.optional(),
   pageContext: AssistantPageContext.optional(),
+  // What the page says is on screen. Declared for the reason every field on this
+  // schema is: it parses the OUTGOING payload and zod strips unknown keys, so an
+  // undeclared field would never leave the browser and the assistant would keep
+  // answering about a page the visitor has left.
+  currentView: AssistantCurrentView.optional(),
 });
 
 export const AssistantTurnResult = z.object({

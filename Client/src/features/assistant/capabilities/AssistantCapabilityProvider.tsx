@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { z } from 'zod';
-import type { AssistantAction, AssistantPageContext } from '@travel-crm/contracts';
+import type { AssistantAction, AssistantCurrentView, AssistantPageContext } from '@travel-crm/contracts';
 
 /**
  * One action the page can execute against its own state. Derived from the shared
@@ -28,6 +28,14 @@ export type AssistantActionPayload = z.infer<typeof AssistantAction>;
  */
 export type AssistantPageContextValue = z.infer<typeof AssistantPageContext>;
 
+/**
+ * What the page reports about what is on screen — the counts a question about
+ * the screen is answered from. Separate from the action registration on purpose:
+ * a page that can count is not thereby a page that can be changed, and every page
+ * gets a baseline report from the widget whether or not it registers anything.
+ */
+export type AssistantCurrentViewValue = z.infer<typeof AssistantCurrentView>;
+
 export interface AssistantPageRegistration {
   surface: AssistantPageContextValue['surface'];
   revision: string;
@@ -41,6 +49,9 @@ interface AssistantCapabilityStore {
   /** Read by the widget when a turn is SENT, never during render. */
   get: () => AssistantPageRegistration | null;
   set: (registration: AssistantPageRegistration | null) => void;
+  /** The mounted page's own report of what is on screen, read at send time too. */
+  getView: () => AssistantCurrentViewValue | null;
+  setView: (view: AssistantCurrentViewValue | null) => void;
 }
 
 const AssistantCapabilityContext = createContext<AssistantCapabilityStore | null>(null);
@@ -58,12 +69,17 @@ const AssistantCapabilityContext = createContext<AssistantCapabilityStore | null
  */
 export function AssistantCapabilityProvider({ children }: { children: ReactNode }) {
   const registration = useRef<AssistantPageRegistration | null>(null);
+  const currentView = useRef<AssistantCurrentViewValue | null>(null);
 
   const store = useMemo<AssistantCapabilityStore>(
     () => ({
       get: () => registration.current,
       set: (next) => {
         registration.current = next;
+      },
+      getView: () => currentView.current,
+      setView: (next) => {
+        currentView.current = next;
       },
     }),
     [],
@@ -95,4 +111,34 @@ export function useAssistantPageRegistration(registration: AssistantPageRegistra
     store.set(registration);
     return () => store.set(null);
   }, [store, registration]);
+}
+
+/**
+ * The view store's getter, for the same reason the action one is a getter.
+ *
+ * Unlike the action pair, this one does NOT throw when the provider is absent:
+ * the report is a baseline every page contributes to, and a page rendered without
+ * the provider — an isolated test, an embedded widget — must not fail for the
+ * want of a nice-to-have. The action hooks keep throwing, because there the
+ * absence is a wiring mistake with a permission consequence.
+ */
+export function useAssistantCurrentView(): () => AssistantCurrentViewValue | null {
+  const store = useContext(AssistantCapabilityContext);
+  return store?.getView ?? (() => null);
+}
+
+/**
+ * Reports what this page has on screen, from the page's own numbers, for as long
+ * as it is mounted. The widget sends the baseline path and query parameters; a
+ * page that can count adds the counts on top, which is what makes "how many are
+ * under 1000" answerable from the screen rather than from the page's previous
+ * state.
+ */
+export function useAssistantViewReport(view: AssistantCurrentViewValue | null): void {
+  const store = useContext(AssistantCapabilityContext);
+
+  useEffect(() => {
+    store?.setView(view);
+    return () => store?.setView(null);
+  }, [store, view]);
 }
