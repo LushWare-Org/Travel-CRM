@@ -60,8 +60,10 @@ const Sidebar = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [orgBranding, setOrgBranding] = useState<OrgBranding | null>(null);
 
-  // Org-configured company name/logo for the sidebar header — falls back to
-  // the static config/branding.js defaults while loading or if the fetch fails.
+  // Org-configured company name for the sidebar header, falling back to the
+  // static config/branding.js defaults while the fetch is in flight or if it
+  // fails. The icon is not org-configured: it ships with the app (see
+  // getSidebarInfo), so the rail never waits on or depends on a remote logo.
   useEffect(() => {
     let cancelled = false;
     adminAPI.getOrganizationBranding()
@@ -83,7 +85,7 @@ const Sidebar = () => {
     shortName:
       orgBranding?.companyShortName ||
       (orgBranding?.companyName ? deriveInitials(orgBranding.companyName) : fallbackInfo.shortName),
-    logoUrl: orgBranding?.logoUrl || fallbackInfo.logoUrl,
+    logoUrl: fallbackInfo.logoUrl,
   };
   const canEditOrgSettings = user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'superAdmin';
 

@@ -92,10 +92,11 @@ export const getSidebarInfo = () => {
     return {
         name: BRANDING.company.name,
         shortName: BRANDING.company.shortName,
-        // The square mark, not the wordmark: the rail shows the company name as
-        // text next to it, and /logo-full.png still carries the retired wordmark
-        // (the login screens keep that asset until it is redrawn).
-        logoUrl: '/favicon.png',
+        // The icon is delivered with the app (public/icon.png: the LUSH/WARE
+        // lockup on the light brand-50 tile), not read from org settings, so the
+        // rail always has a real mark. /logo-full.png still carries the retired
+        // wordmark for the login screens.
+        logoUrl: '/icon.png',
     };
 };
 

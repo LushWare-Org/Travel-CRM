@@ -119,9 +119,9 @@ export const META_DESCRIPTION =
   `${BRANDING.company.name} — sustainable, expertly curated journeys around the world.`;
 
 /**
- * Sets the document title, meta description, and favicon from `BRANDING`
- * at runtime, in JS, instead of relying on Vite's `index.html` %VITE_X%
- * placeholder substitution.
+ * Sets the document title and meta description from `BRANDING` at runtime, in
+ * JS, instead of relying on Vite's `index.html` %VITE_X% placeholder
+ * substitution.
  *
  * Why: Vite only resolves `%VITE_X%` in index.html when the matching env
  * var is actually defined at build time, with NO fallback for a missing
@@ -142,11 +142,6 @@ export const applyBranding = (): void => {
     document.head.appendChild(descriptionTag);
   }
   descriptionTag.setAttribute('content', META_DESCRIPTION);
-
-  const faviconTag = document.querySelector('link[rel="icon"]');
-  if (faviconTag) {
-    faviconTag.setAttribute('href', BRANDING.company.logoPath);
-  }
 };
 
 
