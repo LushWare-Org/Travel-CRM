@@ -66,7 +66,7 @@ PAYLOAD=$(cat <<JSON
           { "value": "thailand", "label": "Thailand" },
           { "value": "maldives", "label": "Maldives" },
           { "value": "sri-lanka", "label": "Sri Lanka" },
-          { "value": "italy", "label": "Europe (UK" }
+          { "value": "europe", "label": "Europe" }
         ]
       }
     },
