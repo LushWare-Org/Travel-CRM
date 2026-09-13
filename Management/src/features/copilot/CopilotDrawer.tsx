@@ -2,7 +2,6 @@ import { useRef, type ReactNode } from "react";
 import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import CopilotSurface from "./CopilotSurface";
 import CopilotTrigger from "./CopilotTrigger";
 
 /**
@@ -84,7 +83,7 @@ export default function CopilotDrawer({
           </Button>
         </div>
 
-        <CopilotSurface className="px-4 py-4 scroll-pb-24">{children}</CopilotSurface>
+        {children}
       </DialogContent>
     </Dialog>
   );

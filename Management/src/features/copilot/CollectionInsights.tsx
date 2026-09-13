@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import ClaimItem from "./ClaimItem";
-import { SuggestedQuestions, claimsIn } from "./insightShared";
+import InsightList from "./InsightList";
+import { ProducerLine, SuggestedQuestions, sectionBuckets } from "./insightShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
-import type { ClaimSection, CopilotClaim, CopilotSession } from "./types";
+import type { ClaimSection, CopilotClaim, CopilotSession, RenderedInsights } from "./types";
 
 type CollectionInsightsProps = {
   session: CopilotSession;
   scopeLabel: string;
   onCollapse?: () => void;
+  /** Bring the conversation forward after a suggested question is submitted. */
+  onShowConversation?: () => void;
 };
 
 const SECTION_LABELS: Record<ClaimSection, string> = {
@@ -26,35 +28,6 @@ const SECTION_ORDER: ClaimSection[] = ["attention", "changed", "current_state", 
 // only about the viewport, so it cannot be the server's decision.
 const RANKED_INITIAL = 5;
 
-/**
- * The one or two scored inputs that put this item where it is, in plain words.
- *
- * Every value comes from the server: this reads the flattened score components
- * rather than recomputing or reinterpreting them, so the line explains the
- * server's ordering and cannot contradict it.
- */
-function whyThis(claim: CopilotClaim): string | null {
-  const scored: Array<{ value: number | undefined; label: string }> = [
-    { value: claim.urgency, label: "time-sensitive" },
-    { value: claim.novelty, label: "new" },
-    { value: claim.confidence, label: "well-evidenced" },
-    { value: claim.actionability, label: "actionable" },
-  ];
-  const strong = scored
-    .filter((entry): entry is { value: number; label: string } => typeof entry.value === "number" && entry.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 2)
-    .map((entry) => entry.label);
-  return strong.length > 0 ? strong.join(", ") : null;
-}
-
-function formatMoment(value?: string | null): string | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
-}
-
 function InlineStatusRow({ dotColor, message, onRetry }: { dotColor?: string, message: string, onRetry?: () => void }) {
   return (
     <p className="flex items-center gap-2 text-sm text-foreground py-2 border-b border-border min-h-[44px]">
@@ -69,7 +42,12 @@ function InlineStatusRow({ dotColor, message, onRetry }: { dotColor?: string, me
   );
 }
 
-export default function CollectionInsights({ session, scopeLabel, onCollapse }: CollectionInsightsProps) {
+export default function CollectionInsights({
+  session,
+  scopeLabel,
+  onCollapse,
+  onShowConversation,
+}: CollectionInsightsProps) {
   // Per-source baselines are emitted with the documented ID shape
   // (`<page>:source:<name>:recordCount`) and carry the count in `capturedValue`.
   // The empty state reports that count so it can say "nothing is flagged of the
@@ -83,8 +61,16 @@ export default function CollectionInsights({ session, scopeLabel, onCollapse }: 
   );
   const [announcement, announce] = useAnnouncer();
   const claimsRegionRef = useRef<HTMLDivElement | null>(null);
-  const [renderedClaims, setRenderedClaims] = useState<CopilotClaim[]>(session.claims);
-  const [queuedClaims, setQueuedClaims] = useState<CopilotClaim[] | null>(null);
+  // The producer is stored WITH the claims it describes, and every write below
+  // writes both halves as one value. That pairing is what stops the header
+  // labelling rule-computed rows as AI-authored during the deferral window,
+  // where the model phase has settled but the deterministic rows are still the
+  // ones on screen.
+  const [rendered, setRendered] = useState<RenderedInsights>({
+    producer: session.producer,
+    claims: session.claims,
+  });
+  const [queued, setQueued] = useState<RenderedInsights | null>(null);
   // Expansion is a viewport state, and it must not survive a scope change: an
   // expanded list on the next page would show items the operator never asked for
   // and cannot tell apart from the default view.
@@ -96,30 +82,34 @@ export default function CollectionInsights({ session, scopeLabel, onCollapse }: 
   }, [rankedHead]);
 
   useEffect(() => {
-    if (session.claims === renderedClaims) return;
+    const incoming: RenderedInsights = { producer: session.producer, claims: session.claims };
+    if (incoming.claims === rendered.claims) return;
     const region = claimsRegionRef.current;
     const focused = typeof document !== "undefined" ? document.activeElement : null;
     const focusInside = Boolean(region && focused && focused !== document.body && region.contains(focused));
     if (focusInside) {
-      setQueuedClaims(session.claims);
+      // Queue the pair, never a bare claims array: the flush must not have to
+      // reconstruct a producer, because the only thing it could reconstruct one
+      // from is the phase flag that is already wrong in this window.
+      setQueued(incoming);
       announce("Updated insights ready");
       return;
     }
-    setRenderedClaims(session.claims);
-  }, [session.claims, renderedClaims, announce]);
+    setRendered(incoming);
+  }, [session.claims, session.producer, rendered, announce]);
 
   useEffect(() => {
-    if (!queuedClaims) return undefined;
+    if (!queued) return undefined;
     const onFocusChange = () => {
       const region = claimsRegionRef.current;
       const focused = document.activeElement;
       if (region && focused && focused !== document.body && region.contains(focused)) return;
-      setRenderedClaims(queuedClaims);
-      setQueuedClaims(null);
+      setRendered(queued);
+      setQueued(null);
     };
     document.addEventListener("focusin", onFocusChange);
     return () => document.removeEventListener("focusin", onFocusChange);
-  }, [queuedClaims]);
+  }, [queued]);
 
   const modelClaimsShown = !session.provisional && session.claims.length > 0;
 
@@ -132,10 +122,41 @@ export default function CollectionInsights({ session, scopeLabel, onCollapse }: 
   const ranked = session.ranked;
   const showRanked = !modelClaimsShown && ranked.length > 0;
   const visibleRanked = showAllRanked ? ranked : ranked.slice(0, RANKED_INITIAL);
+  const hiddenRankedCount = showAllRanked ? 0 : Math.max(0, ranked.length - RANKED_INITIAL);
 
-  const moment = formatMoment(modelClaimsShown ? session.context?.generatedAt : session.context?.asOf);
-  const momentLabel = modelClaimsShown ? "Generated" : "Checked";
-  const hasAnyClaim = renderedClaims.length > 0;
+  // The panel chooses the SOURCE, never the shape. Both sources render through
+  // one list, which is what stops the findings redrawing themselves when the
+  // model phase settles.
+  const source: RenderedInsights = showRanked
+    ? { producer: "rule", claims: visibleRanked }
+    : rendered;
+
+  // Memoized because `keepMounted` keeps the inactive panel re-rendering on
+  // every composer keystroke, and this must not scale with the list on each one.
+  const buckets = useMemo(
+    () =>
+      sectionBuckets(source.claims, SECTION_ORDER, {
+        // The ranked source's order IS the server's ranking and must survive
+        // untouched. The unranked fallback has no ranking to overrule, so the
+        // panel's own section order and attention severity ordering apply there
+        // exactly as they always have.
+        ordering: showRanked ? "server" : "panel",
+      }),
+    [source.claims, showRanked]
+  );
+
+  const hasAnyClaim = source.claims.length > 0;
+
+  // Attaching a finding BRINGS THE CONVERSATION FORWARD, and that composition
+  // lives here rather than in the session because the session does not own the
+  // tab. Without it the quoted block renders into a hidden panel: present in the
+  // DOM, invisible to the operator, and the composer's focus call is a no-op
+  // because the browser will not focus a `display: none` element. Verified live —
+  // the click left Insights selected and focus on `<body>`.
+  const attachFinding = (claim: CopilotClaim) => {
+    session.chatAbout(claim);
+    onShowConversation?.();
+  };
 
   useEffect(() => {
     if (session.noAccess) announce("You don't have access to this page's data.");
@@ -165,12 +186,17 @@ export default function CollectionInsights({ session, scopeLabel, onCollapse }: 
             </Button>
           )}
         </div>
-        <p className="text-sm text-foreground">{scopeLabel}</p>
-        {moment && (
-          <p className="text-xs text-muted-foreground">
-            {momentLabel} <span className="font-mono tabular-nums">{moment}</span>
-          </p>
-        )}
+        {/*
+          Line two of two. The marker never truncates and the scope label
+          truncates first: the timestamp is the freshness signal the panel's
+          trust rests on, and a clipped one makes a stale briefing look current.
+          `min-w` on the scope keeps it legible by wrapping the marker to its own
+          line rather than squeezing the label to nothing at 360px.
+        */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="min-w-[4rem] truncate text-sm text-foreground">{scopeLabel}</p>
+          <ProducerLine producer={source.producer} context={session.context} />
+        </div>
       </header>
 
       <LiveStatus message={announcement} />
@@ -215,61 +241,25 @@ export default function CollectionInsights({ session, scopeLabel, onCollapse }: 
              </div>
           )}
 
-          {showRanked ? (
-            // SERVER ORDER, rendered as received. Nothing here re-sorts: the band
-            // ordering and the score inside a band are the ranking, and a client
-            // that re-sorted would quietly replace it with its own opinion.
-            <div ref={claimsRegionRef} data-copilot-ranked>
-              {visibleRanked.map((claim) => {
-                const why = whyThis(claim);
-                return (
-                  <div
-                    key={claim.key ?? claim.id}
-                    data-copilot-item
-                    data-copilot-item-id={claim.key ?? claim.id}
-                    data-copilot-band={claim.severity}
-                    data-copilot-score={claim.score ?? 0}
-                    className="py-2 border-b border-border/40 last:border-0 min-h-[44px]"
-                  >
-                    <ClaimItem claim={claim} sources={session.sources} announce={announce} />
-                    {why && <p className="text-xs text-muted-foreground mt-1">Why now: {why}</p>}
-                  </div>
-                );
-              })}
-              {ranked.length > RANKED_INITIAL && !showAllRanked && (
-                <Button
-                  data-copilot-show-more
-                  variant="ghost"
-                  size="sm"
-                  className="mt-1 h-auto justify-start text-sm text-primary"
-                  onClick={() => setShowAllRanked(true)}
-                >
-                  Show {ranked.length - RANKED_INITIAL} more
-                </Button>
-              )}
-            </div>
-          ) : (
-          <div ref={claimsRegionRef}>
-            {SECTION_ORDER.map((sectionId) => {
-              const claims = claimsIn(renderedClaims, sectionId);
-              if (claims.length === 0) return null;
-              return (
-                <section key={sectionId} aria-labelledby={`heading-${sectionId}`} className="mb-6 last:mb-0">
-                  <h3 id={`heading-${sectionId}`} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1 pb-1 border-b border-border/50">
-                    {SECTION_LABELS[sectionId]}
-                  </h3>
-                  <div className="space-y-0">
-                    {claims.map((claim) => (
-                      <div key={claim.id} className="py-2 border-b border-border/40 last:border-0 min-h-[44px]">
-                        <ClaimItem claim={claim} sources={session.sources} announce={announce} />
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
+          {/*
+            ONE list, two sources. The bucket order is the server's ranking,
+            regrouped by severity band and section; nothing here re-sorts, so the
+            client cannot quietly replace the server's opinion with its own.
+            `data-copilot-ranked` survives on the region so the existing ranked
+            spec keeps asserting the same thing about the same source.
+          */}
+          <div ref={claimsRegionRef} {...(showRanked ? { "data-copilot-ranked": "" } : {})}>
+            <InsightList
+              buckets={buckets}
+              labels={SECTION_LABELS}
+              sources={session.sources}
+              announce={announce}
+              ranked={showRanked}
+              hiddenCount={hiddenRankedCount}
+              onShowMore={showRanked ? () => setShowAllRanked(true) : undefined}
+              onChatAbout={session.canAsk ? attachFinding : undefined}
+            />
           </div>
-          )}
 
           {session.suppressedCount > 0 && (
             <p data-copilot-suppressed={session.suppressedCount} className="text-xs text-muted-foreground">
@@ -292,7 +282,7 @@ export default function CollectionInsights({ session, scopeLabel, onCollapse }: 
             </p>
           )}
 
-          <SuggestedQuestions session={session} />
+          <SuggestedQuestions session={session} onAsk={onShowConversation} />
         </>
       )}
     </section>

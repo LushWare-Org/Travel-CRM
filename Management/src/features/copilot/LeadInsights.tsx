@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { ClipboardList, Loader2, PanelRightClose } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, ClipboardList, Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import ClaimItem from "./ClaimItem";
-import { SuggestedQuestions, claimsIn } from "./insightShared";
+import InsightRow from "./InsightRow";
+import { ProducerLine, SuggestedQuestions, sectionBuckets } from "./insightShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
-import type { ClaimSection, CopilotClaim, CopilotSession } from "./types";
+import type { ClaimSection, CopilotClaim, CopilotSession, RenderedInsights } from "./types";
 
 type LeadInsightsProps = {
   session: CopilotSession;
@@ -13,6 +13,8 @@ type LeadInsightsProps = {
   leadId?: string | null;
   /** Collapses the persistent desktop dock. Omitted below `xl`. */
   onCollapse?: () => void;
+  /** Bring the conversation forward after a suggested question is submitted. */
+  onShowConversation?: () => void;
 };
 
 const SECTION_LABELS: Record<ClaimSection, string> = {
@@ -22,12 +24,16 @@ const SECTION_LABELS: Record<ClaimSection, string> = {
   experienced_view: "Experienced view",
 };
 
-function formatMoment(value?: string | null): string | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
-}
+// The record panel's own order, deliberately different from the collection's:
+// a record is read changed-first, a list is scanned attention-first. Only the
+// SECTION ORDER and the heading text differ — the grouping mechanism, the row,
+// and the critical band are shared.
+const LEAD_SECTION_ORDER: ClaimSection[] = [
+  "changed",
+  "current_state",
+  "attention",
+  "experienced_view",
+];
 
 /**
  * The insight-first hierarchy: lead identity and freshness, what changed since
@@ -39,48 +45,66 @@ function formatMoment(value?: string | null): string | null {
  * non-empty model insight set replaces it atomically — never clearing first and
  * never unmounting a control the agent is focused on.
  */
-export default function LeadInsights({ session, scopeLabel, leadId, onCollapse }: LeadInsightsProps) {
+export default function LeadInsights({
+  session,
+  scopeLabel,
+  leadId,
+  onCollapse,
+  onShowConversation,
+}: LeadInsightsProps) {
   const [announcement, announce] = useAnnouncer();
   const claimsRegionRef = useRef<HTMLDivElement | null>(null);
-  const [renderedClaims, setRenderedClaims] = useState<CopilotClaim[]>(session.claims);
-  const [queuedClaims, setQueuedClaims] = useState<CopilotClaim[] | null>(null);
+  // The producer travels WITH the claims here too, and for the same reason: the
+  // model phase can settle while the deterministic rows are still mounted, and a
+  // header reading the phase would label those rows as AI-authored.
+  const [rendered, setRendered] = useState<RenderedInsights>({
+    producer: session.producer,
+    claims: session.claims,
+  });
+  const [queued, setQueued] = useState<RenderedInsights | null>(null);
 
   // Atomic replacement, deferred while the agent's focus is in the provisional
   // claims region so a focused control is never unmounted under them.
   useEffect(() => {
-    if (session.claims === renderedClaims) return;
+    const incoming: RenderedInsights = { producer: session.producer, claims: session.claims };
+    if (incoming.claims === rendered.claims) return;
     const region = claimsRegionRef.current;
     const focused = typeof document !== "undefined" ? document.activeElement : null;
     const focusInside = Boolean(region && focused && focused !== document.body && region.contains(focused));
     if (focusInside) {
-      setQueuedClaims(session.claims);
+      setQueued(incoming);
       announce("Updated insights ready");
       return;
     }
-    setRenderedClaims(session.claims);
-  }, [session.claims, renderedClaims, announce]);
+    setRendered(incoming);
+  }, [session.claims, session.producer, rendered, announce]);
 
   useEffect(() => {
-    if (!queuedClaims) return undefined;
+    if (!queued) return undefined;
     const onFocusChange = () => {
       const region = claimsRegionRef.current;
       const focused = document.activeElement;
       if (region && focused && focused !== document.body && region.contains(focused)) return;
-      setRenderedClaims(queuedClaims);
-      setQueuedClaims(null);
+      setRendered(queued);
+      setQueued(null);
     };
     document.addEventListener("focusin", onFocusChange);
     return () => document.removeEventListener("focusin", onFocusChange);
-  }, [queuedClaims]);
+  }, [queued]);
 
-  const modelClaimsShown = !session.provisional && session.claims.length > 0;
-  const moment = formatMoment(modelClaimsShown ? session.context?.generatedAt : session.context?.asOf);
-  const momentLabel = modelClaimsShown ? (session.generatedWhileOpen ? "AI checked this lead" : "Generated") : "Checked";
-  const changed = claimsIn(renderedClaims, "changed");
-  const attention = claimsIn(renderedClaims, "attention");
-  const currentState = claimsIn(renderedClaims, "current_state");
-  const experienced = claimsIn(renderedClaims, "experienced_view");
-  const hasAnyClaim = renderedClaims.length > 0;
+  const buckets = useMemo(
+    () => sectionBuckets(rendered.claims, LEAD_SECTION_ORDER, { ordering: "panel" }),
+    [rendered.claims]
+  );
+  const hasAnyClaim = rendered.claims.length > 0;
+
+  // Same composition as the collection panel: the attachment lives on the
+  // Copilot tab, so attaching must also raise that tab or the quoted block lands
+  // in a hidden panel and the composer cannot take focus.
+  const attachFinding = (claim: CopilotClaim) => {
+    session.chatAbout(claim);
+    onShowConversation?.();
+  };
 
   return (
     <section aria-labelledby="copilot-insights-heading" data-copilot-panel="record" className="space-y-4">
@@ -103,17 +127,19 @@ export default function LeadInsights({ session, scopeLabel, leadId, onCollapse }
           )}
         </div>
 
-        <p className="text-sm text-foreground">{scopeLabel}</p>
-
-        <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-          {leadId && <span className="font-mono tabular-nums">{leadId}</span>}
-          {moment && (
-            <span>
-              {momentLabel} <span className="font-mono tabular-nums">{moment}</span>
-            </span>
-          )}
-          {session.modelPartial && <span className="text-warning">Partial insights</span>}
-        </p>
+        {/*
+          Line two of two, same rule as the collection panel: the producer marker
+          never truncates, the scope label truncates first. The old third label
+          ("AI checked this lead") collapsed into the marker — authorship is now
+          stated once, and a label that says "AI" next to a marker that already
+          says it was the duplication this removes.
+        */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="min-w-[4rem] truncate text-sm text-foreground">{scopeLabel}</p>
+          <ProducerLine producer={rendered.producer} context={session.context} />
+          {leadId && <span className="font-mono text-xs tabular-nums text-muted-foreground">{leadId}</span>}
+          {session.modelPartial && <span className="text-xs text-warning">Partial insights</span>}
+        </div>
       </header>
 
       <LiveStatus message={announcement} />
@@ -142,57 +168,45 @@ export default function LeadInsights({ session, scopeLabel, leadId, onCollapse }
 
       {session.hasScope && !session.noAccess && !session.error && (
         <div ref={claimsRegionRef} className="space-y-4">
-          {changed.length > 0 && (
-            <section aria-label={SECTION_LABELS.changed} className="border-y border-border py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {SECTION_LABELS.changed}
-              </p>
-              <div className="mt-2 space-y-3">
-                {changed.map((claim) => (
-                  <ClaimItem key={claim.id} claim={claim} sources={session.sources} announce={announce} />
-                ))}
-              </div>
-            </section>
-          )}
+          {buckets.map((bucket) => {
+            const key = bucket.kind === "critical" ? "critical" : bucket.section;
+            const label = bucket.kind === "critical" ? "Critical" : SECTION_LABELS[bucket.section];
+            const isCritical = bucket.kind === "critical";
+            // The record panel keeps its own section SHAPES — `changed` is boxed
+            // because it answers the return question, everything else is a plain
+            // group — while the row and the band come from the shared pieces.
+            const isChanged = bucket.kind === "section" && bucket.section === "changed";
 
-          {currentState.length > 0 && (
-            <section aria-label={SECTION_LABELS.current_state} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {SECTION_LABELS.current_state}
-              </p>
-              <div className="space-y-3">
-                {currentState.map((claim) => (
-                  <ClaimItem key={claim.id} claim={claim} sources={session.sources} announce={announce} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {attention.length > 0 && (
-            <section aria-label={SECTION_LABELS.attention} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {SECTION_LABELS.attention}
-              </p>
-              <div className="space-y-3">
-                {attention.map((claim) => (
-                  <ClaimItem key={claim.id} claim={claim} sources={session.sources} announce={announce} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {experienced.length > 0 && (
-            <section aria-label={SECTION_LABELS.experienced_view} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {SECTION_LABELS.experienced_view}
-              </p>
-              <div className="space-y-3">
-                {experienced.map((claim) => (
-                  <ClaimItem key={claim.id} claim={claim} sources={session.sources} announce={announce} />
-                ))}
-              </div>
-            </section>
-          )}
+            return (
+              <section
+                key={key}
+                aria-label={label}
+                className={isChanged ? "border-y border-border py-3" : "space-y-2"}
+              >
+                <p
+                  className={
+                    isCritical
+                      ? "flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-destructive"
+                      : "text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  }
+                >
+                  {isCritical && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+                  {label}
+                </p>
+                <div className={isChanged ? "mt-2" : undefined}>
+                  {bucket.claims.map((claim) => (
+                    <InsightRow
+                      key={claim.key ?? claim.id}
+                      claim={claim}
+                      sources={session.sources}
+                      announce={announce}
+                      onChatAbout={session.canAsk ? attachFinding : undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
 
           {!hasAnyClaim && !session.loading && (
             <p className="text-sm text-muted-foreground">No verified insights for this lead yet.</p>
@@ -216,7 +230,7 @@ export default function LeadInsights({ session, scopeLabel, leadId, onCollapse }
             </div>
           )}
 
-          <SuggestedQuestions session={session} />
+          <SuggestedQuestions session={session} onAsk={onShowConversation} />
         </div>
       )}
     </section>

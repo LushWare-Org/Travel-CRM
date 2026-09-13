@@ -427,19 +427,21 @@ const LeadManagement = () => {
         pageKey="leads"
         scope={copilotScope}
         scopeLabel={copilotLabel}
-        renderInsights={({ session, collapse }) =>
+        renderInsights={({ session, collapse, showConversation }) =>
           detailLeadId ? (
             <LeadInsights
               session={session}
               scopeLabel={copilotLabel}
               leadId={detailLeadId}
               onCollapse={collapse}
+              onShowConversation={showConversation}
             />
           ) : (
             <CollectionInsights
               session={session}
               scopeLabel={copilotLabel}
               onCollapse={collapse}
+              onShowConversation={showConversation}
             />
           )
         }

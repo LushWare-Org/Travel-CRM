@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useCopilotSession, INSIGHTS_FRESHNESS_MS } from '../useCopilotSession';
 import type { CopilotScope } from '../types';
 import { deferred } from '@/test/deferred';
+import { claim } from './copilotTestUtils';
 
 const api = vi.hoisted(() => ({
   copilotDeterministic: vi.fn(),
@@ -75,11 +76,18 @@ function Harness({ scope, open = true }: HarnessProps) {
       <p data-testid="error">{session.error ?? ''}</p>
       <p data-testid="turns">{session.turns.map((turn) => `${turn.question}:${turn.status}`).join('|')}</p>
       <p data-testid="model">{session.modelPending ? 'pending' : session.modelPartial ? 'partial' : 'settled'}</p>
+      <p data-testid="pending">{session.pendingContext ? session.pendingContext.text : 'none'}</p>
       <button type="button" onClick={() => session.setInput('typed question')}>
         type
       </button>
       <button type="button" onClick={() => session.submit()}>
         submit
+      </button>
+      <button type="button" onClick={() => session.chatAbout(claim({ id: 'c1', text: 'A finding' }))}>
+        chat-about
+      </button>
+      <button type="button" onClick={() => session.detachFinding()}>
+        detach
       </button>
       <button type="button" onClick={() => session.retryInsights()}>
         retry-insights
@@ -333,6 +341,27 @@ describe('useCopilotSession — acknowledgement', () => {
     rerender(<Harness scope={{ leadId: 'a' }} open />);
     await waitFor(() => expect(api.copilotSeen).toHaveBeenCalledTimes(2));
     expect(screen.getByTestId('claims')).toHaveTextContent('Insights a');
+  });
+});
+
+describe('useCopilotSession — the attachment', () => {
+  it('detaches the finding and leaves the draft and the transcript alone', async () => {
+    const user = userEvent.setup();
+    render(<Harness scope={{ leadId: 'a' }} />);
+    // Wait for the settled model claims: the deterministic ones are replaced once
+    // the insights phase lands, and attaching is not gated on either phase.
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
+
+    await user.click(screen.getByRole('button', { name: 'type' }));
+    await user.click(screen.getByRole('button', { name: 'chat-about' }));
+    expect(screen.getByTestId('pending')).toHaveTextContent('A finding');
+
+    await user.click(screen.getByRole('button', { name: 'detach' }));
+
+    expect(screen.getByTestId('pending')).toHaveTextContent('none');
+    // The draft and the transcript are not the attachment's to discard.
+    expect(screen.getByTestId('input')).toHaveTextContent('typed question');
+    expect(screen.getByTestId('turns')).toBeEmptyDOMElement();
   });
 });
 

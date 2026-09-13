@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import CopilotSurface from '../CopilotSurface';
 import CopilotDock from '../CopilotDock';
 import CopilotDrawer from '../CopilotDrawer';
+import CopilotTabs from '../CopilotTabs';
 
 const SURFACE_SELECTOR = '[data-copilot-surface="surface"]';
 
@@ -40,27 +41,42 @@ describe('CopilotSurface', () => {
 });
 
 describe('the panel scrollers', () => {
-  it('keeps the dock’s only scroller in CopilotSurface', () => {
-    const { container } = render(<CopilotDock>body</CopilotDock>);
-
-    const scrollers = [...container.querySelectorAll<HTMLElement>('*')].filter((element) =>
+  const scrollersIn = (root: HTMLElement | Document) =>
+    [...root.querySelectorAll<HTMLElement>('*')].filter((element) =>
       element.classList.contains(SCROLLER_CLASS)
     );
-    expect(scrollers).toHaveLength(1);
-    expect(scrollers[0]).toHaveAttribute('data-copilot-surface', 'surface');
+
+  it('gives each tab panel its own CopilotSurface, and renames nothing', () => {
+    // REGRESSION (was: "keeps the dock's only scroller in CopilotSurface"). The
+    // surface moved into the tab panels, because one scroller shared by two
+    // panels cannot hold two scroll offsets — so the invariant is no longer
+    // "there is exactly one". It becomes "every scroller IS a CopilotSurface",
+    // one per panel, which still fails on an accidental second scroller.
+    const { container } = render(
+      <CopilotTabs
+        insights={<p>findings</p>}
+        conversation={<p>conversation</p>}
+        active="insights"
+        onActiveChange={vi.fn()}
+      />
+    );
+
+    const scrollers = scrollersIn(container);
+    expect(scrollers).toHaveLength(2);
+    for (const scroller of scrollers) {
+      expect(scroller).toHaveAttribute('data-copilot-surface', 'surface');
+    }
   });
 
-  it('keeps the drawer’s only scroller in CopilotSurface', () => {
-    render(
+  it('leaves no scroller in the dock or the drawer, which now delegate', () => {
+    const dock = render(<CopilotDock>body</CopilotDock>);
+    expect(scrollersIn(dock.container)).toHaveLength(0);
+
+    const drawer = render(
       <CopilotDrawer open onOpenChange={vi.fn()} hasAttention={false} showCue={false} onDismissCue={vi.fn()}>
         body
       </CopilotDrawer>
     );
-
-    const scrollers = [...document.querySelectorAll<HTMLElement>('*')].filter((element) =>
-      element.classList.contains(SCROLLER_CLASS)
-    );
-    expect(scrollers).toHaveLength(1);
-    expect(scrollers[0]).toHaveAttribute('data-copilot-surface', 'surface');
+    expect(scrollersIn(document.body)).toHaveLength(0);
   });
 });
