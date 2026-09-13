@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import ClaimItem from "./ClaimItem";
+import { cn } from "@/lib/utils";
+import ClaimItem, { severityStyles } from "./ClaimItem";
 import type { CopilotClaim, CopilotSource } from "./types";
 
 type InsightRowProps = {
@@ -50,31 +51,37 @@ function whyThis(claim: CopilotClaim): string | null {
  * one published `data-copilot-item` — so the same finding was two different
  * objects depending on which phase happened to be showing.
  *
- * `Management/DESIGN.md` documents this row as `claim-row`: an unpadded row
- * separated from the next by a hairline, severity carried by the marker and the
- * text weight rather than a colour tint, and no container.
+ * `Management/DESIGN.md` documents this row as `insight-row`, which is `claim-row`
+ * plus the box: a fill and a single-edge severity spine, never an outline, with
+ * the row's own affordances gathered into one footer. `claim-row` itself is the
+ * answer transcript's shape (`ClaimItem`), and it stays unboxed.
  */
 export default function InsightRow({ claim, sources, announce, ranked = false, onChatAbout }: InsightRowProps) {
   const why = ranked ? whyThis(claim) : null;
+  const { spineClass } = severityStyles(claim.severity);
 
   return (
     <div
       data-copilot-item
       data-copilot-item-id={claim.key ?? claim.id}
       {...(ranked ? { "data-copilot-band": claim.severity, "data-copilot-score": claim.score ?? 0 } : {})}
-      className="py-2 border-b border-border/40 last:border-0 min-h-[44px]"
+      className={cn("rounded-lg border-l-4 bg-foreground/10 px-3 py-2 min-h-[44px]", spineClass)}
     >
       <ClaimItem claim={claim} sources={sources} announce={announce} />
-      {why && <p className="text-xs text-muted-foreground mt-1">Why now: {why}</p>}
-      {onChatAbout && (
-        <Button
-          variant="ghost"
-          size="xs"
-          className="mt-1 h-auto px-0 text-xs text-primary"
-          onClick={() => onChatAbout(claim)}
-        >
-          Chat about this
-        </Button>
+      {(why || onChatAbout) && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {why && <p className="text-xs text-muted-foreground">Why now: {why}</p>}
+          {onChatAbout && (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-auto px-0 text-xs text-primary"
+              onClick={() => onChatAbout(claim)}
+            >
+              Chat about this
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
