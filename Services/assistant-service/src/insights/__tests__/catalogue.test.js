@@ -7,13 +7,17 @@ import {
   toolsForActor,
 } from '../catalogue.js';
 import { ManagementToolAccess } from '@travel-crm/contracts';
-import { toolNames } from '../../tools/toolRegistry.js';
+import { PUBLIC_TOOL_NAMES, toolNames } from '../../tools/toolRegistry.js';
 
 describe('the catalogue covers the registry', () => {
-  it('declares access for every registered tool, so a new tool cannot arrive unreachable', () => {
-    // A tool added to the registry but not to the access map would be invisible to
-    // every actor forever, and nothing else would say so.
-    expect(allToolNames().sort()).toEqual(toolNames().sort());
+  it('accounts for every registered tool, so one cannot arrive reachable by nobody', () => {
+    // A tool in the registry and in neither vocabulary would be invisible both to
+    // every actor and to the public turn, and nothing else would say so. The
+    // registry is therefore exactly the union of the management vocabulary and
+    // the public tools; the management half alone would now be the wrong
+    // assertion, because the public catalogue tools are deliberately reachable
+    // with no actor identity at all.
+    expect([...allToolNames(), ...PUBLIC_TOOL_NAMES].sort()).toEqual(toolNames().sort());
   });
 
   it('stamps a version', () => {

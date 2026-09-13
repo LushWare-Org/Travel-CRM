@@ -29,6 +29,19 @@ export const GROUNDING_RULES = [
   '- Unknown or partial evidence means you say so; never guess.',
 ];
 
+// The subset that holds when there is no typed-fact contract — the public
+// site-wide assistant resolves one tool call with a flat args object, has no
+// evidence bundle and emits no claims, so the rules above about evidenceIds
+// and `derivation` would ask for fields its schema rejects. These lines are
+// the ones that survive that difference, and they exist so the wording lives
+// here rather than being written out again in the assistant-turn prompt.
+export const GROUNDING_RULES_UNSTRUCTURED = [
+  'GROUNDING RULES (mandatory):',
+  '- Produce JSON matching the response schema exactly.',
+  '- Never invent a number, policy, promise, availability statement, or required action.',
+  '- Unknown or partial information means you say so; never guess.',
+].join('\n');
+
 export const STRUCTURED_OUTPUT_NOTE = [
   'WHERE STRUCTURE GOES:',
   '- `text` is what you would say out loud to a colleague: short, second person, one idea per sentence.',

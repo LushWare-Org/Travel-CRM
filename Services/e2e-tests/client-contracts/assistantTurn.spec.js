@@ -4,6 +4,9 @@ import { apiClient } from '../helpers/api-client.js';
 const TOOLS = [
   'navigate',
   'answer_faq_policy',
+  'answer_packages',
+  'hand_off',
+  'request_booking',
   'respond_conversationally',
   'redirect_off_topic',
 ];

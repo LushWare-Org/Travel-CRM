@@ -17,7 +17,17 @@ export const routerCorpusRowSchema = z
     expectedSocialSubtype: z.enum(['greeting', 'thanks', 'farewell', 'repair', 'none']),
     directResponseAllowed: z.boolean(),
     allowedFinalTools: z
-      .array(z.enum(['navigate', 'answer_faq_policy', 'respond_conversationally', 'redirect_off_topic']))
+      .array(
+        z.enum([
+          'navigate',
+          'answer_faq_policy',
+          'answer_packages',
+          'hand_off',
+          'request_booking',
+          'respond_conversationally',
+          'redirect_off_topic',
+        ]),
+      )
       .min(1),
   })
   .strict();
