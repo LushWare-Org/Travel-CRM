@@ -13,7 +13,7 @@ const api = vi.hoisted(() => ({
   copilotAsk: vi.fn(),
   copilotSeen: vi.fn(),
   isCopilotAbort: vi.fn((err: unknown) => (err as { name?: string } | null)?.name === 'AbortError'),
-  COPILOT_CLIENT_TIMEOUT_MS: 35_000,
+  COPILOT_CLIENT_TIMEOUT_MS: 50_000,
 }));
 
 vi.mock('@/services/copilotAPI', () => api);

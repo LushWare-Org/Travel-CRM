@@ -40,7 +40,7 @@ vi.mock('@/services/copilotAPI', () => ({
   copilotAsk: mockAsk,
   copilotSeen: mockSeen,
   isCopilotAbort: (err: unknown) => Boolean(err) && (err as { name?: string }).name === 'AbortError',
-  COPILOT_CLIENT_TIMEOUT_MS: 35_000,
+  COPILOT_CLIENT_TIMEOUT_MS: 50_000,
 }));
 
 vi.mock('react-router-dom', () => ({
