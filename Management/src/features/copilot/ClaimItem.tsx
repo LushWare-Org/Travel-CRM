@@ -8,10 +8,19 @@ type ClaimItemProps = {
   announce: (message: string) => void;
 };
 
-function severityStyles(severity: CopilotClaim["severity"]) {
-  if (severity === "critical") return { textClass: "font-semibold", markerClass: "text-destructive", label: "Critical", Icon: OctagonAlert, badgeVariant: "destructive" as const };
-  if (severity === "warning") return { textClass: "font-medium", markerClass: "text-warning", label: "Warning", Icon: AlertTriangle, badgeVariant: "warning" as const };
-  return { textClass: "font-normal", markerClass: "text-foreground", label: "Information", Icon: null, badgeVariant: "muted" as const };
+/**
+ * Severity, spelled once: the marker colour, the text weight, the sr-only word,
+ * the evidence badge variant, and the spine `InsightRow` draws down the card's
+ * leading edge. The spine is a single edge, never an outline - the boundary rule
+ * this panel follows allows a fill or an edge, not a box drawn around a box.
+ *
+ * Exported because the row needs the spine, and severity must not be derived a
+ * second time: two mappings drift the moment either one changes.
+ */
+export function severityStyles(severity: CopilotClaim["severity"]) {
+  if (severity === "critical") return { textClass: "font-semibold", markerClass: "text-destructive", label: "Critical", Icon: OctagonAlert, badgeVariant: "destructive" as const, spineClass: "border-l-destructive" };
+  if (severity === "warning") return { textClass: "font-medium", markerClass: "text-warning", label: "Warning", Icon: AlertTriangle, badgeVariant: "warning" as const, spineClass: "border-l-warning" };
+  return { textClass: "font-normal", markerClass: "text-foreground", label: "Information", Icon: null, badgeVariant: "muted" as const, spineClass: "border-l-border" };
 }
 
 /**

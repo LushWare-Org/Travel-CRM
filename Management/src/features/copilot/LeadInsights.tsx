@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Loader2, PanelRightClose } from "lucide-react";
+import { Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import InsightRow from "./InsightRow";
+import InsightList from "./InsightList";
 import { ProducerLine, sectionBuckets } from "./insightShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
 import type { ClaimSection, CopilotClaim, CopilotSession, RenderedInsights } from "./types";
@@ -164,45 +164,13 @@ export default function LeadInsights({
 
       {session.hasScope && !session.noAccess && !session.error && (
         <div ref={claimsRegionRef} className="space-y-4">
-          {buckets.map((bucket) => {
-            const key = bucket.kind === "critical" ? "critical" : bucket.section;
-            const label = bucket.kind === "critical" ? "Critical" : SECTION_LABELS[bucket.section];
-            const isCritical = bucket.kind === "critical";
-            // The record panel keeps its own section SHAPES — `changed` is boxed
-            // because it answers the return question, everything else is a plain
-            // group — while the row and the band come from the shared pieces.
-            const isChanged = bucket.kind === "section" && bucket.section === "changed";
-
-            return (
-              <section
-                key={key}
-                aria-label={label}
-                className={isChanged ? "border-y border-border py-3" : "space-y-2"}
-              >
-                <p
-                  className={
-                    isCritical
-                      ? "flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-destructive"
-                      : "text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                  }
-                >
-                  {isCritical && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
-                  {label}
-                </p>
-                <div className={isChanged ? "mt-2" : undefined}>
-                  {bucket.claims.map((claim) => (
-                    <InsightRow
-                      key={claim.key ?? claim.id}
-                      claim={claim}
-                      sources={session.sources}
-                      announce={announce}
-                      onChatAbout={session.canAsk ? attachFinding : undefined}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+          <InsightList
+            buckets={buckets}
+            labels={SECTION_LABELS}
+            sources={session.sources}
+            announce={announce}
+            onChatAbout={session.canAsk ? attachFinding : undefined}
+          />
 
           {!hasAnyClaim && !session.loading && (
             <p className="text-sm text-muted-foreground">No verified insights for this lead yet.</p>

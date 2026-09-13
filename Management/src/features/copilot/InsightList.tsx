@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import InsightRow from "./InsightRow";
 import type { InsightBucket } from "./insightShared";
@@ -21,13 +22,13 @@ type InsightListProps = {
 
 const CRITICAL_LABEL = "Critical";
 
-const HEADING_CLASS = "text-xs font-semibold uppercase tracking-wide mb-1 pb-1 border-b border-border/50";
+const HEADING_CLASS = "flex items-center gap-1.5 rounded-md px-2 py-1 mb-2 text-xs font-semibold uppercase tracking-wide";
 
 /**
  * The findings list, rendered from `sectionBuckets`.
  *
  * **The critical band is a severity level, not a fifth category.** It keeps the
- * section heading's *shape* — same type role, same rule, same spacing — and
+ * section heading's *shape* — same type role, same band, same spacing — and
  * differs in its *content*: the destructive token plus a warning icon, which is
  * the icon-plus-word treatment `ClaimItem` already applies to severity and the
  * rail marker already uses for attention. Drawing it as an identical heading
@@ -54,6 +55,14 @@ export default function InsightList({
         const key = bucket.kind === "critical" ? "critical" : bucket.section;
         const label = bucket.kind === "critical" ? CRITICAL_LABEL : labels[bucket.section];
         const isCritical = bucket.kind === "critical";
+        // The band's tone states what the section is FOR. The hoisted critical
+        // group is destructive; "Needs attention" is the section asking to be
+        // acted on, so it takes warning; everything else informs, and stays quiet.
+        const bandTone = isCritical
+          ? "bg-destructive/10 dark:bg-destructive/20 text-destructive"
+          : bucket.kind === "section" && bucket.section === "attention"
+            ? "bg-warning/10 dark:bg-warning/20 text-warning"
+            : "bg-foreground/15 text-muted-foreground";
 
         return (
           <section
@@ -62,18 +71,11 @@ export default function InsightList({
             aria-labelledby={`heading-${key}`}
             className="mb-6 last:mb-0"
           >
-            <h3
-              id={`heading-${key}`}
-              className={
-                isCritical
-                  ? `flex items-center gap-1.5 text-destructive ${HEADING_CLASS}`
-                  : `text-muted-foreground ${HEADING_CLASS}`
-              }
-            >
+            <h3 id={`heading-${key}`} className={cn(HEADING_CLASS, bandTone)}>
               {isCritical && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
               {label}
             </h3>
-            <div className="space-y-0">
+            <div className="space-y-2">
               {bucket.claims.map((claim) => (
                 <InsightRow
                   key={claim.key ?? claim.id}
