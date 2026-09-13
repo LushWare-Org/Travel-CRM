@@ -82,8 +82,8 @@ Plain env vars (set directly on the Cloud Run service, not Secret Manager):
 - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`/absent, `EMAIL_FROM` — notification, booking.
 - `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_API_VERSION` — notification.
 - `TRAVELPORT_ENV=sandbox`, `TRAVELPORT_MOCK_MODE` — flight (leave `true` until real Travelport credentials are supplied).
-- `GEMINI_ROUTER_MODEL=gemini-3.5-flash` — assistant; this model is pinned independently from the resolver.
-- `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED=false` — assistant; keep the compatible resolver outcomes disabled until the client bundle has propagated and the rollback window has been tested.
+- `GEMINI_ROUTER_MODEL=gemini-3.5-flash-lite` — assistant; this model is pinned independently from the resolver, on the lite tier because the stage-1 classifier has a 1.5s budget.
+- `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED=true` — assistant; the conversational pair and the stage-1 router are both gated by this. It ships enabled now that the client bundle has propagated and the rollback window has been tested; the flag itself is a removal candidate.
 - `ASSISTANT_ROUTER_SOCIAL_ENABLED=false` and `ASSISTANT_ROUTER_OFF_TOPIC_ENABLED=false` — assistant; these direct-response classes remain independently disabled until their evaluation gates pass.
 - `ASSISTANT_ROUTER_SOCIAL_THRESHOLD=0.95` and `ASSISTANT_ROUTER_OFF_TOPIC_THRESHOLD=0.95` — assistant confidence thresholds for the corresponding direct-response classes.
 - Every `*_SERVICE_URL` var — resolved from that same environment's `module.services[...].uri` outputs, so an environment's gateway only ever points at that same environment's backends, never another environment's.

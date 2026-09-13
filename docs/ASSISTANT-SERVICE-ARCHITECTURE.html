@@ -780,7 +780,7 @@ catch { return { unavailable: true } }                                    // nev
       <tr><td><code>GEMINI_API_KEY</code></td><td>— (secret)</td><td>Absent → <code>503</code> from the model seam; copilot briefing falls back to deterministic</td></tr>
       <tr><td><code>GEMINI_MODEL</code></td><td><code>gemini-3.5-flash</code></td><td>Resolver model pin</td></tr>
       <tr><td><code>GEMINI_ROUTER_MODEL</code></td><td><code>gemini-3.5-flash</code></td><td>Stage-1 model, pinned independently of the resolver</td></tr>
-      <tr><td><code>ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED</code></td><td><code>false</code></td><td>Master gate for the conversational outcomes; false → the four always-available tools only (<code>navigate</code>, <code>answer_faq_policy</code>, <code>answer_packages</code>, <code>hand_off</code>)</td></tr>
+      <tr><td><code>ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED</code></td><td><code>false</code></td><td>Master gate for the conversational outcomes and the stage-1 router; false → the always-available core set only, which is the four legacy tools plus the page actions a page registers and <code>search_travel_info</code> when its own flag is on</td></tr>
       <tr><td><code>ASSISTANT_ROUTER_SOCIAL_ENABLED</code> / <code>…_OFF_TOPIC_ENABLED</code></td><td><code>false</code></td><td>Per-class commit gates, rolled out only against a passing evaluation corpus</td></tr>
       <tr><td><code>ASSISTANT_ROUTER_SOCIAL_THRESHOLD</code> / <code>…_OFF_TOPIC_THRESHOLD</code></td><td><code>0.95</code></td><td>Confidence required to skip the resolver</td></tr>
       <tr><td><code>MANAGEMENT_COPILOT_ENABLED</code></td><td><code>false</code></td><td>Off → turn and seen routes return an undisclosed <code>404</code></td></tr>
