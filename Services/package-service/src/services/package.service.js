@@ -1,4 +1,5 @@
 import slugify from 'slugify';
+import { PackageCategory } from '@prisma/client';
 import prisma from '../db/client.js';
 import { calculateBasePrice, computeMargin } from '../../../shared/pricing-engine/src/index.js';
 
@@ -480,7 +481,17 @@ export function assembleWhere(query) {
   if (query.isFeatured !== undefined) {
     where.isFeatured = query.isFeatured === 'true' || query.isFeatured === true;
   }
-  if (query.category) where.category = query.category;
+  // `category` is a Prisma enum column, and an unrecognised value used to reach
+  // Prisma unchanged and surface as a 500 — so `/packages?category=family`
+  // returned "Something went wrong on our side" instead of a page. That is the
+  // URL the site itself produces: the landing page's category cards lowercase
+  // the name (Stats.tsx), and the assistant writes the same lowercase slug. So
+  // the comparison is case-insensitive against the real enum, and a value that
+  // is not in it matches nothing: an unknown category has no packages, which is
+  // an empty result, not a server fault.
+  if (query.category) {
+    where.category = PackageCategory[String(query.category).trim().toUpperCase()] ?? { in: [] };
+  }
 
   // A list of raw destination strings, already resolved from a slug by
   // resolveDestinationRaws. An empty array means "the slug matched nothing" —
