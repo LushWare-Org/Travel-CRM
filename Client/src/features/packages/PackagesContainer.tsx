@@ -14,6 +14,7 @@ import PackageListItem from './components/PackageListItem';
 import Pagination from './components/Pagination';
 import { Button } from '../../components/ui/button';
 import { formatCurrency } from '../../lib/currency';
+import { useAssistantViewReport } from '../assistant/capabilities/AssistantCapabilityProvider';
 import { pluralize } from '../../lib/pluralize';
 import { categoryImage } from '../../config/media';
 
@@ -195,6 +196,22 @@ export default function PackagesContainer() {
     sortBy,
     currentPage,
   ]);
+
+  // What the assistant may say about this screen, from the page's own numbers:
+  // `total` is the service's filtered count for the URL's filters (the catalogue
+  // is filtered server-side) and `packages.length` is what this page of results
+  // actually drew. Registered while the page is mounted, so a question about the
+  // screen is answered from the screen and not from the page the visitor left.
+  const assistantView = useMemo(
+    () => ({
+      path: '/packages',
+      params: Object.fromEntries(searchParams.entries()),
+      filteredCount: total,
+      renderedCount: packages.length,
+    }),
+    [searchParams, total, packages.length],
+  );
+  useAssistantViewReport(assistantView);
 
   // A URL carries bounds, the sidebar renders labelled bands, and
   // RangeFilterGroup decides what is checked by comparing labels — so a URL

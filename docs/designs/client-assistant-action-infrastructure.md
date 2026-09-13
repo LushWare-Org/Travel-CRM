@@ -142,6 +142,30 @@ From `/plan-design-review` (seven passes; text-based, because the designer binar
 10. **Failure semantics and telemetry.** Server-side rejection degrades to the existing repair copy and records a rejection event. Client-side rejection shows an inline message and records the same. Needs an event type that does not exist, plus `action` and `reason` carried in `metadata`: `AssistantEvent` already has a `metadata Json?` column (`prisma/schema.prisma:33`), but `recordEventSchema` is strict and has no `metadata` field and `events.controller.js:12-14` hardcodes `metadata: null`. No migration needed.
 11. **CI coverage.** Add a Client unit-test job and a `Services/e2e-tests` job to `microservices-ci.yml`. Today the four `npm test` invocations cover shared/contracts, the backend service matrix, Management and package-service; Client is only built in `deploy.yml`, and neither `Services/e2e-tests/` nor Management's Playwright suite is referenced by any workflow. Roughly two thirds of this branch's diff is Client.
 
+**Built as (step 9 and the view answer, 2026-09-13).** The page-state channel ships
+on its own, ahead of the action members it shares plumbing with, because the
+stale-context bug it fixes needs none of them. `currentView` rides every turn
+(`{ path, params, filteredCount, renderedCount, catalogueTotal }`, bounded in
+`Services/shared/contracts/src/assistantActions.js`); the packages page reports its
+own filtered total and its rendered count through the capability registry, and
+every other page contributes the baseline path and query parameters; and
+`answer_current_view` is a core outcome — offered with the flag on or off, and
+declaring no arguments — whose sentence the server composes from that report.
+
+Three things differ from the sketch above, all deliberately. The view is sent
+every turn rather than only when it changes (the server is stateless, the report
+is bounded, and "on change" needs client state the server must still tolerate
+missing). The model supplies nothing at all for the answer, so the strict union
+admits `args: {}` and any number it writes is dropped before dispatch — the
+sentence is the server's, from the page's numbers. And the filter chips are
+rendered client-side from `params` through the site's own currency formatter,
+rather than by a second copy of the page's label logic.
+
+Still unbuilt from this document: `open_panel`, `prefill_form` and the writable-
+field allowlist, the wire module extraction (step 2), the per-route param schemas
+for the actions (step 3's remainder), the telemetry `metadata` plumbing (step 10)
+and the CI jobs (step 11).
+
 ### Deferred, not in this branch
 
 A bounded server-side `search_packages` tool, in the registry with a per-page `tools:` declaration like Management. Gate: this design's success criteria plus the phase-1 go/no-go bar.

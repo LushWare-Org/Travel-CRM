@@ -8,7 +8,7 @@ import {
   canonicalizeAssistantTurnResponse,
   assistantTurnResponseSchema,
 } from '../ai/prompts/assistantTurn.v1.js';
-import { ASSISTANT_PAGE_ACTIONS } from '@travel-crm/contracts';
+import { ASSISTANT_PAGE_ACTIONS, ASSISTANT_VIEW_TOOL } from '@travel-crm/contracts';
 import { generateGrounded, GROUNDING_TIMEOUT_MS } from '../ai/groundedSearch.js';
 import { buildTravelSearchPrompt } from '../ai/prompts/travelSearch.v1.js';
 import { isTravelDomainQuery, sanitizeSearchQuery, toSearchPhrase } from '../ai/travelDomain.js';
@@ -79,6 +79,40 @@ function capabilitiesMessage({ pageActionsOffered, travelSearchEnabled, routesOf
     ? ' I can look up travel information for a destination — entry rules, timing, costs, getting around, safety notes — with its sources.'
     : '';
   return `${base}${custom}${customize}${page}${search} Try "build me a custom trip to Japan", "packages in Dubai under 1000" or "what is your cancellation policy".`;
+}
+
+/**
+ * What the assistant says about the screen the visitor is looking at.
+ *
+ * Server-owned in full, and the only place a number about the screen is written:
+ * the count is the page's own report relayed unchanged, never a rendered page
+ * size and never a figure the model composed. A missing report is answered as a
+ * missing report — "I can't see the page" — because a guess about something the
+ * visitor is looking at is the one thing they can check in a second.
+ */
+function describeCurrentView(view) {
+  if (!view?.path) {
+    return "I can't see the page you're on right now. Tell me what you're looking for and I'll help you find it.";
+  }
+
+  const count = view.filteredCount;
+  if (count === null || count === undefined) {
+    return `You're on ${view.path}, but it hasn't told me how many results are showing. Ask me about the catalogue and I'll look it up.`;
+  }
+
+  const filtered = Boolean(view.params && Object.keys(view.params).length);
+  const trips = count === 1 ? 'trip' : 'trips';
+  const lead = `There ${count === 1 ? 'is' : 'are'} ${count} ${trips} ${
+    filtered ? 'matching the filters on this page' : 'on this page'
+  }.`;
+  // Said only when the page drew fewer than it counted: the number above is still
+  // the true one, and this is what keeps it from reading as "and that is all".
+  const rendered = view.renderedCount;
+  const qualifier =
+    typeof rendered === 'number' && rendered < count
+      ? ` ${rendered} ${rendered === 1 ? 'is' : 'are'} shown so far.`
+      : '';
+  return `${lead}${qualifier}`;
 }
 
 // A page action is one the browser executes, so an empty model-authored line
@@ -303,7 +337,7 @@ function bookingSummary(draft, title) {
 // keep the pre-session behaviour rather than failing the turn.
 export const assistantTurn = asyncHandler(async (req, res) => {
   const startedAt = Date.now();
-  const { sessionId, messages, availableRoutes, shownPackageIds, capabilities, pageContext } = req.body;
+  const { sessionId, messages, availableRoutes, shownPackageIds, capabilities, pageContext, currentView } = req.body;
   const outcomesEnabled = conversationalOutcomesEnabled();
   // What this turn may offer and execute. Resolved once, here, so the response
   // schema, the prompt and the dispatch guard all read the same pair.
@@ -419,6 +453,7 @@ export const assistantTurn = asyncHandler(async (req, res) => {
       packageDetail,
       pageCapabilities: capabilities,
       pageContext,
+      currentView,
       travelSearchEnabled: searchEnabled,
     });
     const stageTwoStartedAt = Date.now();
@@ -951,6 +986,15 @@ export const assistantTurn = asyncHandler(async (req, res) => {
         // An empty line here would be replaced by the "I didn't quite catch
         // that" fallback about an action that is about to run.
         if (!actionMessage) message = PAGE_ACTION_MESSAGE_DEFAULTS[tool];
+        break;
+      }
+      // ── Server-composed answer about the screen ─────────────────────────
+      case ASSISTANT_VIEW_TOOL: {
+        // The model chose the outcome and authored nothing: no arguments, no
+        // numbers. Everything the visitor reads here comes from the page's own
+        // report, relayed.
+        serverResult = { view: currentView ?? null };
+        message = describeCurrentView(currentView);
         break;
       }
       // ── Server-executed grounded travel answer ──────────────────────────

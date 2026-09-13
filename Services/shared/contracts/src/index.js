@@ -89,7 +89,9 @@ export {
 export {
   ASSISTANT_PAGE_ACTIONS,
   ASSISTANT_SEARCH_TOOL,
+  ASSISTANT_VIEW_TOOL,
   ASSISTANT_ACTION_TOOLS,
+  ASSISTANT_TOOL_NAMES,
   ASSISTANT_PAGE_SURFACES,
   ASSISTANT_DAY_OPERATIONS,
   ASSISTANT_CONTACT_FIELDS,
@@ -97,5 +99,6 @@ export {
   AssistantPageCapabilities,
   AssistantPageDay,
   AssistantPageContext,
+  AssistantCurrentView,
   AssistantAction,
 } from './assistantActions.js';

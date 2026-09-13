@@ -6,7 +6,8 @@ import type { AssistantEventPayload } from '../../../services/api/assistantEvent
 import { getEnabledAssistantRoutes } from '../../../config/assistantRoutes';
 import { ASSISTANT_PAGE_ACTIONS } from '@travel-crm/contracts';
 import { loadAssistantParamValues } from '../assistantParamValues';
-import { useAssistantCapabilities } from '../capabilities/AssistantCapabilityProvider';
+import { useAssistantCapabilities, useAssistantCurrentView } from '../capabilities/AssistantCapabilityProvider';
+import type { AssistantCurrentViewValue } from '../capabilities/AssistantCapabilityProvider';
 import type { AssistantPageRegistration } from '../capabilities/AssistantCapabilityProvider';
 import { runAssistantAction } from '../actions/runAssistantAction';
 
@@ -74,7 +75,17 @@ export type AssistantTurnData =
   | { tool: 'page_action'; revision: string | null; announcement: string }
   // A web-grounded travel answer. The reply text is the message; these are the
   // sources the server extracted from the provider's grounding metadata.
-  | { tool: 'search_travel_info'; citations: AssistantCitation[] };
+  | { tool: 'search_travel_info'; citations: AssistantCitation[] }
+  // An answer about the screen. The sentence is the server's; these are the
+  // page's own numbers, relayed, for the summary block under the bubble.
+  | { tool: 'answer_current_view'; view: AssistantViewSummary };
+
+/** The page's own numbers, as the view-summary block renders them. */
+export interface AssistantViewSummary {
+  count: number | null;
+  renderedCount: number | null;
+  params: { key: string; value: string }[];
+}
 
 /** One source under a grounded answer. Validated again here: the widget turns it into a link. */
 export interface AssistantCitation {
@@ -158,6 +169,56 @@ function deriveCitations(serverResult: Record<string, unknown> | null | undefine
     .map((citation) => ({ ...citation, title: citation.title || citation.uri }));
 }
 
+// The view the page reports, sanitised to what the shared schema accepts BEFORE
+// it leaves the browser. This is a request field, so a value the schema rejects
+// fails the whole turn's parse rather than dropping one entry — an out-of-bounds
+// count or a newline in a query parameter would cost the visitor the assistant,
+// not one number.
+const VIEW_PARAM_KEY = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
+const MAX_VIEW_PARAMS = 20;
+const MAX_VIEW_COUNT = 100_000;
+
+const sanitiseViewParams = (source: Record<string, unknown> | undefined): Record<string, string> => {
+  const params: Record<string, string> = {};
+  if (!source) return params;
+  for (const [key, value] of Object.entries(source)) {
+    if (Object.keys(params).length >= MAX_VIEW_PARAMS) break;
+    if (!VIEW_PARAM_KEY.test(key) || typeof value !== 'string' || /[\r\n]/.test(value) || value.length > 200) continue;
+    params[key] = value;
+  }
+  return params;
+};
+
+const sanitiseCount = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.min(MAX_VIEW_COUNT, Math.trunc(value)))
+    : undefined;
+
+/**
+ * The page state a turn carries, from the mounted page's own report when there is
+ * one and from the browser's own location otherwise. The baseline is deliberate:
+ * every page can say where it is, and only a page that can count says how many.
+ */
+function buildCurrentView(reported: AssistantCurrentViewValue | null): AssistantCurrentViewValue {
+  const raw = reported ?? {
+    path: window.location.pathname,
+    params: Object.fromEntries(new URLSearchParams(window.location.search)),
+  };
+  const params = sanitiseViewParams(raw.params);
+  const path = `${raw.path ?? ''}`.startsWith('/') ? `${raw.path}` : `/${raw.path ?? ''}`;
+  const filteredCount = sanitiseCount(raw.filteredCount);
+  const renderedCount = sanitiseCount(raw.renderedCount);
+  const catalogueTotal = sanitiseCount(raw.catalogueTotal);
+
+  return {
+    path: (path || '/').slice(0, 200),
+    ...(Object.keys(params).length ? { params } : {}),
+    ...(filteredCount !== undefined ? { filteredCount } : {}),
+    ...(renderedCount !== undefined ? { renderedCount } : {}),
+    ...(catalogueTotal !== undefined ? { catalogueTotal } : {}),
+  };
+}
+
 function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
   const serverResult = result.serverResult as
     | {
@@ -172,6 +233,8 @@ function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
         present?: unknown;
         handoff?: unknown;
         booking?: unknown;
+        // The view answer's payload: the page's own report, relayed by the server.
+        view?: unknown;
       }
     | null
     | undefined;
@@ -196,6 +259,27 @@ function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
 
   if (result.toolCall.tool === 'redirect_off_topic') {
     return { tool: 'redirect_off_topic', redirected: true };
+  }
+
+  if (result.toolCall.tool === 'answer_current_view') {
+    const raw = serverResult?.view;
+    const entry = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+    const params =
+      entry && entry.params && typeof entry.params === 'object'
+        ? Object.entries(entry.params as Record<string, unknown>)
+            .filter(([key, value]) => typeof key === 'string' && typeof value === 'string')
+            .slice(0, MAX_VIEW_PARAMS)
+            .map(([key, value]) => ({ key, value: value as string }))
+        : [];
+
+    return {
+      tool: 'answer_current_view',
+      view: {
+        count: typeof entry?.filteredCount === 'number' ? entry.filteredCount : null,
+        renderedCount: typeof entry?.renderedCount === 'number' ? entry.renderedCount : null,
+        params,
+      },
+    };
   }
 
   if (result.toolCall.tool === 'search_travel_info') {
@@ -296,6 +380,7 @@ export function useAssistantChat() {
   // not state, so capturing it here during render would miss a page that mounted
   // after this component last rendered.
   const getRegistration = useAssistantCapabilities();
+  const getView = useAssistantCurrentView();
   const [messages, setMessages] = useState<AssistantTurnMessageT[]>([]);
   // One view per successful assistant reply, joined to the assistant message
   // by id — nav chips/FAQ text from earlier turns stay rendered even after a
@@ -340,6 +425,10 @@ export function useAssistantChat() {
           ? { version: 1, surface: registration.surface, actions: registration.actions }
           : undefined,
         pageContext: registration?.pageContext,
+        // Sent every turn: the server is stateless, the report is bounded, and
+        // "only when it changes" would need the client to hold state the server
+        // must still tolerate missing.
+        currentView: buildCurrentView(getView()),
       });
       // Defense-in-depth: the server now guarantees a non-empty,
       // length-capped message (never-empty + MAX_MESSAGE_LENGTH guard in

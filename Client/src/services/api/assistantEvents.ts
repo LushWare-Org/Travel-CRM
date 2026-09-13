@@ -29,6 +29,7 @@ export type AssistantEventTool =
   | 'regenerate_days'
   | 'edit_day'
   | 'search_travel_info'
+  | 'answer_current_view'
   | null;
 
 export interface AssistantEventPayload {

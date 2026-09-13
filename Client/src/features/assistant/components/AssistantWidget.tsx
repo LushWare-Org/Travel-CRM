@@ -7,9 +7,38 @@ import type { AssistantTurnMessageT } from '../../../services/api/assistantTurn'
 import { sendAssistantEvent } from '../../../services/api/assistantEvents';
 import { ASSISTANT_PANEL_BOTTOM_OFFSET_PX } from '../../../config/floatingActions';
 import { isAssistantExcludedPath } from '../../../config/assistantRoutes';
+import { Badge } from '../../../components/ui/badge';
+import { formatCurrency } from '../../../lib/currency';
 import { setAssistantLauncherOpen, useAssistantLauncherOpen } from '../../../components/shared/floating-actions/assistantLauncherState';
 
 const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + route.slice(1);
+
+// The filter chips under a count answer. The map exists so a chip reads like the
+// page's own control rather than like a query parameter; a key it does not know
+// is humanised from its own name, and the value is always shown as the page
+// reported it — the one thing this block must not do is paraphrase a number or a
+// filter into something the page did not say.
+const FILTER_LABELS: Record<string, string> = {
+  destination: 'Destination',
+  category: 'Category',
+  priceMax: 'Under',
+  priceMin: 'From',
+  durationMax: 'Up to',
+  durationMin: 'At least',
+  rating: 'Rating',
+  sort: 'Sorted by',
+  view: 'View',
+  page: 'Page',
+};
+
+const filterLabel = (key: string, value: string): string => {
+  const name = FILTER_LABELS[key] ?? `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+  if (/^\d+$/.test(value) && (key === 'priceMin' || key === 'priceMax')) {
+    return `${name} ${formatCurrency(Number(value))}`;
+  }
+  if (key === 'durationMin' || key === 'durationMax') return `${name} ${value} days`;
+  return `${name}: ${value}`;
+};
 
 const GREETING =
   "Hi! I can help you find a package, build a custom trip with AI, or answer questions about LushWare. What are you planning?";
@@ -38,6 +67,33 @@ function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnE
           <ArrowRight className="w-3 h-3" />
           Go to {routeLabel(data.route)}
         </button>
+      </div>
+    );
+  }
+
+  if (data.tool === 'answer_current_view') {
+    const { count, renderedCount, params } = data.view;
+    // Nothing to summarise: the page could not count and named no filters, so the
+    // reply text is the whole answer.
+    if (count === null && params.length === 0) return null;
+
+    return (
+      <div className="mt-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+        {count !== null && (
+          <p className="font-display text-display-md leading-none text-brand-600">{count.toLocaleString('en-US')}</p>
+        )}
+        {params.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {params.map(({ key, value }) => (
+              <Badge key={`${key}:${value}`} variant="outline">
+                {filterLabel(key, value)}
+              </Badge>
+            ))}
+          </div>
+        )}
+        {count !== null && typeof renderedCount === 'number' && renderedCount < count && (
+          <p className="mt-1 text-sm text-gray-600">{renderedCount.toLocaleString('en-US')} shown so far</p>
+        )}
       </div>
     );
   }
