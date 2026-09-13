@@ -1,4 +1,6 @@
 import { useRef, useState, useEffect } from "react";
+import { useAssistantPageRegistration } from "../assistant/capabilities/AssistantCapabilityProvider";
+import type { AssistantActionPayload, AssistantPageAction, AssistantPageRegistration } from "../assistant/capabilities/AssistantCapabilityProvider";
 import {
   MapPin,
   Calendar,
@@ -26,7 +28,7 @@ import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../../services/api/manualItinerary";
 import { useAIItineraryGenerator } from "./hooks/useAIItineraryGenerator";
 import { useAIDayGenerator } from "./hooks/useAIDayGenerator";
-import { buildItineraryDayFromAIDay, computeDurationDays, computeMissingDayNumbers, mergeDayByNumber, mergeDaysByNumber, toExistingDayContext } from "./utils/formHelpers";
+import { buildItineraryDayFromAIDay, computeDurationDays, computeMissingDayNumbers, localTodayISO, mergeDayByNumber, mergeDaysByNumber, toExistingDayContext, withAddedEntries, withoutMatchingEntries } from "./utils/formHelpers";
 import type { DayAccommodation, DayMeals, ItineraryDay } from "./utils/formHelpers";
 import { pluralize } from "../../lib/pluralize";
 import DestinationSelector from "../../components/shared/DestinationSelector";
@@ -80,6 +82,25 @@ const destValue = (dest: DestinationLike): string => {
  * manual itinerary flow. */
 const MAX_TRIP_DAYS = 90;
 
+/** The page actions this page executes, sent to the assistant every turn. It is
+ * the whole list: each one writes state this container owns. */
+const ASSISTANT_ACTIONS: AssistantPageAction[] = [
+  'set_destination',
+  'set_travellers',
+  'set_preferences',
+  'set_contact_details',
+  'go_to_step',
+  'generate_itinerary',
+  'regenerate_days',
+  'edit_day',
+];
+
+/** Contact details are only written when they look like contact details. The
+ * assistant is not a validation layer, so a half-typed address is dropped (and
+ * said so) rather than saved into the form where the submit path would reject
+ * it later with a worse message. */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** User-facing copy shown for any submit rejection. Deliberately generic —
  * booking-service has no availability check today, so the UI must never
  * claim a specific "sold out"/"conflict" state. */
@@ -113,22 +134,28 @@ interface BookingPrefillSource {
   packageName?: string | null;
 }
 
-/** Projects a past booking's destination fields onto a DestinationSelector
- * option (value/label exact match first; then an embedded value match on
- * the package name, e.g. "5-Day Bali Escape" → Bali). null when nothing
- * matches — the step then stays unfilled for the visitor to choose. */
+/** Maps a destination name onto a DestinationSelector option — an exact match
+ * on the value or label first, then an embedded value ("5-Day Bali Escape" →
+ * Bali). null when nothing matches, which callers treat as "leave it alone"
+ * rather than guessing: an invented destination would filter pages to nothing
+ * and write a place the catalogue does not have. Shared by the returning-visitor
+ * pre-fill and the assistant's set_trip_details action. */
+const findDestination = (name: string): DestinationLike => {
+  const raw = name.trim().toLowerCase();
+  if (!raw) return null;
+  const exact = ALL_DESTINATIONS.find(
+    (d) => d.value.toLowerCase() === raw || d.label.toLowerCase() === raw,
+  );
+  if (exact) return exact;
+  return ALL_DESTINATIONS.find((d) => d.value.length >= 3 && raw.includes(d.value.toLowerCase())) ?? null;
+};
+
+/** Projects a past booking's destination fields onto the extracted lookup. */
 const matchDestinationOption = (booking: BookingPrefillSource): DestinationLike => {
   for (const candidate of [booking.packageDestination, booking.packageName]) {
-    const raw = (candidate ?? '').trim().toLowerCase();
-    if (!raw) continue;
-    const exact = ALL_DESTINATIONS.find(
-      (d) => d.value.toLowerCase() === raw || d.label.toLowerCase() === raw,
-    );
-    if (exact) return exact;
-    const embedded = ALL_DESTINATIONS.find(
-      (d) => d.value.length >= 3 && raw.includes(d.value.toLowerCase()),
-    );
-    if (embedded) return embedded;
+    if (!(candidate ?? '').trim()) continue;
+    const match = findDestination(candidate as string);
+    if (match) return match;
   }
   return null;
 };
@@ -281,8 +308,7 @@ export default function PlanYourTripContainer() {
   const dateFieldErrors = (() => {
     const errors: { start?: string; end?: string } = {};
     if (startDate && endDate) {
-      const now = new Date();
-      const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const todayISO = localTodayISO();
       if (startDate < todayISO) errors.start = 'Start date cannot be in the past.';
       if (endDate < todayISO) errors.end = 'End date cannot be in the past.';
       else if (endDate < startDate) errors.end = 'End date must be on or after the start date.';
@@ -542,6 +568,166 @@ export default function PlanYourTripContainer() {
     await aiGenerator.generate({ destination: params.destination, duration: chatDuration, travelers: params.travelers, preferences: params.preferences || undefined });
     goToStep(3);
   };
+
+  /** Runs one assistant page action against this page's own state.
+   *
+   * Every judgement about whether the named thing exists is made HERE, not by
+   * the model: a destination must be one the catalogue has, a date pair must be
+   * a usable range, a day must be one of this trip's. What fails returns a
+   * sentence for the transcript instead of throwing — the visitor asked for
+   * something, and the reply has to say what happened either way.
+   *
+   * The assistant never submits: this page's actions write form state, generate
+   * days, and nothing else.
+   */
+  const runAssistantAction = async (action: AssistantActionPayload): Promise<string> => {
+    switch (action.tool) {
+      case 'set_destination': {
+        const match = findDestination(action.destination);
+        if (!match) return `I don't have "${action.destination}" as a destination — pick one on the destination step.`;
+        setSelectedDest(match);
+        return `Set your destination to ${destLabel(match)}.`;
+      }
+
+      case 'set_travellers':
+        setTravelers(action.travelers);
+        return `Set ${pluralize(action.travelers, 'traveller')}.`;
+
+      case 'set_preferences':
+        setPreferences(action.preferences);
+        return 'Saved your preferences.';
+
+      case 'set_contact_details': {
+        if (action.field === 'email') {
+          if (!EMAIL_SHAPE.test(action.value)) return 'That email address does not look complete — say it again?';
+          setEmail(action.value);
+          return 'Saved your email address.';
+        }
+        if (action.field === 'phone') {
+          if (action.value.replace(/\D/g, '').length < 6) return 'That phone number does not look complete — say it again?';
+          setPhone(action.value);
+          return 'Saved your phone number.';
+        }
+        setName(action.value);
+        return 'Saved your name.';
+      }
+
+      case 'go_to_step':
+        goToStep(Math.min(4, Math.max(1, action.step)));
+        return '';
+
+      case 'generate_itinerary': {
+        const destination = destLabel(selectedDest);
+        if (!destination || duration === 0) {
+          return 'I need the destination and the dates before I can build the plan.';
+        }
+        const outcome = await aiGenerator.generate({
+          destination,
+          duration,
+          travelers,
+          preferences: preferences || undefined,
+        });
+        if (outcome === 'generated') {
+          goToStep(3);
+          return 'Generated your day-by-day plan.';
+        }
+        if (outcome === 'cancelled') return 'Left the plan as it was.';
+        return 'The plan did not generate — the page shows the error.';
+      }
+
+      case 'regenerate_days': {
+        const kept = action.dayNumbers.filter((dayNumber) => dayNumber >= 1 && dayNumber <= duration);
+        if (kept.length === 0) return 'None of those days are in this plan.';
+        const outcome = await aiDayGenerator.generateDays(kept);
+        if (outcome === 'generated') return `Regenerated ${pluralize(kept.length, 'day')}.`;
+        // The hook's own banner names the days that are still missing, so this
+        // line points at it rather than inventing a count of its own.
+        if (outcome === 'partial') return 'Regenerated some of those days — the page names what is still missing.';
+        return 'Regenerating those days failed — the page shows the error.';
+      }
+
+      case 'edit_day': {
+        const day = itineraryDays.find((entry) => entry.dayNumber === action.dayNumber);
+        if (!day) return `There is no Day ${action.dayNumber} in this plan.`;
+
+        const next: ItineraryDay = { ...day };
+        let changed = false;
+        let unmatchedRemoval = false;
+
+        switch (action.operation) {
+          case 'set_title':
+          case 'set_notes': {
+            const text = action.values.join(' ').trim();
+            const field = action.operation === 'set_title' ? 'title' : 'notes';
+            if (text && text !== day[field]) {
+              next[field] = text;
+              changed = true;
+            }
+            break;
+          }
+          case 'add_activities':
+          case 'remove_activities':
+          case 'add_locations':
+          case 'remove_locations': {
+            const field = action.operation.endsWith('activities') ? 'activities' : 'locations';
+            const entries =
+              action.operation.startsWith('add')
+                ? withAddedEntries(day[field], action.values)
+                : withoutMatchingEntries(day[field], action.values);
+            if (entries === day[field]) {
+              unmatchedRemoval = action.operation.startsWith('remove');
+              break;
+            }
+            next[field] = entries;
+            changed = true;
+            break;
+          }
+        }
+
+        if (unmatchedRemoval) return `Day ${action.dayNumber} does not list that, so I left it alone.`;
+        if (!changed) return `Day ${action.dayNumber} already says that.`;
+
+        const snapshot = itineraryDays;
+        setItineraryDays((prev) => prev.map((entry) => (entry.dayNumber === day.dayNumber ? next : entry)));
+        setRegenToast({
+          message: `Day ${day.dayNumber} updated`,
+          undo: () => setItineraryDays(snapshot),
+        });
+        return `Updated Day ${day.dayNumber}.`;
+      }
+
+      default:
+        // search_travel_info is server-executed, so it can never be registered
+        // here; anything else is an action this page does not implement.
+        return 'That is not something I can change on this page.';
+    }
+  };
+
+  // Registered on every render on purpose: the store behind this keeps a ref, not
+  // state, so a fresh registration costs one ref assignment and gives the
+  // assistant the live state it is about to change. Memoising it would hand the
+  // runner a closure over stale days and dates.
+  const assistantRegistration: AssistantPageRegistration = {
+    surface: 'planner',
+    // Identity, not content: this page is the planner whichever step it is on.
+    revision: 'planner',
+    pageContext: {
+      surface: 'planner',
+      revision: 'planner',
+      step,
+      destination: destLabel(selectedDest) || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      duration: duration || undefined,
+      travelers,
+      preferences: preferences || undefined,
+      days: itineraryDays.map((day) => ({ dayNumber: day.dayNumber, title: day.title || undefined })),
+    },
+    actions: ASSISTANT_ACTIONS,
+    runAction: runAssistantAction,
+  };
+
+  useAssistantPageRegistration(assistantRegistration);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 font-body">

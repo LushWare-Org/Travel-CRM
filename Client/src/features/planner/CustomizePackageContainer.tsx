@@ -16,11 +16,13 @@ import { FLOATING_ACTIONS_CONFIG } from '../../config/floatingActions';
 import ActivitySelector from '../../components/shared/ActivitySelector';
 import LocationSelector from '../../components/shared/LocationSelector';
 import Stepper from '../../components/shared/Stepper';
-import { buildDayState, computeMissingDayNumbers, mergeDayByNumber, mergeDaysByNumber, splitTextToList, toExistingDayContext } from './utils/formHelpers';
+import { buildDayState, computeMissingDayNumbers, mergeDayByNumber, mergeDaysByNumber, splitTextToList, toExistingDayContext, withAddedEntries, withoutMatchingEntries } from './utils/formHelpers';
 import type { DayOverrideState } from './utils/formHelpers';
 import { useAIItineraryGenerator } from './hooks/useAIItineraryGenerator';
 import { useAIDayGenerator } from './hooks/useAIDayGenerator';
 import RegenerationToast from './components/RegenerationToast';
+import { useAssistantPageRegistration } from '../assistant/capabilities/AssistantCapabilityProvider';
+import type { AssistantActionPayload, AssistantPageAction, AssistantPageRegistration } from '../assistant/capabilities/AssistantCapabilityProvider';
 
 /** Step labels for the shared Stepper — must match the five per-step titles below. */
 const CUSTOMIZE_STEPS = [
@@ -33,6 +35,20 @@ const CUSTOMIZE_STEPS = [
 
 const WHATSAPP_HELP_MESSAGE =
   "Hello! I'm customizing a trip and have a question before submitting my request.";
+
+/** The page actions this page executes, sent to the assistant every turn. */
+const ASSISTANT_ACTIONS: AssistantPageAction[] = [
+  'set_destination',
+  'set_travellers',
+  'set_preferences',
+  'set_contact_details',
+  'go_to_step',
+  'generate_itinerary',
+  'regenerate_days',
+  'edit_day',
+];
+
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const callEnabled = FLOATING_ACTIONS_CONFIG.call.enabled;
 const whatsappEnabled = FLOATING_ACTIONS_CONFIG.whatsapp.enabled;
 
@@ -202,6 +218,154 @@ export default function CustomizePackageContainer() {
   const handleRemoveDay = (index: number) => {
     setDayOverrides((prev) => prev.filter((_, idx) => idx !== index));
   };
+
+  /** Runs one assistant page action against this page's own state.
+   *
+   * This page owns the contact details, one travel date, the notes box and the
+   * per-day activities/locations — nothing else. An action naming a field this
+   * page does not have has that field dropped and says so; a day regenerates
+   * through the page's own AI call, never through a second implementation.
+   */
+  const tripDestination = pkg?.destination?.name || pkg?.destinationRaw || '';
+
+  const runAssistantAction = async (action: AssistantActionPayload): Promise<string> => {
+    switch (action.tool) {
+      case 'set_destination':
+        return `This page is for the ${pkg?.title ? `${pkg.title} trip` : 'trip you picked'} — the destination comes from the package. Set it on the trip planner instead.`;
+
+      case 'set_travellers':
+        setTravelPrefs((prev) => ({ ...prev, travelers: action.travelers }));
+        return `Set ${pluralize(action.travelers, 'traveller')}.`;
+
+      case 'set_preferences':
+        setMessage(action.preferences);
+        return 'Saved your notes.';
+
+      case 'set_contact_details': {
+        if (action.field === 'email') {
+          if (!EMAIL_SHAPE.test(action.value)) return 'That email address does not look complete — say it again?';
+          setContact((prev) => ({ ...prev, email: action.value }));
+          return 'Saved your email address.';
+        }
+        if (action.field === 'phone') {
+          if (action.value.replace(/\D/g, '').length < 6) return 'That phone number does not look complete — say it again?';
+          setContact((prev) => ({ ...prev, phone: action.value }));
+          return 'Saved your phone number.';
+        }
+        setContact((prev) => ({ ...prev, name: action.value }));
+        return 'Saved your name.';
+      }
+
+      case 'go_to_step':
+        setCurrentStep(Math.min(totalSteps, Math.max(1, action.step)));
+        return '';
+
+      case 'generate_itinerary': {
+        if (!tripDestination || totalDurationDays === 0) {
+          return 'This trip has no dates or length yet, so there is nothing to rebuild.';
+        }
+        const outcome = await aiGenerator.generate({
+          destination: tripDestination,
+          duration: totalDurationDays,
+          travelers: Number(travelPrefs.travelers) || undefined,
+          preferences: message || undefined,
+        });
+        if (outcome === 'generated') {
+          setCurrentStep(3);
+          return 'Rebuilt the day-by-day plan.';
+        }
+        if (outcome === 'cancelled') return 'Left the plan as it was.';
+        return 'The plan did not generate — the page shows the error.';
+      }
+
+      case 'regenerate_days': {
+        const kept = action.dayNumbers.filter((dayNumber) => dayNumber >= 1 && dayNumber <= totalDurationDays);
+        if (kept.length === 0) return 'None of those days are in this trip.';
+        const outcome = await aiDayGenerator.generateDays(kept);
+        if (outcome === 'generated') return `Regenerated ${pluralize(kept.length, 'day')}.`;
+        if (outcome === 'partial') return 'Regenerated some of those days — the page names what is still missing.';
+        return 'Regenerating those days failed — the page shows the error.';
+      }
+
+      case 'edit_day': {
+        const day = dayOverrides.find((entry) => entry.dayNumber === action.dayNumber);
+        if (!day) return `There is no Day ${action.dayNumber} in this trip.`;
+
+        const next: DayOverrideState = { ...day };
+        let changed = false;
+        let unmatchedRemoval = false;
+
+        switch (action.operation) {
+          case 'set_title': {
+            const text = action.values.join(' ').trim();
+            if (text && text !== day.title) {
+              next.title = text;
+              changed = true;
+            }
+            break;
+          }
+          case 'set_notes':
+            // This page's day cards edit activities and locations; the notes box
+            // here is the trip's own, not a day's.
+            return 'This page has no per-day notes — the trip planner\u2019s day form does.';
+          case 'add_activities':
+          case 'remove_activities':
+          case 'add_locations':
+          case 'remove_locations': {
+            const field = action.operation.endsWith('activities') ? 'activities' : 'locations';
+            const entries =
+              action.operation.startsWith('add')
+                ? withAddedEntries(day[field], action.values)
+                : withoutMatchingEntries(day[field], action.values);
+            if (entries === day[field]) {
+              unmatchedRemoval = action.operation.startsWith('remove');
+              break;
+            }
+            next[field] = entries;
+            changed = true;
+            break;
+          }
+        }
+
+        if (unmatchedRemoval) return `Day ${action.dayNumber} does not list that, so I left it alone.`;
+        if (!changed) return `Day ${action.dayNumber} already says that.`;
+
+        const snapshot = dayOverrides;
+        setDayOverrides((prev) => prev.map((entry) => (entry.dayNumber === day.dayNumber ? next : entry)));
+        setRegenToast({
+          message: `Day ${day.dayNumber} updated`,
+          undo: () => setDayOverrides(snapshot),
+        });
+        return `Updated Day ${day.dayNumber}.`;
+      }
+
+      default:
+        return 'That is not something I can change on this page.';
+    }
+  };
+
+  // Fresh every render on purpose: the capability store keeps a ref, so this
+  // costs one assignment and always hands the assistant the live trip state.
+  const assistantRegistration: AssistantPageRegistration = {
+    surface: 'customize',
+    // Identity, not content: the package is what makes this page itself.
+    revision: `customize:${id ?? ''}`,
+    pageContext: {
+      surface: 'customize',
+      revision: `customize:${id ?? ''}`,
+      step: currentStep,
+      destination: tripDestination || undefined,
+      startDate: travelPrefs.travelDate || undefined,
+      duration: totalDurationDays || undefined,
+      travelers: Number(travelPrefs.travelers) || undefined,
+      preferences: message || undefined,
+      days: dayOverrides.map((day) => ({ dayNumber: day.dayNumber, title: day.title || undefined })),
+    },
+    actions: ASSISTANT_ACTIONS,
+    runAction: runAssistantAction,
+  };
+
+  useAssistantPageRegistration(assistantRegistration);
 
   const handleNextStep = () => {
     if (currentStep === 1) {

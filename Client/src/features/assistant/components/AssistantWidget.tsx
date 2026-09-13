@@ -12,7 +12,7 @@ import { setAssistantLauncherOpen, useAssistantLauncherOpen } from '../../../com
 const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + route.slice(1);
 
 const GREETING =
-  "Hi! I can help with destinations, packages, site navigation, and LushWare policy questions. What are you planning?";
+  "Hi! I can help you find a package, build a custom trip with AI, or answer questions about LushWare. What are you planning?";
 
 const PANEL_CLASS =
   'pointer-events-auto w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-floating';
@@ -109,6 +109,42 @@ function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnE
 
   if (data.tool === 'respond_conversationally' || data.tool === 'redirect_off_topic') {
     return null;
+  }
+
+  if (data.tool === 'page_action') {
+    // The page executed this, so the sentence is the page's own report of what
+    // it did — or of why it did not. Nothing is rendered while the action is
+    // still running: the page's own spinner is the pending signal, and a
+    // "working on it" line here would be the second place a change is claimed.
+    if (!data.announcement) return null;
+    return (
+      <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
+        <p className="text-sm text-gray-700">{data.announcement}</p>
+      </div>
+    );
+  }
+
+  if (data.tool === 'search_travel_info') {
+    if (data.citations.length === 0) return null;
+    return (
+      <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Sources</p>
+        <ul className="mt-1 space-y-1">
+          {data.citations.map((citation) => (
+            <li key={citation.uri}>
+              <a
+                href={citation.uri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-brand-700 underline break-all"
+              >
+                {citation.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   }
 
   if (data.tool === 'hand_off') {
@@ -284,7 +320,7 @@ export default function AssistantWidget() {
             <Bot className="w-5 h-5 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-tight">Travel Assistant</p>
-              <p className="text-xs text-white/80 leading-tight">Travel help, navigation &amp; policies</p>
+              <p className="text-xs text-white/80 leading-tight">Travel help, planning &amp; policies</p>
             </div>
           </div>
           <button

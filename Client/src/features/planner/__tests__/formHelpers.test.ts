@@ -11,7 +11,52 @@ import {
   sanitizeNumber,
   splitTextToList,
   toExistingDayContext,
+  withAddedEntries,
+  withoutMatchingEntries,
 } from '../utils/formHelpers';
+
+describe('withAddedEntries', () => {
+  it('appends what the visitor named', () => {
+    expect(withAddedEntries(['Beach'], ['whale watching'])).toEqual(['Beach', 'whale watching']);
+  });
+
+  it('does not add what the day already lists, whatever the case', () => {
+    const entries = ['Beach'];
+    expect(withAddedEntries(entries, ['beach'])).toBe(entries);
+  });
+
+  it('returns the same array when there is nothing to add', () => {
+    const entries = ['Beach'];
+    expect(withAddedEntries(entries, [''])).toBe(entries);
+  });
+
+  it('adds several at once', () => {
+    expect(withAddedEntries([], ['Temple', 'Beach'])).toEqual(['Temple', 'Beach']);
+  });
+});
+
+describe('withoutMatchingEntries', () => {
+  it('removes an entry named exactly', () => {
+    expect(withoutMatchingEntries(['Beach', 'Temple'], ['Beach'])).toEqual(['Temple']);
+  });
+
+  it('removes an entry the visitor described in their own words', () => {
+    // How a person phrases a removal rarely repeats the entry: the shared word
+    // is what makes "the temple visit" find "Temple of the Tooth".
+    expect(withoutMatchingEntries(['Temple of the Tooth', 'Beach walk'], ['the temple visit'])).toEqual(['Beach walk']);
+  });
+
+  it('keeps entries nothing in the request identifies', () => {
+    const entries = ['Beach walk', 'Sunset cruise'];
+    expect(withoutMatchingEntries(entries, ['helicopter tour'])).toBe(entries);
+  });
+
+  it('does not match on a word that carries no identity', () => {
+    // "day" and "visit" are not identities: nearly every entry could match them.
+    const entries = ['Temple visit', 'Beach visit'];
+    expect(withoutMatchingEntries(entries, ['visit the day before'])).toBe(entries);
+  });
+});
 
 describe('splitTextToList', () => {
   it('returns an empty list for empty, null, or undefined input', () => {

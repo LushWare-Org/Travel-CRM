@@ -20,6 +20,15 @@ export type AssistantEventTool =
   | 'request_booking'
   | 'respond_conversationally'
   | 'redirect_off_topic'
+  | 'set_destination'
+  | 'set_travellers'
+  | 'set_preferences'
+  | 'set_contact_details'
+  | 'go_to_step'
+  | 'generate_itinerary'
+  | 'regenerate_days'
+  | 'edit_day'
+  | 'search_travel_info'
   | null;
 
 export interface AssistantEventPayload {

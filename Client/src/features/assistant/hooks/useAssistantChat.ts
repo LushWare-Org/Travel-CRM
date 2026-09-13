@@ -4,7 +4,11 @@ import type { AssistantTurnMessageT, AssistantTurnResultT } from '../../../servi
 import { sendAssistantEvent } from '../../../services/api/assistantEvents';
 import type { AssistantEventPayload } from '../../../services/api/assistantEvents';
 import { getEnabledAssistantRoutes } from '../../../config/assistantRoutes';
+import { ASSISTANT_PAGE_ACTIONS } from '@travel-crm/contracts';
 import { loadAssistantParamValues } from '../assistantParamValues';
+import { useAssistantCapabilities } from '../capabilities/AssistantCapabilityProvider';
+import type { AssistantPageRegistration } from '../capabilities/AssistantCapabilityProvider';
+import { runAssistantAction } from '../actions/runAssistantAction';
 
 // Sliding window resent to the stateless assistant-service each turn — same
 // reasoning as useTripWizard's MAX_SENT_MESSAGES. Older turns still show in
@@ -63,7 +67,20 @@ export type AssistantTurnData =
   | { tool: 'hand_off'; handoff: AssistantHandoff }
   | { tool: 'request_booking'; booking: AssistantBooking }
   | { tool: 'respond_conversationally'; mode: 'social' | 'travel_general' | 'capability' }
-  | { tool: 'redirect_off_topic'; redirected: true };
+  | { tool: 'redirect_off_topic'; redirected: true }
+  // A page action the client is about to run (or has just run). `announcement`
+  // starts empty and is filled in with what the page reported, so the bubble
+  // never claims a change before the page has made one.
+  | { tool: 'page_action'; revision: string | null; announcement: string }
+  // A web-grounded travel answer. The reply text is the message; these are the
+  // sources the server extracted from the provider's grounding metadata.
+  | { tool: 'search_travel_info'; citations: AssistantCitation[] };
+
+/** One source under a grounded answer. Validated again here: the widget turns it into a link. */
+export interface AssistantCitation {
+  title: string;
+  uri: string;
+}
 
 /**
  * One package the assistant answered about, rendered under the reply as a card
@@ -121,6 +138,26 @@ function fireEvent(
   void sendAssistantEvent(payload);
 }
 
+// A citation is renderable only as a real link. The server already dropped
+// anything that was not http(s); this repeats the check where the anchor is
+// actually built, because a javascript: URL in an href is a script execution,
+// not a bad link.
+const CITATION_SCHEME = /^https?:\/\//i;
+
+function deriveCitations(serverResult: Record<string, unknown> | null | undefined): AssistantCitation[] {
+  const raw = serverResult?.citations;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+    .map((entry) => ({
+      title: typeof entry.title === 'string' ? entry.title : '',
+      uri: typeof entry.uri === 'string' ? entry.uri : '',
+    }))
+    .filter((citation) => CITATION_SCHEME.test(citation.uri))
+    .slice(0, 5)
+    .map((citation) => ({ ...citation, title: citation.title || citation.uri }));
+}
+
 function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
   const serverResult = result.serverResult as
     | {
@@ -159,6 +196,18 @@ function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
 
   if (result.toolCall.tool === 'redirect_off_topic') {
     return { tool: 'redirect_off_topic', redirected: true };
+  }
+
+  if (result.toolCall.tool === 'search_travel_info') {
+    return { tool: 'search_travel_info', citations: deriveCitations(result.serverResult) };
+  }
+
+  if (ASSISTANT_PAGE_ACTIONS.includes(result.toolCall.tool)) {
+    // The arguments themselves are read from serverResult by the runner, which
+    // re-validates them against the shared action contract before the page sees
+    // anything. What is carried here is only what the widget renders.
+    const revision = result.serverResult?.revision;
+    return { tool: 'page_action', revision: typeof revision === 'string' ? revision : null, announcement: '' };
   }
 
   if (result.toolCall.tool === 'answer_packages') {
@@ -243,6 +292,10 @@ function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
 
 export function useAssistantChat() {
   const [sessionId] = useState(loadOrCreateSessionId);
+  // The mounted page's registration, READ AT SEND TIME: the store holds a ref,
+  // not state, so capturing it here during render would miss a page that mounted
+  // after this component last rendered.
+  const getRegistration = useAssistantCapabilities();
   const [messages, setMessages] = useState<AssistantTurnMessageT[]>([]);
   // One view per successful assistant reply, joined to the assistant message
   // by id — nav chips/FAQ text from earlier turns stay rendered even after a
@@ -256,6 +309,7 @@ export function useAssistantChat() {
     if (!trimmed || isSending) return;
     const userMessage = createMessage('user', trimmed);
     const nextMessages = [...messages, userMessage].slice(-MAX_SENT_MESSAGES);
+    const registration: AssistantPageRegistration | null = getRegistration();
 
     setMessages((prev) => [...prev, userMessage]);
     setError('');
@@ -282,6 +336,10 @@ export function useAssistantChat() {
         messages: nextMessages,
         availableRoutes,
         shownPackageIds,
+        capabilities: registration
+          ? { version: 1, surface: registration.surface, actions: registration.actions }
+          : undefined,
+        pageContext: registration?.pageContext,
       });
       // Defense-in-depth: the server now guarantees a non-empty,
       // length-capped message (never-empty + MAX_MESSAGE_LENGTH guard in
@@ -290,10 +348,33 @@ export function useAssistantChat() {
       // reject it on every later resend and brick the session (/ship
       // red-team + Claude adversarial review).
       const assistantMessage = createMessage('assistant', (result.message || '...').slice(0, MAX_MESSAGE_LENGTH));
+      const turnData = deriveTurnData(result);
       setMessages((prev) => [...prev, assistantMessage]);
-      setTurns((prev) => [...prev, { assistantMessageId: assistantMessage.id, data: deriveTurnData(result) }]);
+      setTurns((prev) => [...prev, { assistantMessageId: assistantMessage.id, data: turnData }]);
       const route = result.toolCall.tool === 'navigate' ? ((result.toolCall.args.route as string | undefined) ?? null) : null;
       fireEvent(sessionId, userMessage.id, 'response', result.toolCall.tool, route);
+
+      // The page executes what the server named. Awaited inside the try, so
+      // `isSending` stays true for the whole action: a second message must not
+      // start while the itinerary is being rebuilt underneath it.
+      if (turnData.tool === 'page_action') {
+        const actionArgs = result.serverResult?.action;
+        const outcome = await runAssistantAction({
+          registration,
+          tool: result.toolCall.tool,
+          args: actionArgs && typeof actionArgs === 'object' ? (actionArgs as Record<string, unknown>) : {},
+          revision: turnData.revision,
+        });
+        if (outcome.announcement) {
+          setTurns((prev) =>
+            prev.map((turn) =>
+              turn.assistantMessageId === assistantMessage.id && turn.data.tool === 'page_action'
+                ? { ...turn, data: { ...turn.data, announcement: outcome.announcement } }
+                : turn,
+            ),
+          );
+        }
+      }
     } catch {
       setError(ASSISTANT_ERROR_MESSAGE);
       fireEvent(sessionId, userMessage.id, 'error', null, null);

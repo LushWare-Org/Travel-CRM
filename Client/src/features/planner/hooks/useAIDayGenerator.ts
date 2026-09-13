@@ -32,7 +32,9 @@ export function useAIDayGenerator<TDay>({ getContext, mapDay, onDayGenerated, on
   const [generatingDayNumber, setGeneratingDayNumber] = useState<number | null>(null);
   const [error, setError] = useState('');
 
-  const generateDay = async (dayNumber: number) => {
+  /** Resolves to what happened, for the assistant's page action; `error` still
+   * carries the message the page renders. */
+  const generateDay = async (dayNumber: number): Promise<'generated' | 'failed'> => {
     const context = getContext();
     setError('');
     setIsGenerating(true);
@@ -47,16 +49,20 @@ export function useAIDayGenerator<TDay>({ getContext, mapDay, onDayGenerated, on
         existingDays: context.existingDays,
       });
       onDayGenerated(mapDay(day, dayNumber), dayNumber);
+      return 'generated';
     } catch (err) {
       setError(apiErrorMessage(err));
+      return 'failed';
     } finally {
       setIsGenerating(false);
       setGeneratingDayNumber(null);
     }
   };
 
-  const generateDays = async (dayNumbers: number[]) => {
-    if (dayNumbers.length === 0) return;
+  /** `partial` is the existing shortfall outcome — some days came back, the rest
+   * are named in `error`. */
+  const generateDays = async (dayNumbers: number[]): Promise<'generated' | 'partial' | 'failed'> => {
+    if (dayNumbers.length === 0) return 'generated';
     const context = getContext();
     setError('');
     setIsGenerating(true);
@@ -76,9 +82,12 @@ export function useAIDayGenerator<TDay>({ getContext, mapDay, onDayGenerated, on
       if (mapped.length > 0) onDaysGenerated(mapped, dayNumbers);
       if (mapped.length < dayNumbers.length) {
         setError(`${mapped.length} of ${dayNumbers.length} days generated. Click again to fill the rest.`);
+        return 'partial';
       }
+      return 'generated';
     } catch (err) {
       setError(apiErrorMessage(err));
+      return 'failed';
     } finally {
       setIsGenerating(false);
     }

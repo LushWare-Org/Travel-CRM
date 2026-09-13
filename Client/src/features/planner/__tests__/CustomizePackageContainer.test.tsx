@@ -41,6 +41,29 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: mocks.useAuth,
 }));
 
+// The page registers what the assistant may execute through this module. Mocked
+// (not provided) so the tests can read the registration the page builds and call
+// its runAction directly — the same seam the widget uses, without rendering it.
+const mockPageRegistration = vi.hoisted(() => vi.fn());
+
+vi.mock('../../assistant/capabilities/AssistantCapabilityProvider', () => ({
+  useAssistantPageRegistration: mockPageRegistration,
+}));
+
+/** The registration the container last handed the assistant. */
+const lastRegistration = () => {
+  const calls = mockPageRegistration.mock.calls;
+  return calls[calls.length - 1]?.[0] as
+    | {
+        surface: string;
+        revision: string;
+        actions: string[];
+        pageContext: Record<string, unknown>;
+        runAction: (action: unknown) => Promise<string>;
+      }
+    | undefined;
+};
+
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 'pkg-123' }),
   useNavigate: () => mocks.useNavigate(),
@@ -76,6 +99,7 @@ const rawPackage = {
 };
 
 beforeEach(() => {
+  mockPageRegistration.mockReset();
   mocks.useAuth.mockReturnValue({ user: null });
   mocks.useNavigate.mockReturnValue(vi.fn());
   mocks.useLocation.mockReturnValue({ state: null });
@@ -591,5 +615,143 @@ describe('CustomizePackageContainer', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(navigateMock).toHaveBeenCalledWith('/package/pkg-123');
     expect(screen.queryByText('Thank you!')).not.toBeInTheDocument();
+  });
+});
+
+describe('assistant page actions', () => {
+  /** Runs one action the way the widget's runner does: through the registration
+   * the page handed the assistant, not through a second code path. */
+  const runAction = async (action: Record<string, unknown>): Promise<string> => {
+    const registration = lastRegistration();
+    if (!registration) throw new Error('the page registered no assistant surface');
+    let line = '';
+    await act(async () => {
+      line = await registration.runAction(action);
+    });
+    return line;
+  };
+
+  const renderLoaded = async () => {
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+  };
+
+  it('registers the customize surface against the package it is customizing', async () => {
+    await renderLoaded();
+
+    const registration = lastRegistration();
+    expect(registration?.surface).toBe('customize');
+    // Identity, not content: the package id is what makes this page itself, and
+    // it is what stops a turn composed against another package from executing.
+    expect(registration?.revision).toBe('customize:pkg-123');
+    expect(registration?.actions).toEqual([
+      'set_destination',
+      'set_travellers',
+      'set_preferences',
+      'set_contact_details',
+      'go_to_step',
+      'generate_itinerary',
+      'regenerate_days',
+      'edit_day',
+    ]);
+    // The package's own itinerary is what the page starts from, so the days it
+    // reports are those days, not an empty list.
+    expect(registration?.pageContext).toMatchObject({ surface: 'customize', step: 1, duration: 7 });
+    expect(registration?.pageContext.days).toHaveLength(1);
+  });
+
+  it('writes the contact detail, travellers and notes the visitor dictated', async () => {
+    await renderLoaded();
+
+    expect(await runAction({ tool: 'set_contact_details', field: 'email', value: 'ana@example.com' })).toBe(
+      'Saved your email address.',
+    );
+    expect(await runAction({ tool: 'set_contact_details', field: 'name', value: 'Ana' })).toBe('Saved your name.');
+    expect(await runAction({ tool: 'set_travellers', travelers: 4 })).toBe('Set 4 travellers.');
+    expect(await runAction({ tool: 'set_preferences', preferences: 'love hiking' })).toBe('Saved your notes.');
+
+    expect(lastRegistration()?.pageContext).toMatchObject({ travelers: 4, preferences: 'love hiking' });
+  });
+
+  it('refuses an email that does not look complete', async () => {
+    await renderLoaded();
+
+    expect(await runAction({ tool: 'set_contact_details', field: 'email', value: 'ana@' })).toBe(
+      'That email address does not look complete — say it again?',
+    );
+  });
+
+  it('says the destination comes from the package rather than writing one', async () => {
+    await renderLoaded();
+
+    const line = await runAction({ tool: 'set_destination', destination: 'Bali' });
+
+    expect(line).toContain('the destination comes from the package');
+    expect(lastRegistration()?.pageContext.destination).toBe('Sri Lanka');
+  });
+
+  it('rebuilds the plan from the package\u2019s own trip and moves to it', async () => {
+    mocks.swalFire.mockResolvedValue({ isConfirmed: true });
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Ella Hike', locations: ['Ella'], activities: ['Nine Arch Bridge'] }],
+    });
+    await renderLoaded();
+
+    const line = await runAction({ tool: 'generate_itinerary' });
+
+    expect(line).toBe('Rebuilt the day-by-day plan.');
+    expect(generateItineraryPreviewMock).toHaveBeenCalledWith({
+      destination: 'Sri Lanka',
+      duration: 7,
+      travelers: 2,
+      preferences: undefined,
+    });
+    expect(screen.getByText('Ella Hike')).toBeInTheDocument();
+  });
+
+  it('regenerates only the days this trip has', async () => {
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'AI Colombo Day', locations: ['Galle Face'], activities: ['Sunset walk'] }],
+    });
+    await renderLoaded();
+
+    const line = await runAction({ tool: 'regenerate_days', dayNumbers: [1, 12] });
+
+    expect(line).toBe('Regenerated 1 day.');
+    expect(generateDaysRangePreviewMock).toHaveBeenCalledWith(expect.objectContaining({ dayNumbers: [1] }));
+  });
+
+  it('adds what the visitor named to the day they named', async () => {
+    await renderLoaded();
+
+    const line = await runAction({
+      tool: 'edit_day',
+      dayNumber: 1,
+      operation: 'add_activities',
+      values: ['whale watching'],
+    });
+
+    expect(line).toBe('Updated Day 1.');
+    expect(await screen.findByText('Day 1 updated')).toBeInTheDocument();
+
+    // The day editor lives on the itinerary step.
+    await runAction({ tool: 'go_to_step', step: 3 });
+    expect(await screen.findByText('whale watching')).toBeInTheDocument();
+  });
+
+  it('refuses a per-day note this page has no editor for', async () => {
+    await renderLoaded();
+
+    expect(
+      await runAction({ tool: 'edit_day', dayNumber: 1, operation: 'set_notes', values: ['arriving late'] }),
+    ).toBe('This page has no per-day notes — the trip planner\u2019s day form does.');
+  });
+
+  it('says which day it could not find rather than inventing one', async () => {
+    await renderLoaded();
+
+    expect(await runAction({ tool: 'edit_day', dayNumber: 9, operation: 'set_title', values: ['Nope'] })).toBe(
+      'There is no Day 9 in this trip.',
+    );
   });
 });
