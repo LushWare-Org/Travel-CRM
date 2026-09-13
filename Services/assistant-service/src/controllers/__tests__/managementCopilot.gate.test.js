@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../../constants/managementCopilot.js';
+import logger from '../../config/logger.js';
 
 const { mockPrisma, mockGenerateStructured, mockIsAIConfigured } = vi.hoisted(() => ({
   mockPrisma: {
@@ -549,6 +550,69 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.claims)).toBe(true);
     expect(res.body.answerBlocks).toBeUndefined();
+  });
+  it('keeps a record-scope briefing claim that cites a real lead field id', async () => {
+    // The record bundle publishes one evidence item per allowlisted field, so
+    // `lead:<id>:<field>` is the only shape that can ground a claim there - and
+    // unlike a collection page it has no computed or aggregate evidence. This is
+    // the route-level proof that such a claim survives, which nothing covered.
+    enableCopilot();
+    stubLead();
+    mockGenerateStructured.mockResolvedValue({
+      claims: [
+        {
+          id: 'c-status',
+          section: 'current_state',
+          text: 'The lead is in NEW status.',
+          facts: [],
+          evidenceIds: ['lead:lead-1:lifecycleStatus'],
+          evidenceType: 'record',
+          severity: 'info',
+        },
+      ],
+    });
+
+    const res = await postTurn({ mode: 'briefing', page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body.fallback).toBeUndefined();
+    expect(res.body.claims.map((claim) => claim.id)).toEqual(['c-status']);
+  });
+
+  it('says why a briefing claim was rejected instead of falling back silently', async () => {
+    // The legacy composite id grounds nothing (see the evaluation fixture
+    // `legacy-composite-evidence-id`), so this is a claim the validator refuses.
+    // Before this logging existed the controller discarded `rejected`, and the
+    // panel simply showed the deterministic fallback with no trace of the reason.
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    enableCopilot();
+    stubLead();
+    mockGenerateStructured.mockResolvedValue({
+      claims: [
+        {
+          id: 'c-legacy',
+          section: 'current_state',
+          text: 'The lead was updated recently.',
+          facts: [],
+          evidenceIds: ['lead:lead-1'],
+          evidenceType: 'record',
+          severity: 'info',
+        },
+      ],
+    });
+
+    const res = await postTurn({ mode: 'briefing', page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' } });
+
+    expect(res.status).toBe(200);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageKey: 'leads',
+        rejected: expect.arrayContaining([expect.objectContaining({ id: 'c-legacy', reason: 'no-valid-evidence' })]),
+        rejectedText: ['The lead was updated recently.'],
+      }),
+      'every briefing claim was rejected',
+    );
+    warnSpy.mockRestore();
   });
 
   it('leaves the deterministic phase deterministic when the provider is unconfigured (R3)', async () => {

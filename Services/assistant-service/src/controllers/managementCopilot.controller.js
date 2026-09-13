@@ -328,7 +328,22 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   }
 
   const canonical = canonicalizeBriefingResponse(raw, BriefingClaimSchema);
-  const { claims } = validateClaims({ claims: canonical, bundle, enableGuidance: guidanceEnabled });
+  const { claims, rejected } = validateClaims({ claims: canonical, bundle, enableGuidance: guidanceEnabled });
+
+  if (rejected.length > 0) {
+    logger.warn(
+      {
+        pageKey: page.key,
+        rejected,
+        // The text is what makes a rejection actionable: the reason alone says a
+        // number was unsupported, not which number or how it was written.
+        rejectedText: canonical
+          .filter((claim) => rejected.some((entry) => entry.id === claim.id))
+          .map((claim) => claim.text),
+      },
+      claims.length === 0 ? 'every briefing claim was rejected' : 'some briefing claims were rejected',
+    );
+  }
 
   if (claims.length === 0) {
     return respondWithFallback(res, page, bundle, adapter, sinceBoundary);

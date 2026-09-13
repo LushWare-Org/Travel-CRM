@@ -7,6 +7,9 @@
 // via `deadlineMs`, so retrying can never push the response past it. It is the
 // number the Management client's 20s abort wraps, and it lives here so the loop
 // budget and the briefing deadline cannot drift apart.
+// Raise this and COPILOT_CLIENT_TIMEOUT_MS together: the client's abort must
+// stay above this number, or it cuts off a generation the server still
+// considers live.
 export const MANAGEMENT_GENERATION_DEADLINE_MS = 17_000;
 
 // The smallest slice of the turn budget worth starting a generation on. A call
