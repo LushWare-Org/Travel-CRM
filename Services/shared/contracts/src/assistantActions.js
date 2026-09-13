@@ -97,6 +97,51 @@ export const AssistantPageContext = z.object({
   days: z.array(AssistantPageDay).max(30).optional(),
 });
 
+/**
+ * Server-composed answer about the page the visitor is looking at.
+ *
+ * Not an action: nothing is executed, no page capability is required, and the
+ * model supplies no numbers — the sentence is written by the server from the
+ * page's own report (`AssistantCurrentView`). It exists because both outcomes
+ * that can answer a question are otherwise dead ends for a question about the
+ * screen: `answer_faq_policy` falls back to policy copy when retrieval matches
+ * nothing, so "how many are under $1000" had nowhere to land, and the assistant
+ * answered from a page the visitor had already left.
+ */
+export const ASSISTANT_VIEW_TOOL = 'answer_current_view';
+
+/** A URL path only, no whitespace: the value is interpolated into the prompt as data. */
+const ViewPath = z.string().min(1).max(200).regex(/^\/\S*$/);
+/** A query-parameter name, never prose. */
+const ViewParamKey = z.string().min(1).max(40).regex(/^[A-Za-z][A-Za-z0-9_-]*$/);
+/** A query-parameter value: bounded, and never a second line. */
+const ViewParamValue = z.string().max(200).regex(/^[^\r\n]*$/);
+const ViewCount = z.number().int().min(0).max(100_000).nullable();
+
+/**
+ * What the page reports about what is on screen, sent with every turn.
+ *
+ * Untrusted input for the same reason `pageContext` is: this is public,
+ * unauthenticated, and interpolated into the model's prompt, so every field is
+ * bounded and the prompt labels the whole block as data. It is sent every turn
+ * rather than on change — the server is stateless, the payload is bounded, and
+ * "only when it changes" would need the client to hold state the server must
+ * still tolerate missing.
+ *
+ * `filteredCount` is the number the page can actually see; `renderedCount` is how
+ * many of those it drew; `catalogueTotal` exists only to qualify the first as
+ * partial. A count answer composes its number from `filteredCount` and never from
+ * `renderedCount`, because a rendered page size is not an answer to "how many are
+ * there".
+ */
+export const AssistantCurrentView = z.object({
+  path: ViewPath,
+  params: z.record(ViewParamKey, ViewParamValue).optional(),
+  filteredCount: ViewCount.optional(),
+  renderedCount: ViewCount.optional(),
+  catalogueTotal: ViewCount.optional(),
+});
+
 // The model's own one-liner, carried beside the action. Optional, and absent
 // from what the client executes: it is a reply, not an argument the page can act
 // on, and requiring it would make an action unexecutable the moment a caller
@@ -161,3 +206,12 @@ export const AssistantAction = z.discriminatedUnion('tool', [
 
 /** Every action name, page-executed and server-executed, in one list. */
 export const ASSISTANT_ACTION_TOOLS = [ASSISTANT_SEARCH_TOOL, ...ASSISTANT_PAGE_ACTIONS];
+
+/**
+ * Every tool name the model may return in one turn — the list the client's mirror
+ * enum, the telemetry enums and the router evaluation mirror. It is derived from
+ * `ASSISTANT_ACTION_TOOLS` rather than restated, so the two cannot drift, and it
+ * is a superset because `ASSISTANT_VIEW_TOOL` is composed by the server and
+ * executed by nobody.
+ */
+export const ASSISTANT_TOOL_NAMES = [...ASSISTANT_ACTION_TOOLS, ASSISTANT_VIEW_TOOL];
