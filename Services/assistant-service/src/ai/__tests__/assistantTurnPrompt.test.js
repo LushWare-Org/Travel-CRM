@@ -508,6 +508,57 @@ describe('the view channel in the turn prompt', () => {
   });
 });
 
+describe('the form-filling member in the turn prompt', () => {
+  const FORM_CAPS = { version: 1, surface: 'contact', actions: ['prefill_form'] };
+
+  const withForm = () =>
+    buildAssistantTurnPrompt({
+      ...PROMPT_INPUT,
+      conversationalOutcomesEnabled: false,
+      pageCapabilities: FORM_CAPS,
+      prefillForm: 'contact',
+    });
+
+  it('lists the form on screen, its fields and their types, and forbids submitting', () => {
+    const prompt = withForm();
+
+    expect(prompt).toContain('The form on screen right now reports these fields');
+    expect(prompt).toContain('contact — name (text), email (email), phone (tel), subject (text), message (textarea), travelDate (date)');
+    expect(prompt).toContain('never submit the form — the button stays theirs');
+    expect(prompt).toContain('Use prefill_form, with one `field_<name>` argument');
+    expect(prompt).toContain('- "my name is Ana and my email is ana@example.com" (on the contact form) -> prefill_form');
+  });
+
+  it('says nothing about a form when the page registered none', () => {
+    const prompt = buildAssistantTurnPrompt({ ...PROMPT_INPUT, conversationalOutcomesEnabled: false });
+
+    expect(prompt).not.toContain('The form on screen right now');
+    expect(prompt).not.toContain('Use prefill_form');
+    // The tool is a page action, so it is not offered at all without a surface.
+    expect(prompt).not.toContain('- prefill_form — args:');
+  });
+
+  it('offers the field arguments the mounted form declared, and no others', () => {
+    const schema = buildAssistantTurnResponseJsonSchema({
+      conversationalOutcomesEnabled: false,
+      capabilityActions: ['prefill_form'],
+      prefillForm: 'contact',
+    });
+    const keys = Object.keys(schema.properties.args.properties);
+
+    expect(schema.properties.tool.enum).toContain('prefill_form');
+    expect(keys).toContain('form');
+    for (const field of ['name', 'email', 'phone', 'subject', 'message', 'travelDate']) {
+      expect(keys, field).toContain(`field_${field}`);
+    }
+    // Fields another form declares are not part of this turn's argument space.
+    for (const field of ['travelers', 'comment', 'fullName', 'position', 'coverLetter']) {
+      expect(keys, field).not.toContain(`field_${field}`);
+    }
+    expect(schema.properties.args.properties.field_travelers).toBeUndefined();
+  });
+});
+
 describe('buildAssistantTurnResponseJsonSchema', () => {
   it('offers exactly the tools this turn may return', () => {
     const schema = buildAssistantTurnResponseJsonSchema({
@@ -796,6 +847,67 @@ describe('canonicalizeAssistantTurnResponse — the view answer', () => {
         { conversationalOutcomesEnabled: false },
       ),
     ).toEqual({ tool: ASSISTANT_VIEW_TOOL, args: {} });
+  });
+
+  it('collects the flat field arguments into the fields the form declares', () => {
+    expect(
+      canonicalizeAssistantTurnResponse(
+        {
+          tool: 'prefill_form',
+          args: { form: 'contact', field_name: 'Ana', field_email: 'ana@example.com', message: 'Sure.' },
+        },
+        { conversationalOutcomesEnabled: false },
+      ),
+    ).toEqual({
+      tool: 'prefill_form',
+      args: { form: 'contact', fields: { name: 'Ana', email: 'ana@example.com' }, message: 'Sure.' },
+    });
+  });
+
+  it('drops a field the form does not declare, and a value its type rejects', () => {
+    const canonical = canonicalizeAssistantTurnResponse(
+      {
+        tool: 'prefill_form',
+        args: {
+          form: 'booking',
+          field_name: 'Ana',
+          field_travelers: 4,
+          field_email: 'nope',
+          field_comment: 'belongs to the review form',
+          field_resume: 'cv.pdf',
+        },
+      },
+      { conversationalOutcomesEnabled: false },
+    );
+
+    expect(canonical).toEqual({
+      tool: 'prefill_form',
+      args: { form: 'booking', fields: { name: 'Ana', travelers: 4 }, message: '' },
+    });
+  });
+
+  it('refuses a fill with nothing left, and a form that does not exist', () => {
+    expect(
+      canonicalizeAssistantTurnResponse(
+        { tool: 'prefill_form', args: { form: 'contact', field_resume: 'cv.pdf' } },
+        { conversationalOutcomesEnabled: false },
+      ),
+    ).toBeNull();
+    expect(
+      canonicalizeAssistantTurnResponse(
+        { tool: 'prefill_form', args: { form: 'contact', field_email: 'not an email' } },
+        { conversationalOutcomesEnabled: false },
+      ),
+    ).toBeNull();
+    expect(
+      canonicalizeAssistantTurnResponse(
+        { tool: 'prefill_form', args: { form: 'login', field_name: 'Ana' } },
+        { conversationalOutcomesEnabled: false },
+      ),
+    ).toBeNull();
+    expect(
+      canonicalizeAssistantTurnResponse({ tool: 'prefill_form', args: {} }, { conversationalOutcomesEnabled: false }),
+    ).toBeNull();
   });
 
   it('passes the canonicalized outcome through the strict union', () => {

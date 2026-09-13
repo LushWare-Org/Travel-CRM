@@ -2112,6 +2112,93 @@ describe('POST /api/v1/assistant/turn — page actions', () => {
   const pageBody = (overrides = {}) =>
     baseBody({ capabilities: CAPABILITIES, pageContext: PAGE_CONTEXT, ...overrides });
 
+  // A form is a SURFACE, not an action bolted onto one: the mounted form decides
+  // which fields may be written, and the form id is the surface id.
+  const FORM_CAPABILITIES = { version: 1, surface: 'contact', actions: ['prefill_form'] };
+  const FORM_CONTEXT = { surface: 'contact', revision: 'contact', step: 1 };
+  const formBody = (overrides = {}) =>
+    baseBody({ capabilities: FORM_CAPABILITIES, pageContext: FORM_CONTEXT, ...overrides });
+
+  it('hands a form fill to the page with the fields the contract validated', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'prefill_form',
+      args: { form: 'contact', field_name: 'Ana', field_email: 'ana@example.com', message: 'Filling that in.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(formBody({ messages: [assistantMsg('my name is Ana and my email is ana@example.com')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall.tool).toBe('prefill_form');
+    // The payload names fields and nothing else: no submit flag exists to set,
+    // and the page presses no button on the assistant's behalf.
+    expect(res.body.data.serverResult).toEqual({
+      action: { tool: 'prefill_form', form: 'contact', fields: { name: 'Ana', email: 'ana@example.com' } },
+      revision: 'contact',
+      surface: 'contact',
+    });
+  });
+
+  it('drops a field the form does not have, and a value its type rejects, keeping the rest', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'prefill_form',
+      args: {
+        form: 'contact',
+        field_name: 'Ana',
+        // Not a contact field at all, and one that belongs to the booking form.
+        field_resume: 'cv.pdf',
+        field_travelers: 4,
+        // Right field, wrong value for its declared type.
+        field_email: 'not an email',
+        field_message: 'We would like to visit in March.',
+        message: 'Filling that in.',
+      },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(formBody({ messages: [assistantMsg('here are my details')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult.action.fields).toEqual({
+      name: 'Ana',
+      message: 'We would like to visit in March.',
+    });
+  });
+
+  it('refuses a fill for a form that is not the one on screen', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'prefill_form',
+      args: { form: 'booking', field_email: 'ana@example.com', message: 'Filling that in.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(formBody({ messages: [assistantMsg('ana@example.com')] }));
+
+    expect(res.status).toBe(200);
+    // The same treatment an unoffered page action gets: the reviewed capability
+    // answer, never a write the page would refuse.
+    expect(res.body.data.serverResult.mode).toBe('capability');
+    expect(res.body.data.serverResult.action).toBeUndefined();
+  });
+
+  it('refuses a fill on a page that has no form at all', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'prefill_form',
+      args: { form: 'contact', field_name: 'Ana', message: 'Filling that in.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(pageBody({ messages: [assistantMsg('my name is Ana')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult.mode).toBe('capability');
+    expect(res.body.data.serverResult.action).toBeUndefined();
+  });
+
   it('returns the validated action with the page revision it was chosen against', async () => {
     mockGenerateStructured.mockResolvedValue({
       tool: 'edit_day',

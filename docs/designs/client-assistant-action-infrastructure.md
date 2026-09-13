@@ -161,10 +161,45 @@ sentence is the server's, from the page's numbers. And the filter chips are
 rendered client-side from `params` through the site's own currency formatter,
 rather than by a second copy of the page's label logic.
 
-Still unbuilt from this document: `open_panel`, `prefill_form` and the writable-
-field allowlist, the wire module extraction (step 2), the per-route param schemas
-for the actions (step 3's remainder), the telemetry `metadata` plumbing (step 10)
-and the CI jobs (step 11).
+Still unbuilt from this document: `open_panel`, the wire module extraction
+(step 2), the per-route param schemas for the actions (step 3's remainder), the
+telemetry `metadata` plumbing (step 10) and the CI jobs (step 11). Step 8's form
+filling landed after this note — see below.
+
+**Built as (step 8, 2026-09-13).** Form filling ships for the four forms the
+design names — contact, the booking dialog, the review dialog, the job
+application — as a protocol rather than four tools. A form declares its fields and
+the TYPE of each, and the type is what makes the refusals structural: only text,
+email, tel, textarea, date, number and select are writable, so a resume file, a
+consent checkbox and a credential cannot be named in a fill at all. The page
+reports what each field holds and who put it there, which is how a write that
+would replace the visitor's own text is held back and offered as a confirm chip in
+the bubble — client-side, not another turn. The marker is the two-signal one
+DESIGN.md specifies, and it clears on the visitor's first keystroke.
+
+Two deliberate differences from the sketch above. The form schemas are keyed by
+form id and the form id IS the capability surface, rather than living in the
+contract keyed by route with forms carried beside the actions: one route hosts two
+forms (the package page's booking and review dialogs) and a modal is not a route,
+so a route-keyed table could not say which form was on screen. And a page with a
+form on screen registers no `runAction` at all — the runner handles the fill
+itself, against the live form, because the collision decision needs the values as
+they are at that moment rather than as they were when the page last rendered.
+
+`z-floating-assistant` (110) is now defined in `index.css`, and `/reset-password/:token`
+joined the excluded paths, because a reset link carries a credential. Escape is
+implemented in the capture phase on the panel: it closes the assistant and stops
+the key before the dialog underneath sees it, which is the design's ordering.
+
+**The layer itself is wired but NOT working, and the browser says so.** The
+registration carries `hostedInDialog`, the provider holds it as state, the panel
+switches class on it — and with the booking dialog genuinely open
+(`/package/<id>?book=1` renders its contact step) the panel still computes
+`z-index: 70`, the layer below the dialog. So a modal-hosted form is registered and
+fillable *if* the visitor can reach the panel, and the booking and review dialogs
+are the two forms whose browser pass is therefore still missing. Focus moving into
+the panel and back on close is likewise unverified. This needs one debugging pass
+with the layer inspected from inside an open dialog.
 
 ### Deferred, not in this branch
 

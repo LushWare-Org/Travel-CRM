@@ -43,6 +43,9 @@ vi.mock('../../capabilities/AssistantCapabilityProvider', () => ({
   useAssistantCapabilities: () => () => mockPageRegistration.current,
   useAssistantPageRegistration: vi.fn(),
   useAssistantCurrentView: () => () => mockCurrentView.current,
+  // False here: the panel's layer only follows a dialog-hosted form, and these
+  // tests exercise the ordinary page case.
+  useAssistantDialogHost: () => false,
 }));
 
 // The search string is included because a handoff lands on

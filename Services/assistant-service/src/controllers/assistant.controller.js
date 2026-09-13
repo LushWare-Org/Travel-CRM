@@ -8,7 +8,7 @@ import {
   canonicalizeAssistantTurnResponse,
   assistantTurnResponseSchema,
 } from '../ai/prompts/assistantTurn.v1.js';
-import { ASSISTANT_PAGE_ACTIONS, ASSISTANT_VIEW_TOOL } from '@travel-crm/contracts';
+import { ASSISTANT_FORM_SURFACES, ASSISTANT_PAGE_ACTIONS, ASSISTANT_VIEW_TOOL } from '@travel-crm/contracts';
 import { generateGrounded, GROUNDING_TIMEOUT_MS } from '../ai/groundedSearch.js';
 import { buildTravelSearchPrompt } from '../ai/prompts/travelSearch.v1.js';
 import { isTravelDomainQuery, sanitizeSearchQuery, toSearchPhrase } from '../ai/travelDomain.js';
@@ -131,6 +131,7 @@ const PAGE_ACTION_MESSAGE_DEFAULTS = {
   generate_itinerary: 'Building your day-by-day plan.',
   regenerate_days: 'Redoing those days now.',
   edit_day: 'Updating that day now.',
+  prefill_form: 'Filling that in on the page now.',
 };
 
 const SEARCH_DISABLED_MESSAGE =
@@ -443,6 +444,11 @@ export const assistantTurn = asyncHandler(async (req, res) => {
 
     const catalogueCurrency = packages[0]?.currency || 'USD';
     const routerIntent = routerResult?.classification.intent ?? null;
+    // A form IS the surface this turn: the mounted form decides which fields may
+    // be written, and the canonicalizer narrowed the fill to exactly those. A
+    // planner surface has no form, so a fill there is refused below.
+    const prefillForm = ASSISTANT_FORM_SURFACES.includes(capabilities?.surface) ? capabilities.surface : null;
+
     const prompt = buildAssistantTurnPrompt({
       messages: history,
       availableRoutes,
@@ -454,6 +460,7 @@ export const assistantTurn = asyncHandler(async (req, res) => {
       pageCapabilities: capabilities,
       pageContext,
       currentView,
+      prefillForm,
       travelSearchEnabled: searchEnabled,
     });
     const stageTwoStartedAt = Date.now();
@@ -466,6 +473,7 @@ export const assistantTurn = asyncHandler(async (req, res) => {
         conversationalOutcomesEnabled: outcomesEnabled,
         capabilityActions: offeredActions,
         travelSearchEnabled: searchEnabled,
+        prefillForm,
       }),
       // One tool call, and the arguments of one tool: 1024 was enough for the
       // seven-tool vocabulary, but the model occasionally enumerates synonyms
@@ -512,8 +520,15 @@ export const assistantTurn = asyncHandler(async (req, res) => {
     // not report is answered with copy, never executed and never a 502 — the
     // browser is the only thing that knows what it mounted.
     const surfaceMismatch = Boolean(capabilities && pageContext && capabilities.surface !== pageContext.surface);
-    if (ASSISTANT_PAGE_ACTIONS.includes(tool) && (surfaceMismatch || !offeredActions.includes(tool))) {
-      logger.warn({ sessionId, tool, surfaceMismatch }, 'assistant named a page action this turn did not offer');
+    // A fill must name the form that is actually on screen. The surface IS the
+    // form, so filling another one is the same class of mistake as naming an
+    // action the page never offered — and the page would refuse it anyway.
+    const formMismatch = tool === 'prefill_form' && args.form !== prefillForm;
+    if (ASSISTANT_PAGE_ACTIONS.includes(tool) && (surfaceMismatch || formMismatch || !offeredActions.includes(tool))) {
+      logger.warn(
+        { sessionId, tool, surfaceMismatch, formMismatch },
+        'assistant named a page action this turn did not offer',
+      );
       tool = 'respond_conversationally';
       args = { mode: 'capability' };
     }
@@ -976,7 +991,8 @@ export const assistantTurn = asyncHandler(async (req, res) => {
       case 'go_to_step':
       case 'generate_itinerary':
       case 'regenerate_days':
-      case 'edit_day': {
+      case 'edit_day':
+      case 'prefill_form': {
         const { message: actionMessage, ...actionArgs } = args;
         serverResult = {
           action: { tool, ...actionArgs },

@@ -5,6 +5,8 @@ import careerService from '../../services/api/career';
 import { HERO_TITLE, HIRING_PERKS } from '../../content/career';
 import VacancyList from './components/VacancyList';
 import ApplicationForm from './components/ApplicationForm';
+import { useAssistantPageRegistration } from '../assistant/capabilities/AssistantCapabilityProvider';
+import { assistantFieldState, useAssistantWrittenFields } from '../assistant/actions/useAssistantFormPrefill';
 import { isImgbbConfigured, uploadResumeToImgbb } from './services/imageUpload';
 import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 
@@ -80,10 +82,40 @@ export default function CareerContainer() {
     fetchVacancies();
   }, []);
 
+  const { written, markWritten, clearWritten } = useAssistantWrittenFields();
+
+  // The state lives here, so the registration does too: the form below is
+  // presentational and only ever sees change events.
+  useAssistantPageRegistration({
+    surface: 'application',
+    revision: 'application',
+    // `step` is a planner idea; a form has exactly one, so it reports 1.
+    pageContext: { surface: 'application', revision: 'application', step: 1 },
+    actions: ['prefill_form'],
+    prefill: {
+      form: 'application',
+      fields: () => ({
+        fullName: assistantFieldState(formData.fullName, written.has('fullName')),
+        email: assistantFieldState(formData.email, written.has('email')),
+        phone: assistantFieldState(formData.phone, written.has('phone')),
+        position: assistantFieldState(formData.position, written.has('position')),
+        coverLetter: assistantFieldState(formData.coverLetter, written.has('coverLetter')),
+      }),
+      write: (fields) => {
+        // Only the fields the contract allows can arrive here — the resume and the
+        // consent checkbox are not in this form's declared fields.
+        setFormData((prev) => ({ ...prev, ...fields }));
+        markWritten(Object.keys(fields));
+      },
+    },
+  });
+
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
+    // The visitor's own keystroke takes the field back.
+    clearWritten(name);
     const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
     setFormData((prev) => ({
       ...prev,
@@ -287,6 +319,7 @@ export default function CareerContainer() {
                 isSubmitting={isSubmitting}
                 uploadProgress={uploadProgress}
                 onChange={handleInputChange}
+                assistantWritten={written}
                 onFileChange={handleFileChange}
                 onRemoveResume={handleRemoveResume}
                 onSubmit={handleSubmit}

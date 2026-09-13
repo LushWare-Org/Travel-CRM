@@ -30,6 +30,7 @@ export type AssistantEventTool =
   | 'edit_day'
   | 'search_travel_info'
   | 'answer_current_view'
+  | 'prefill_form'
   | null;
 
 export interface AssistantEventPayload {

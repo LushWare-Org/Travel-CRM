@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AssistantCapabilityProvider } from '../../assistant/capabilities/AssistantCapabilityProvider';
+
+// The booking and review modals register what the assistant may fill while they
+// are open, and that registration requires the provider the app mounts at root.
+const renderWithAssistant = (ui: Parameters<typeof render>[0]) =>
+  render(<AssistantCapabilityProvider>{ui}</AssistantCapabilityProvider>);
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -92,7 +98,7 @@ const LocationProbe = () => {
 };
 
 const renderContainer = (entry = '/package/pkg-1') =>
-  render(
+  renderWithAssistant(
     <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route
@@ -249,14 +255,16 @@ describe('ReviewModal', () => {
         await submitReview('pkg-1', data);
       };
       return (
-        <ReviewModal
-          open
-          reviewData={data}
-          isSubmittingReview={false}
-          setReviewData={setData}
-          onSubmit={handleSubmit}
-          onClose={() => {}}
-        />
+        <AssistantCapabilityProvider>
+          <ReviewModal
+            open
+            reviewData={data}
+            isSubmittingReview={false}
+            setReviewData={setData}
+            onSubmit={handleSubmit}
+            onClose={() => {}}
+          />
+        </AssistantCapabilityProvider>
       );
     };
 

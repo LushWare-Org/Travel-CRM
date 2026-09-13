@@ -9,7 +9,8 @@ import { loadAssistantParamValues } from '../assistantParamValues';
 import { useAssistantCapabilities, useAssistantCurrentView } from '../capabilities/AssistantCapabilityProvider';
 import type { AssistantCurrentViewValue } from '../capabilities/AssistantCapabilityProvider';
 import type { AssistantPageRegistration } from '../capabilities/AssistantCapabilityProvider';
-import { runAssistantAction } from '../actions/runAssistantAction';
+import { resolveHeldPrefill, runAssistantAction } from '../actions/runAssistantAction';
+import type { PendingPrefill } from '../actions/runAssistantAction';
 
 // Sliding window resent to the stateless assistant-service each turn — same
 // reasoning as useTripWizard's MAX_SENT_MESSAGES. Older turns still show in
@@ -71,8 +72,9 @@ export type AssistantTurnData =
   | { tool: 'redirect_off_topic'; redirected: true }
   // A page action the client is about to run (or has just run). `announcement`
   // starts empty and is filled in with what the page reported, so the bubble
-  // never claims a change before the page has made one.
-  | { tool: 'page_action'; revision: string | null; announcement: string }
+  // never claims a change before the page has made one. `pending` is a form fill
+  // held back because the visitor's own text is in the way.
+  | { tool: 'page_action'; revision: string | null; announcement: string; pending?: PendingPrefill | null }
   // A web-grounded travel answer. The reply text is the message; these are the
   // sources the server extracted from the provider's grounding metadata.
   | { tool: 'search_travel_info'; citations: AssistantCitation[] }
@@ -454,11 +456,18 @@ export function useAssistantChat() {
           args: actionArgs && typeof actionArgs === 'object' ? (actionArgs as Record<string, unknown>) : {},
           revision: turnData.revision,
         });
-        if (outcome.announcement) {
+        if (outcome.announcement || outcome.pending) {
           setTurns((prev) =>
             prev.map((turn) =>
               turn.assistantMessageId === assistantMessage.id && turn.data.tool === 'page_action'
-                ? { ...turn, data: { ...turn.data, announcement: outcome.announcement } }
+                ? {
+                    ...turn,
+                    data: {
+                      ...turn.data,
+                      announcement: outcome.announcement || turn.data.announcement,
+                      pending: outcome.pending ?? null,
+                    },
+                  }
                 : turn,
             ),
           );
@@ -472,5 +481,22 @@ export function useAssistantChat() {
     }
   };
 
-  return { messages, turns, sessionId, isSending, error, sendMessage };
+  // The confirm chip's own action. Deliberately not a turn: the values it applies
+  // are already in the browser, and "keep mine" is a decision to do nothing.
+  const resolvePrefill = (assistantMessageId: string, choice: 'replace' | 'keep') => {
+    const turn = turns.find((entry) => entry.assistantMessageId === assistantMessageId);
+    const pending = turn?.data.tool === 'page_action' ? turn.data.pending : null;
+    if (!pending) return;
+
+    const outcome = resolveHeldPrefill({ registration: getRegistration(), pending, choice });
+    setTurns((prev) =>
+      prev.map((entry) =>
+        entry.assistantMessageId === assistantMessageId && entry.data.tool === 'page_action'
+          ? { ...entry, data: { ...entry.data, announcement: outcome.announcement, pending: null } }
+          : entry,
+      ),
+    );
+  };
+
+  return { messages, turns, sessionId, isSending, error, sendMessage, resolvePrefill };
 }

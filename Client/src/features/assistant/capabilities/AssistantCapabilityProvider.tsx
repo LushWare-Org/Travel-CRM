@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { z } from 'zod';
 import type { AssistantAction, AssistantCurrentView, AssistantPageContext } from '@travel-crm/contracts';
+import { ASSISTANT_FORM_SURFACES } from '@travel-crm/contracts';
 
 /**
  * One action the page can execute against its own state. Derived from the shared
@@ -9,6 +10,9 @@ import type { AssistantAction, AssistantCurrentView, AssistantPageContext } from
  * to name, and the runner cannot hand it an action shape the contract rejects.
  */
 export type AssistantPageAction = z.infer<typeof AssistantAction>['tool'];
+
+/** One of the site's forms, as the contract names it. A form id is also its surface id. */
+export type AssistantFormValue = (typeof ASSISTANT_FORM_SURFACES)[number];
 
 export type AssistantActionPayload = z.infer<typeof AssistantAction>;
 
@@ -36,13 +40,48 @@ export type AssistantPageContextValue = z.infer<typeof AssistantPageContext>;
  */
 export type AssistantCurrentViewValue = z.infer<typeof AssistantCurrentView>;
 
+/** What one of a form's writable fields holds, and who put it there. */
+export interface AssistantFormFieldState {
+  value: string | number;
+  /**
+   * `visitor` is the one that matters: the assistant never overwrites text the
+   * visitor typed without a confirm, and the mark it leaves on its own writes is
+   * cleared the moment the visitor edits that field.
+   */
+  source: 'visitor' | 'assistant' | 'empty';
+}
+
+/**
+ * A form the mounted page can have filled. Deliberately read-through rather than
+ * a copy: `fields()` reports what the form holds at the moment a fill arrives, so
+ * a collision is decided against the live form rather than against whatever it
+ * held when the page last rendered.
+ */
+export interface AssistantFormPrefill {
+  form: AssistantFormValue;
+  fields: () => Record<string, AssistantFormFieldState>;
+  write: (fields: Record<string, string | number>) => void;
+}
+
 export interface AssistantPageRegistration {
   surface: AssistantPageContextValue['surface'];
   revision: string;
   pageContext: AssistantPageContextValue;
   actions: AssistantPageAction[];
-  /** Executes the action against the page and resolves to a line for the transcript ('' says nothing). */
-  runAction: (action: AssistantActionPayload) => Promise<string>;
+  /**
+   * Executes one of the page's OTHER actions and resolves to a line for the
+   * transcript ('' says nothing). Absent on a page whose only registered action is
+   * `prefill_form`, which the runner handles itself against `prefill` below.
+   */
+  runAction?: (action: AssistantActionPayload) => Promise<string>;
+  /** Present only on a page with a form on screen; the `prefill_form` member needs it. */
+  prefill?: AssistantFormPrefill;
+  /**
+   * True when the registered form lives inside a dialog. The panel has to sit
+   * above an open dialog to be usable at all, and the layer it takes is the only
+   * thing that says so.
+   */
+  hostedInDialog?: boolean;
 }
 
 interface AssistantCapabilityStore {
@@ -52,6 +91,9 @@ interface AssistantCapabilityStore {
   /** The mounted page's own report of what is on screen, read at send time too. */
   getView: () => AssistantCurrentViewValue | null;
   setView: (view: AssistantCurrentViewValue | null) => void;
+  /** Whether the mounted registration is a dialog-hosted form, for the panel's layer. */
+  setDialogHost: (hosted: boolean) => void;
+  hostedInDialog: boolean;
 }
 
 const AssistantCapabilityContext = createContext<AssistantCapabilityStore | null>(null);
@@ -70,6 +112,9 @@ const AssistantCapabilityContext = createContext<AssistantCapabilityStore | null
 export function AssistantCapabilityProvider({ children }: { children: ReactNode }) {
   const registration = useRef<AssistantPageRegistration | null>(null);
   const currentView = useRef<AssistantCurrentViewValue | null>(null);
+  // State, not a ref: the widget has to re-render to change its layer, and this is
+  // the only part of a registration that is read during render.
+  const [hostedInDialog, setDialogHost] = useState(false);
 
   const store = useMemo<AssistantCapabilityStore>(
     () => ({
@@ -81,8 +126,10 @@ export function AssistantCapabilityProvider({ children }: { children: ReactNode 
       setView: (next) => {
         currentView.current = next;
       },
+      setDialogHost,
+      hostedInDialog,
     }),
-    [],
+    [hostedInDialog],
   );
 
   return <AssistantCapabilityContext.Provider value={store}>{children}</AssistantCapabilityContext.Provider>;
@@ -109,8 +156,18 @@ export function useAssistantPageRegistration(registration: AssistantPageRegistra
 
   useEffect(() => {
     store.set(registration);
-    return () => store.set(null);
+    store.setDialogHost(Boolean(registration?.hostedInDialog));
+    return () => {
+      store.set(null);
+      store.setDialogHost(false);
+    };
   }, [store, registration]);
+}
+
+/** Whether the mounted form lives in a dialog: the panel's layer follows it. */
+export function useAssistantDialogHost(): boolean {
+  const store = useContext(AssistantCapabilityContext);
+  return store?.hostedInDialog ?? false;
 }
 
 /**

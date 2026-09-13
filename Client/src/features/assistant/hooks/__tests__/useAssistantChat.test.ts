@@ -645,6 +645,7 @@ describe('useAssistantChat — page capabilities', () => {
     });
     expect(result.current.turns[0].data).toEqual({
       tool: 'page_action',
+      pending: null,
       revision: 'planner',
       announcement: 'Updated Day 3: activities.',
     });
@@ -673,6 +674,7 @@ describe('useAssistantChat — page capabilities', () => {
     expect(runAction).not.toHaveBeenCalled();
     expect(result.current.turns[0].data).toEqual({
       tool: 'page_action',
+      pending: null,
       revision: 'customize:p1',
       announcement: 'The page changed, so I did not touch it — ask me again.',
     });
