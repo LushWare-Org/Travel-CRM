@@ -431,21 +431,33 @@
 **Priority:** P2
 **Depends on:** Per-descriptor tool design for the remaining eight page keys (the `tools` seam and two tools have landed)
 
-### Interrogable briefing: promptable claim rows
+### Interrogable briefing: promptable claim rows — SHIPPING, with a weaker mechanism
 
-**What:** Make each briefing claim row a prompt. An `Ask why this` affordance on a claim submits a turn carrying that claim's own `evidenceIds`, so the answer is grounded against evidence already on screen, and the Needs attention list becomes the agent's open loop rather than a wall of prose.
+**Status:** In flight. `docs/designs/management-copilot-insights-reframe.md` (approved 2026-09-13) builds the interaction: a per-finding "Chat about this" that binds the row to a turn, renders it as a quoted block, and carries the transcript forward so follow-ups stay in context.
 
-**Why:** The strongest idea surfaced in the 2026-09-11 panel-hardening session, from the independent model read. Today the conversation is a box below the briefing, and the operator has to re-describe what they are looking at. Carrying the claim's evidence ids makes the turn self-grounding and makes the briefing the entry point to the agent, which is what "act as a real agent copilot" actually requires.
+**What shipped vs. what this item described:** The interaction ships. The **self-grounding** half does not. `PriorClaimSchema` (`Services/shared/contracts/src/managementCopilot.js:149-165`) deliberately carries no `evidenceId` and is documented as "client-asserted and never satisfies grounding", so the turn carries the finding's **sentence and facts**, not its citations. The answer is grounded in the page bundle the ask path re-fetches, which is the same read the claim came from, rather than in the specific claim the operator clicked. Accepted deliberately during review (decision D2) because the exposure is narrow and the alternative was a contract change.
 
-**Pros:** Zero re-description, since the question arrives with its scope and citations attached. Turns the briefing into the agent's interface rather than a report with a chat underneath it. Reuses the existing turn endpoint, the claim shape, and `evidenceIds`; no new transport.
+**Residual work:** see the item below.
 
-**Cons:** A new interaction surface needing its own focus, keyboard, and accessibility pass. Prompt affordances can crowd the briefing hierarchy that the Evidence Lens design deliberately ranked first. The turn request needs an optional originating-claim field.
-
-**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-panel-hardening.md` (approach C, "Interrogable briefing") because it is a new interaction rather than a fix, and that change set was already ~20 files. Its substrate has landed: the conversation lives in the shell so it renders on every scope, the page-scoped tool seam exists (`adapter.askTools(scope)`), and the shared briefing logic is extracted. Start it once the panel-hardening slice has real agent usage behind it.
-
-**Effort:** L
+**Effort:** L (was); the interaction portion is now planned
 **Priority:** P3
-**Depends on:** Landed panel-hardening slice (shell-owned conversation + page-scoped ask tools); an optional originating-claim field on `ManagementAssistantTurnRequest`
+**Depends on:** Landed panel-hardening slice — satisfied; the app-wide conversation shell and `adapter.askTools(scope)` both exist
+
+### Self-grounding turns: carry the claim's evidence ids
+
+**What:** Add an optional `evidenceIds` array to `PriorClaimSchema`, and have the server **intersect client-asserted ids against the evidence it fetched itself**, dropping anything that does not resolve. The client asserts which claim the operator clicked; the server decides whether that assertion earns a citation. Then a bound turn answers against the same evidence the row cited, rather than against whatever the bundle happens to hold.
+
+**Why:** The approved insights reframe ships the interaction with continuity only. Without this, the model receives the finding's text but not its citation, so it can answer using any evidence it has loaded, including a different finding's. The operator gets a confident answer that cites real evidence — just not necessarily the evidence they were pointing at. That is the failure mode this product line exists to prevent, and it is currently bounded only by the bundle happening to contain the right items.
+
+**Pros:** Completes the intent the original item described. The server-side intersection makes client-asserted ids safe rather than trusted, and it is the same pattern `groundingValidator` already uses, where a cited id only counts if it resolves inside the server's own bundle. A fabricated id simply disappears instead of grounding anything.
+
+**Cons:** It is a contract change, which is the constraint the insights reframe was deliberately shaped around to avoid — additive in the request direction, but still needing the two-directional rollout that `client-assistant-action-infrastructure.md` established as the bar for this endpoint. It also re-opens a decision the review made with the exposure in front of it.
+
+**Context:** Raised as finding 1A during `/plan-eng-review` on the insights reframe, and deferred by explicit decision rather than oversight. The review's reasoning for deferring: the ask path re-fetches the same bundle the deterministic claim came from, and the evidence-cap pruning rule guarantees a claim's cited evidence is present in it, so the practical exposure is narrow. Revisit if a bound answer is ever observed to drift onto a different finding's evidence. The design sketch is in the reframe doc's "NOT in scope".
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** The insights reframe landing; an additive `priorClaims.evidenceIds` on `ManagementAssistantTurnRequest` with server-side intersection before the ids reach the prompt
 
 ### Generate the collection briefing mockups
 
