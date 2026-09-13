@@ -1,15 +1,17 @@
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import logger from '../config/logger.js';
 import { nextQuotationNumber, nextInvoiceNumber } from '../utils/docNumber.js';
 import { quotationTotals, createOrVersionQuotation } from '../services/quotation.service.js';
-import { emitLeadEvent } from '../services/events.client.js';
+import { emitLeadEvent, logLeadCommunication } from '../services/events.client.js';
 import { generateQuotationPDF } from '../utils/quotationPDFGenerator.js';
 import { sendQuotationEmail } from '../utils/emailService.js';
 import { sendQuotationWhatsapp } from '../utils/whatsappService.js';
 import { uploadPdfBuffer } from '../utils/cloudinary.js';
-import { sendQuotationSchema } from '../validators/quotation.validator.js';
+import { sendQuotationSchema, convertToInvoiceSchema } from '../validators/quotation.validator.js';
 import { LeadSnapshotForQuotation } from '@travel-crm/contracts';
+import { getOrgSettings, toBrandingShape, getBankDetails } from '../config/orgSettings.js';
 
 const quotationInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -159,6 +161,13 @@ export const sendQuotation = asyncHandler(async (req, res) => {
         where: { id: quotation.id },
         data: { status: 'sent', sentAt: now, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
       });
+      try {
+        await logLeadCommunication({
+          leadId: quotation.leadId, type: 'whatsapp', notes: `WhatsApp: Quotation ${quotation.quotationNumber} sent`,
+        });
+      } catch (err) {
+        req.log.error({ err, leadId: quotation.leadId }, 'Failed to log WhatsApp send on lead timeline');
+      }
       return res.json({ success: true, message: 'Quotation sent via WhatsApp', data: updated });
     }
 
@@ -172,8 +181,10 @@ export const sendQuotation = asyncHandler(async (req, res) => {
     return res.json({ success: true, message: 'Quotation sent via email', data: updated });
   } catch (err) {
     if (err instanceof AppError) throw err;
-    // Configuration / delivery failures surface as a clean 400, not a 500.
-    throw new AppError(err.message || 'Failed to send quotation', 400);
+    // Configuration / delivery failures surface as a clean 400, not a 500. The
+    // transport's own message is logged here and never echoed to the client.
+    logger.error({ err }, 'Failed to send quotation');
+    throw new AppError("We couldn't send that quotation. Please try again.", 400);
   }
 });
 
@@ -219,24 +230,46 @@ export const rejectQuotation = asyncHandler(async (req, res) => {
   res.json({ success: true, data: quotation });
 });
 
+/**
+ * Creates an Invoice from an already-priced Quotation. Pricing
+ * (subtotal/tax/discount/serviceCharge/total + items) is always copied
+ * verbatim from the quotation — an invoice must never recompute the numbers
+ * a customer already agreed to. Customer/destination/bank/terms fields
+ * follow a three-level precedence: explicit override in the request body →
+ * the quotation's own snapshot (customer/destination) or current org
+ * settings (bank/terms) → nothing (left blank) if neither is set.
+ */
 export const convertQuotationToInvoice = asyncHandler(async (req, res) => {
+  const overrides = convertToInvoiceSchema.parse(req.body || {});
+
   const quotation = await prisma.quotation.findUnique({ where: { id: req.params.id }, include: { items: true } });
   if (!quotation) throw new AppError('Quotation not found', 404);
   if (quotation.status === 'converted') throw new AppError('Already converted', 400);
 
   const invoiceNumber = await nextInvoiceNumber();
-  const dueDate = req.body.dueDate ? new Date(req.body.dueDate) : new Date(Date.now() + 30 * 86400000);
+  const dueDate = overrides.dueDate || new Date(Date.now() + 30 * 86400000);
+
+  const orgSettings = await getOrgSettings();
+  const branding = toBrandingShape(orgSettings);
+  const bank = getBankDetails(branding);
 
   const invoice = await prisma.invoice.create({
     data: {
       invoiceNumber,
+      currency: quotation.currency,
       leadId: quotation.leadId,
       quotationId: quotation.id,
+      bookingId: overrides.bookingId ?? undefined,
       createdById: req.user.id,
-      customerName: quotation.customerName,
-      customerEmail: quotation.customerEmail,
-      customerPhone: quotation.customerPhone,
-      customerAddress: quotation.customerAddress,
+
+      customerName: overrides.customerName ?? quotation.customerName,
+      customerEmail: overrides.customerEmail ?? quotation.customerEmail,
+      customerPhone: overrides.customerPhone ?? quotation.customerPhone,
+      customerAddress: overrides.customerAddress ?? quotation.customerAddress,
+      customerGstNumber: overrides.customerGstNumber ?? quotation.customerGstNumber,
+      destination: overrides.destination ?? quotation.destination,
+
+      // Pricing is never recomputed — copied verbatim from the quotation.
       subtotal: quotation.subtotal,
       taxRate: quotation.taxRate,
       taxAmount: quotation.taxAmount,
@@ -247,9 +280,21 @@ export const convertQuotationToInvoice = asyncHandler(async (req, res) => {
       serviceChargeAmount: quotation.serviceChargeAmount,
       totalAmount: quotation.totalAmount,
       outstandingAmount: quotation.totalAmount,
+
       dueDate,
-      notes: quotation.notes,
+      notes: overrides.notes ?? quotation.notes,
       terms: quotation.terms,
+      paymentTerms: overrides.paymentTerms ?? branding.content.invoiceTerms,
+      paymentInstructions: overrides.paymentInstructions ?? branding.content.invoicePaymentInstructions,
+
+      bankAccountName: overrides.bankAccountName ?? bank.accountName,
+      bankAccountNumber: overrides.bankAccountNumber ?? bank.accountNumber,
+      bankName: overrides.bankName ?? bank.bankName,
+      bankIfscCode: overrides.bankIfscCode ?? bank.ifscCode,
+      bankSwiftCode: overrides.bankSwiftCode ?? bank.swiftCode,
+      bankBranch: overrides.bankBranch ?? bank.branch,
+      bankUpiId: overrides.bankUpiId ?? bank.upiId,
+
       items: { create: quotation.items.map(({ id, quotationId, ...item }) => item) },
     },
     include: { items: true },

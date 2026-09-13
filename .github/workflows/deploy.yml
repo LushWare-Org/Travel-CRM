@@ -1,0 +1,229 @@
+name: Deploy to GCP
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy to
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches: [microservices]
+
+env:
+  NODE_VERSION: '20.x'
+  # workflow_dispatch carries the chosen environment; a push to
+  # microservices auto-deploys the lowest-stakes environment only.
+  TARGET_ENV: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  build-and-push:
+    name: Build and push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - user-service
+          - package-service
+          - lead-service
+          - booking-service
+          - billing-service
+          - career-service
+          - flight-service
+          - analytics-service
+          - notification-service
+          - assistant-service
+          - gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
+
+      # Short SHA to match the convention used everywhere else in this repo
+      # (infra/README.md's manual rebuild steps, terraform.tfvars image_tag)
+      # -- github.sha is the full 40-char hash and would never match what
+      # Terraform expects, so a later `terraform apply` would silently roll
+      # every service back to whatever short-SHA tag it already has in state.
+      - name: Build and push image
+        run: |
+          IMAGE=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${GITHUB_SHA:0:7}
+          docker build -f Services/${{ matrix.service }}/Dockerfile -t "$IMAGE" Services/
+          docker push "$IMAGE"
+
+  migrate:
+    name: Run database migrations
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # migrate-all.mjs runs `npx prisma migrate deploy` inside each
+      # Prisma-backed service, so every service's own node_modules must
+      # exist for npx to resolve the prisma version locked in its
+      # package.json rather than downloading an unpinned one.
+      - name: Install Prisma-backed services
+        working-directory: Services
+        run: |
+          for service in auth-service user-service package-service lead-service booking-service billing-service career-service flight-service assistant-service; do
+            (cd "$service" && npm ci)
+          done
+
+      # One shared database per environment — never matrixed, so
+      # migrations can't race each other.
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.SUPABASE_DIRECT_URL }}
+        run: node Services/migrate-all.mjs
+
+  deploy:
+    name: Deploy ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: migrate
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - user-service
+          - package-service
+          - lead-service
+          - booking-service
+          - billing-service
+          - career-service
+          - flight-service
+          - analytics-service
+          - notification-service
+          - assistant-service
+          - gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      # Image tag only, no env/secret flags — Terraform remains the sole
+      # source of truth for env vars and secrets, so CI and Terraform
+      # never fight over ownership.
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.TARGET_ENV }}-${{ matrix.service }} \
+            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${GITHUB_SHA:0:7} \
+            --region ${{ vars.GCP_REGION }}
+
+  deploy-hosting:
+    name: Deploy Firebase Hosting sites
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            Client/package-lock.json
+            Management/package-lock.json
+
+      # Client/Management depend on @travel-crm/contracts via a `file:`
+      # link into Services/shared/contracts — npm ci in Client/Management
+      # only installs *their* deps, it never installs the linked package's
+      # own deps (zod), so that has to happen explicitly first.
+      - name: Install shared contracts package
+        working-directory: Services/shared/contracts
+        run: npm ci
+
+      - name: Install and build Client
+        working-directory: Client
+        env:
+          VITE_API_URL: ${{ vars.GATEWAY_URL }}
+          # Non-secret branding constants (same values as Client/.env's local
+          # defaults). CI never had these set, so index.html's %VITE_X%
+          # placeholders shipped to production unresolved, e.g. a literal
+          # "%VITE_COMPANY_NAME%" browser tab title -- see
+          # src/config/branding.ts's applyBranding() doc comment. That runtime
+          # fallback keeps a future missing var from ever regressing to a raw
+          # placeholder again, but these should still resolve to the real
+          # company name here, not the generic "Your Company" fallback.
+          VITE_COMPANY_NAME: 'LUSH Ware'
+          VITE_META_DESCRIPTION: 'LUSH Ware — sustainable, expertly curated journeys around the world.'
+          VITE_LOGO_PATH: '/logo.png'
+          # The catalog is stored in USD (package-service defaults
+          # currency: 'USD'), and Client/.env is gitignored, so a CI build with
+          # these unset fell back to lib/currency.ts's defaults and rendered ₹
+          # for USD prices. Set them explicitly per environment.
+          VITE_CURRENCY_CODE: 'USD'
+          VITE_CURRENCY_SYMBOL: '$'
+          VITE_CURRENCY_LOCALE: 'en-US'
+        run: npm ci --legacy-peer-deps && npm run build
+
+      - name: Install and build Management
+        working-directory: Management
+        env:
+          VITE_API_URL: ${{ vars.GATEWAY_URL }}
+          # The Management copilot panel is a build-time feature gate:
+          # src/pages/LeadManagement.tsx reads
+          # `import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === 'true'`, and any
+          # other value tree-shakes the whole copilot component tree out of the
+          # bundle. Until now the flag only ever came from a developer's local,
+          # gitignored Management/.env, so CI-built Management shipped without
+          # the copilot while local dev builds had it -- deployed and local
+          # silently disagreed. Set it explicitly so the CI artifact matches the
+          # intended feature set; revisit per-environment if staging/prod should
+          # not enable it.
+          VITE_MANAGEMENT_COPILOT_ENABLED: 'true'
+        run: npm ci --legacy-peer-deps && npm run build
+
+      - name: Authenticate to Google Cloud with Firebase service account
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: firebase-hosting-deployer@travelcrm-506818.iam.gserviceaccount.com
+
+      - name: Deploy to Firebase Hosting
+        run: npx --yes firebase-tools@latest deploy --only hosting:client-${{ env.TARGET_ENV }},hosting:management-${{ env.TARGET_ENV }}

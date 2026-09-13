@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "travelcrm-506818"
+  },
+  "targets": {
+    "travelcrm-506818": {
+      "hosting": {
+        "client-dev": [
+          "lush-ware-client-dev"
+        ],
+        "management-dev": [
+          "lush-ware-management-dev"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

@@ -42,7 +42,7 @@ vi.mock('../../../../services/api', () => ({
   },
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -93,7 +93,7 @@ vi.mock('../PricingSection', () => ({
   ),
 }));
 
-import EditLeadDialog from '../EditLeadDialog.jsx';
+import EditLeadDialog from '../EditLeadDialog.tsx';
 
 const PKG_A = 'pkg-a';
 const PKG_B = 'pkg-b';

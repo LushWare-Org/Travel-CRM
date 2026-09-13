@@ -1,4 +1,17 @@
 import axios from 'axios';
+import AppError from '../../utils/appError.js';
+import logger from '../../config/logger.js';
+import { BAD_REQUEST, SERVICE_UNAVAILABLE } from '../../constants/httpStatus.js';
+import {
+  HOTEL_ID_REQUIRED,
+  OFFER_ID_REQUIRED,
+  PREBOOK_ID_REQUIRED,
+  BOOKING_ID_REQUIRED,
+  GUESTS_REQUIRED,
+  CONTACT_EMAIL_REQUIRED,
+  HOTELS_NOT_CONFIGURED,
+  hotelProviderFailure,
+} from '../../constants/errorMessages.js';
 
 /**
  * @implements {import('./interface.js').HotelApiClient}
@@ -53,18 +66,18 @@ export class LiteApiClient {
       const { data } = await this.#client().post('/hotels/rates', body);
       return this.#normalizeOffers(data.data || []);
     } catch (err) {
-      this.#unwrapError(err, 'Hotel search failed');
+      this.#unwrapError(err, 'search');
     }
   }
 
   /** @param {string} hotelId */
   async getHotelDetails(hotelId) {
-    if (!hotelId) throw new Error('hotelId is required');
+    if (!hotelId) throw new AppError(HOTEL_ID_REQUIRED, BAD_REQUEST);
     try {
       const { data } = await this.#client().get('/data/hotel', { params: { id: hotelId } });
       return this.#normalizeDetails(data.data);
     } catch (err) {
-      this.#unwrapError(err, 'Hotel details lookup failed');
+      this.#unwrapError(err, 'details');
     }
   }
 
@@ -76,13 +89,13 @@ export class LiteApiClient {
       const list = Array.isArray(data.data) ? data.data : [];
       return list.map((h) => this.#normalizeDetails(h));
     } catch (err) {
-      this.#unwrapError(err, 'Hotel batch details failed');
+      this.#unwrapError(err, 'details');
     }
   }
 
   /** @param {import('./interface.js').PrebookParams} params */
   async prebook(params) {
-    if (!params.offerId) throw new Error('offerId is required');
+    if (!params.offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
     try {
       const { data } = await this.#bookClient().post('/rates/prebook', {
         offerId: params.offerId,
@@ -91,15 +104,15 @@ export class LiteApiClient {
       const d = data.data;
       return { prebookId: d.prebookId || d.id, status: d.status || 'valid', expiresAt: d.expiresAt };
     } catch (err) {
-      this.#unwrapError(err, 'Hotel prebook failed');
+      this.#unwrapError(err, 'book');
     }
   }
 
   /** @param {import('./interface.js').BookParams} params */
   async book(params) {
-    if (!params.prebookId) throw new Error('prebookId is required');
-    if (!params.guests?.length) throw new Error('At least one guest is required');
-    if (!params.contact?.email) throw new Error('contact.email is required');
+    if (!params.prebookId) throw new AppError(PREBOOK_ID_REQUIRED, BAD_REQUEST);
+    if (!params.guests?.length) throw new AppError(GUESTS_REQUIRED, BAD_REQUEST);
+    if (!params.contact?.email) throw new AppError(CONTACT_EMAIL_REQUIRED, BAD_REQUEST);
 
     const contactName = (params.contact.name || `${params.guests[0].firstName} ${params.guests[0].lastName}`).split(' ');
 
@@ -124,7 +137,7 @@ export class LiteApiClient {
       const { data } = await this.#bookClient().post('/rates/book', body);
       return this.#normalizeBooking(data.data);
     } catch (err) {
-      this.#unwrapError(err, 'Hotel booking failed');
+      this.#unwrapError(err, 'book');
     }
   }
 
@@ -135,29 +148,29 @@ export class LiteApiClient {
       const bookings = Array.isArray(data.data) ? data.data : [];
       return bookings.map((b) => this.#normalizeBooking(b));
     } catch (err) {
-      this.#unwrapError(err, 'Hotel bookings list failed');
+      this.#unwrapError(err, 'list');
     }
   }
 
   /** @param {string} bookingId */
   async getBooking(bookingId) {
-    if (!bookingId) throw new Error('bookingId is required');
+    if (!bookingId) throw new AppError(BOOKING_ID_REQUIRED, BAD_REQUEST);
     try {
       const { data } = await this.#bookClient().get(`/bookings/${bookingId}`);
       return this.#normalizeBooking(data.data);
     } catch (err) {
-      this.#unwrapError(err, 'Hotel booking retrieval failed');
+      this.#unwrapError(err, 'retrieve');
     }
   }
 
   /** @param {string} bookingId @param {string} [reason] */
   async cancelBooking(bookingId, reason) {
-    if (!bookingId) throw new Error('bookingId is required');
+    if (!bookingId) throw new AppError(BOOKING_ID_REQUIRED, BAD_REQUEST);
     try {
       await this.#bookClient().put(`/bookings/${bookingId}`);
       return { bookingId, status: 'cancelled' };
     } catch (err) {
-      this.#unwrapError(err, 'Hotel cancellation failed');
+      this.#unwrapError(err, 'cancel');
     }
   }
 
@@ -165,7 +178,7 @@ export class LiteApiClient {
 
   #ensureConfig() {
     if (!process.env.LITEAPI_API_KEY) {
-      throw new Error('LITEAPI_API_KEY is not configured');
+      throw new AppError(HOTELS_NOT_CONFIGURED, SERVICE_UNAVAILABLE, { code: 'PROVIDER_UNAVAILABLE' });
     }
     this._apiKey = process.env.LITEAPI_API_KEY;
   }
@@ -265,11 +278,27 @@ export class LiteApiClient {
     };
   }
 
-  #unwrapError(err, fallbackMessage) {
-    if (err.message?.startsWith('LITEAPI_') || err.message?.includes('required')) throw err;
-    const status = err.response?.status || 502;
-    const raw = err.response?.data?.message || err.response?.data?.error || err.message || fallbackMessage;
-    const message = typeof raw === 'object' ? JSON.stringify(raw) : raw;
-    throw new Error(`LiteAPI error (${status}): ${message}`);
+  /**
+   * Turns a provider failure into a user-facing AppError.
+   *
+   * LiteAPI returns its error body as an object, which used to be JSON.stringify'd
+   * into the message a user read. The payload is logged here instead, and what
+   * reaches the caller is a sentence written for a traveller plus a status that
+   * matches the situation — previously every provider failure surfaced as a 500,
+   * including a hotel that simply no longer exists.
+   *
+   * @param {unknown} err
+   * @param {'search'|'details'|'book'|'retrieve'|'list'|'cancel'} operation
+   */
+  #unwrapError(err, operation) {
+    if (err instanceof AppError) throw err;
+
+    logger.error(
+      { status: err.response?.status, data: err.response?.data, operation },
+      'LiteAPI error details',
+    );
+
+    const { statusCode, code, message } = hotelProviderFailure(operation, err.response?.status);
+    throw new AppError(message, statusCode, { code });
   }
 }

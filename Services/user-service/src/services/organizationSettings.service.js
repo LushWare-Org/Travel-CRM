@@ -13,11 +13,12 @@ export async function getOrCreateSingleton() {
 }
 
 const EDITABLE_FIELDS = [
-  'companyName', 'companyShortName', 'companyLegalName', 'tagline', 'logoUrl',
+  'companyName', 'companyShortName', 'companyLegalName', 'companyAddress', 'companyGstNumber', 'tagline', 'logoUrl',
   'contactEmail', 'salesEmail', 'supportEmail', 'contactPhone', 'whatsappNumber', 'website',
   'themeInk', 'themeMuted', 'themeAccent', 'themeAccentDark',
   'defaultCurrency', 'defaultTaxRate', 'defaultServiceChargeRate', 'quotationValidityDays',
-  'quotationTerms', 'cancellationPolicy', 'ratingTagline', 'paymentMethods', 'docNumberPrefixes',
+  'quotationTerms', 'cancellationPolicy', 'invoicePaymentTerms', 'invoicePaymentInstructions',
+  'ratingTagline', 'paymentMethods', 'docNumberPrefixes',
   'bankName', 'bankAccountName', 'bankAccountNumber', 'bankIfscCode', 'bankSwiftCode',
   'bankBranch', 'bankAccountType', 'upiId',
 ];

@@ -7,6 +7,8 @@ import {
   assembleWhere,
   recomputeBasePrice,
   buildInclude,
+  buildListOrderBy,
+  destinationSlugSet,
 } from '../package.service.js';
 
 // Mock the shared pricing engine
@@ -48,7 +50,7 @@ const mockPkg = {
   views: 100,
   bookings: 5,
   createdBy: 'user-1',
-  images: [{ id: 'img-1', url: 'https://example.com/a.jpg', altText: 'View', orderIndex: 0 }],
+  images: [{ id: 'img-1', url: 'https://example.com/a.jpg', publicId: 'travel-crm/packages/a', altText: 'View', orderIndex: 0 }],
   itineraryDays: [
     {
       dayNumber: 1,
@@ -58,6 +60,7 @@ const mockPkg = {
       lunchCount: 0,
       dinnerCount: 1,
       mealPriceOverride: null,
+      images: [{ url: 'https://example.com/day1.jpg', publicId: 'travel-crm/itineraries/day1' }],
       places: [{ id: 'dp-1', placeId: 'place-1', place: { id: 'place-1', name: 'City', type: 'CITY' }, customName: null, orderIndex: 0 }],
       activities: [{ id: 'da-1', activityId: 'act-1', activity: { id: 'act-1', name: 'Tour', description: 'City tour', defaultCost: 50 }, costOverride: null, orderIndex: 0 }],
       transports: [{ id: 'dt-1', routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 80, distanceKm: null, originPlaceId: null, destinationPlaceId: null }],
@@ -88,7 +91,19 @@ describe('serializePackage', () => {
       { id: 'flight-1', origin: 'CMB', destination: 'DXB', cabinClass: 'Economy', airlinePreference: 'Emirates', totalAmount: 0 },
     ]);
     expect(result.images).toHaveLength(1);
+    expect(result.images[0].publicId).toBe('travel-crm/packages/a');
+    expect(result.itineraryDays[0].images).toEqual([
+      { url: 'https://example.com/day1.jpg', publicId: 'travel-crm/itineraries/day1' },
+    ]);
     expect(result.reviews).toHaveLength(1);
+  });
+
+  it('defaults itinerary day images to an empty array when absent', () => {
+    const result = serializePackage({
+      ...mockPkg,
+      itineraryDays: [{ ...mockPkg.itineraryDays[0], images: undefined }],
+    });
+    expect(result.itineraryDays[0].images).toEqual([]);
   });
 
   it('handles plain number basePrice and marginInput', () => {
@@ -207,6 +222,42 @@ describe('buildCreateData', () => {
     expect(day.flights).toEqual([{ id: 'flight-1', origin: 'CMB', destination: 'DXB', totalAmount: 0 }]);
   });
 
+  it('includes publicId in created image rows', () => {
+    const data = buildCreateData({
+      title: 'Pkg',
+      durationDays: 1,
+      category: 'FAMILY',
+      itineraryDays: [],
+      images: [{ url: 'a.jpg', publicId: 'travel-crm/packages/a', orderIndex: 0 }],
+    }, 'user-1');
+    expect(data.images.create[0]).toEqual({ url: 'a.jpg', publicId: 'travel-crm/packages/a', altText: undefined, orderIndex: 0 });
+  });
+
+  it('passes through day images into the nested day create data', () => {
+    const data = buildCreateData({
+      title: 'Pkg',
+      durationDays: 1,
+      category: 'FAMILY',
+      itineraryDays: [{
+        dayNumber: 1,
+        images: [{ url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' }],
+      }],
+    }, 'user-1');
+    expect(data.itineraryDays.create[0].images).toEqual([
+      { url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' },
+    ]);
+  });
+
+  it('defaults day images to an empty array when omitted', () => {
+    const data = buildCreateData({
+      title: 'Pkg',
+      durationDays: 1,
+      category: 'FAMILY',
+      itineraryDays: [{ dayNumber: 1 }],
+    }, 'user-1');
+    expect(data.itineraryDays.create[0].images).toEqual([]);
+  });
+
   it('uses customName when placeId is missing', () => {
     const data = buildCreateData({
       title: 'Pkg',
@@ -244,6 +295,11 @@ describe('buildUpdateData', () => {
     const data = buildUpdateData({ images: [{ url: 'new.jpg', orderIndex: 0 }] });
     expect(data.images).toHaveProperty('deleteMany', {});
     expect(data.images.create).toHaveLength(1);
+  });
+
+  it('includes publicId when rebuilding images', () => {
+    const data = buildUpdateData({ images: [{ url: 'new.jpg', publicId: 'travel-crm/packages/new', orderIndex: 0 }] });
+    expect(data.images.create[0].publicId).toBe('travel-crm/packages/new');
   });
 
   it('rebuilds itinerary days with deleteMany + create', () => {
@@ -288,21 +344,48 @@ describe('assembleWhere', () => {
     expect(where.OR[0].title.contains).toBe('beach');
   });
 
-  it('filters by price range', () => {
+  // Price bounds are on sellPrice — the price a customer is shown — and never
+  // on basePrice. They used to be on basePrice, which silently let the
+  // planner offer packages above the budget asked for whenever a package
+  // carried a margin. This is the guard on that correction.
+  it('filters the price range on sellPrice, never basePrice', () => {
     const where = assembleWhere({ minPrice: 100, maxPrice: 500 });
-    expect(where.basePrice).toEqual({ gte: 100, lte: 500 });
+    expect(where.sellPrice).toEqual({ gte: 100, lte: 500 });
+    expect(where.basePrice).toBeUndefined();
   });
 
   it('parses string price filters into numbers', () => {
     const where = assembleWhere({ minPrice: '100', maxPrice: '500' });
-    expect(where.basePrice).toEqual({ gte: 100, lte: 500 });
-    expect(typeof where.basePrice.gte).toBe('number');
-    expect(typeof where.basePrice.lte).toBe('number');
+    expect(where.sellPrice).toEqual({ gte: 100, lte: 500 });
+    expect(typeof where.sellPrice.gte).toBe('number');
+    expect(typeof where.sellPrice.lte).toBe('number');
   });
 
   it('filters by min price only', () => {
     const where = assembleWhere({ minPrice: 100 });
-    expect(where.basePrice).toEqual({ gte: 100 });
+    expect(where.sellPrice).toEqual({ gte: 100 });
+  });
+
+  it('ignores a price bound that is not a finite number', () => {
+    expect(assembleWhere({ maxPrice: 'cheap' })).toEqual({});
+    expect(assembleWhere({ maxPrice: '' })).toEqual({});
+    expect(assembleWhere({ minPrice: Number.NaN })).toEqual({});
+  });
+
+  it('filters by duration range on durationDays', () => {
+    expect(assembleWhere({ durationMin: 5, durationMax: 7 })).toEqual({ durationDays: { gte: 5, lte: 7 } });
+  });
+
+  it('filters by minimum rating', () => {
+    expect(assembleWhere({ minRating: 4 })).toEqual({ rating: { gte: 4 } });
+  });
+
+  it('filters by an explicit list of destination display strings', () => {
+    expect(assembleWhere({ destinations: ['Bali, Indonesia'] })).toEqual({ destination: { in: ['Bali, Indonesia'] } });
+  });
+
+  it('leaves destinations unfiltered when the resolved list is empty', () => {
+    expect(assembleWhere({ destinations: [] })).toEqual({});
   });
 
   it('combines multiple filters', () => {
@@ -310,6 +393,43 @@ describe('assembleWhere', () => {
     expect(where.isActive).toBe(true);
     expect(where.category).toBe('GROUP');
     expect(where.OR).toHaveLength(3);
+  });
+});
+
+describe('buildListOrderBy', () => {
+  it('maps the public sort vocabulary to real columns', () => {
+    expect(buildListOrderBy('price-low')).toEqual({ sellPrice: 'asc' });
+    expect(buildListOrderBy('price-high')).toEqual({ sellPrice: 'desc' });
+    expect(buildListOrderBy('popularity')).toEqual({ numReviews: 'desc' });
+    expect(buildListOrderBy('duration')).toEqual({ durationDays: 'asc' });
+  });
+
+  it('still accepts the Management vocabulary and honours its direction', () => {
+    expect(buildListOrderBy('createdAt', 'asc')).toEqual({ createdAt: 'asc' });
+    expect(buildListOrderBy('title', 'asc')).toEqual({ title: 'asc' });
+  });
+
+  it('falls back to createdAt rather than passing an unknown column to Prisma', () => {
+    expect(buildListOrderBy('notAColumn', 'asc')).toEqual({ createdAt: 'asc' });
+    expect(buildListOrderBy(undefined, 'desc')).toEqual({ createdAt: 'desc' });
+  });
+});
+
+describe('destinationSlugSet', () => {
+  it('answers to both segments of a display string and to the whole string', () => {
+    const slugs = destinationSlugSet('Bali, Indonesia');
+    expect(slugs.has('bali')).toBe(true);
+    expect(slugs.has('indonesia')).toBe(true);
+    expect(slugs.has('bali-indonesia')).toBe(true);
+  });
+
+  it('treats a single-segment destination as its own name and country', () => {
+    expect(destinationSlugSet('Dubai').has('dubai')).toBe(true);
+  });
+
+  it('returns nothing for an empty or whitespace value', () => {
+    expect(destinationSlugSet('').size).toBe(0);
+    expect(destinationSlugSet('   ').size).toBe(0);
   });
 });
 

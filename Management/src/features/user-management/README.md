@@ -339,7 +339,7 @@ VENDOR_VERIFICATION_STATUS         // Verification states
 - Optimized re-renders
 
 ### User Feedback
-- Toast notifications (via react-hot-toast)
+- Toast notifications (via `@/lib/toast`, Base UI's toast primitive)
 - Loading states on buttons
 - Disabled states during processing
 - Confirmation dialogs for destructive actions

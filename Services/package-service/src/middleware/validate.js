@@ -6,7 +6,10 @@ export function validateBody(schema) {
     const result = schema.safeParse(req.body);
     if (!result.success) {
       const details = result.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
-      return next(new AppError(`Validation failed: ${details.map((d) => `${d.field} — ${d.message}`).join('; ')}`, BAD_REQUEST));
+      return next(new AppError('Please check the highlighted fields and try again.', BAD_REQUEST, {
+        code: 'VALIDATION_FAILED',
+        errors: details,
+      }));
     }
     req.body = result.data;
     next();
@@ -18,7 +21,10 @@ export function validateQuery(schema) {
     const result = schema.safeParse(req.query);
     if (!result.success) {
       const details = result.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
-      return next(new AppError(`Invalid query: ${details.map((d) => `${d.field} — ${d.message}`).join('; ')}`, BAD_REQUEST));
+      return next(new AppError('Please check the highlighted fields and try again.', BAD_REQUEST, {
+        code: 'VALIDATION_FAILED',
+        errors: details,
+      }));
     }
     req.query = result.data;
     next();
@@ -30,7 +36,10 @@ export function validateParams(schema) {
     const result = schema.safeParse(req.params);
     if (!result.success) {
       const details = result.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
-      return next(new AppError(`Invalid params: ${details.map((d) => `${d.field} — ${d.message}`).join('; ')}`, BAD_REQUEST));
+      return next(new AppError('Please check the highlighted fields and try again.', BAD_REQUEST, {
+        code: 'VALIDATION_FAILED',
+        errors: details,
+      }));
     }
     req.params = result.data;
     next();

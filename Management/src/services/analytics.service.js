@@ -114,6 +114,27 @@ class AnalyticsService {
   }
 
   /**
+   * Get All Sales Reps Performance (admin only)
+   */
+  static async getAllSalesRepsPerformance(timeRange = 'monthly') {
+    try {
+      const response = await ApiService.fetch(
+        `/analytics/salesreps/performance?timeRange=${timeRange}`,
+        { method: 'GET' }
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch sales rep performance');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all sales reps performance:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get Website Analytics Overview
    */
   static async getWebsiteAnalyticsOverview(timeRange = 'monthly') {

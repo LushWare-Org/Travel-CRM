@@ -6,14 +6,10 @@ import {
   SEARCH_REQUIRED_FIELDS,
   OFFER_ID_REQUIRED,
   TRAVELERS_REQUIRED,
-  TRAVELPORT_NOT_CONFIGURED,
-  TRAVELPORT_AUTH_FAILED,
-  TRAVELPORT_SEARCH_FAILED,
-  TRAVELPORT_PRICE_FAILED,
-  TRAVELPORT_BOOK_FAILED,
   TRAVELPORT_ORDER_ID_REQUIRED,
-  TRAVELPORT_ORDER_RETRIEVE_FAILED,
-  TRAVELPORT_CANCEL_FAILED,
+  PROVIDER_NOT_CONFIGURED_FRIENDLY,
+  FLIGHT_SERVICE_UNAVAILABLE,
+  flightProviderFailure,
 } from '../constants/errorMessages.js';
 
 /**
@@ -47,7 +43,7 @@ export class TravelportClient {
       });
       return data;
     } catch (err) {
-      this.#unwrapError(err, TRAVELPORT_SEARCH_FAILED);
+      this.#unwrapError(err, 'search');
     }
   }
 
@@ -60,7 +56,7 @@ export class TravelportClient {
       const { data } = await client.post('/air/price', { offerId });
       return data;
     } catch (err) {
-      this.#unwrapError(err, TRAVELPORT_PRICE_FAILED);
+      this.#unwrapError(err, 'price');
     }
   }
 
@@ -76,7 +72,7 @@ export class TravelportClient {
       const { data } = await client.post('/order', { offerId, travelers, contact });
       return data;
     } catch (err) {
-      this.#unwrapError(err, TRAVELPORT_BOOK_FAILED);
+      this.#unwrapError(err, 'book');
     }
   }
 
@@ -89,7 +85,7 @@ export class TravelportClient {
       const { data } = await client.get(`/order/${travelportOrderId}`);
       return data;
     } catch (err) {
-      this.#unwrapError(err, TRAVELPORT_ORDER_RETRIEVE_FAILED);
+      this.#unwrapError(err, 'retrieve');
     }
   }
 
@@ -102,7 +98,7 @@ export class TravelportClient {
       const { data } = await client.post(`/order/${travelportOrderId}/cancel`);
       return data;
     } catch (err) {
-      this.#unwrapError(err, TRAVELPORT_CANCEL_FAILED);
+      this.#unwrapError(err, 'cancel');
     }
   }
 
@@ -129,7 +125,9 @@ export class TravelportClient {
 
     const { TRAVELPORT_TOKEN_URL, TRAVELPORT_CLIENT_ID, TRAVELPORT_CLIENT_SECRET } = process.env;
     if (!TRAVELPORT_TOKEN_URL || !TRAVELPORT_CLIENT_ID || !TRAVELPORT_CLIENT_SECRET) {
-      throw new AppError(TRAVELPORT_NOT_CONFIGURED, SERVICE_UNAVAILABLE);
+      throw new AppError(PROVIDER_NOT_CONFIGURED_FRIENDLY, SERVICE_UNAVAILABLE, {
+        code: 'PROVIDER_UNAVAILABLE',
+      });
     }
 
     try {
@@ -146,10 +144,8 @@ export class TravelportClient {
       this._cachedTokenExpiresAt = now + (response.data.expires_in || 1800) * 1000;
       return this._cachedToken;
     } catch (err) {
-      throw new AppError(
-        `${TRAVELPORT_AUTH_FAILED}: ${err.response?.data?.error_description || err.message}`,
-        BAD_GATEWAY,
-      );
+      logger.error({ err }, 'Travelport authentication failed');
+      throw new AppError(FLIGHT_SERVICE_UNAVAILABLE, BAD_GATEWAY, { code: 'PROVIDER_UNAVAILABLE' });
     }
   }
 
@@ -168,17 +164,24 @@ export class TravelportClient {
     });
   }
 
-  #unwrapError(err, fallbackMessage) {
+  /**
+   * Turns a provider failure into a user-facing AppError.
+   *
+   * The provider's payload is logged here and nowhere else. A GDS `Messages[0].Text`
+   * is written for an operator, not a customer, so it must not travel further.
+   *
+   * @param {unknown} err
+   * @param {'search'|'price'|'book'|'retrieve'|'cancel'} operation
+   */
+  #unwrapError(err, operation) {
     if (err instanceof AppError) throw err;
-    const status = err.response?.status || 502;
-    const message =
-      err.response?.data?.Messages?.[0]?.Text ||
-      err.response?.data?.message ||
-      err.message ||
-      fallbackMessage;
-    throw new AppError(
-      `Travelport error: ${message}`,
-      status >= 400 && status < 600 ? status : BAD_GATEWAY,
+
+    logger.error(
+      { status: err.response?.status, data: err.response?.data, operation },
+      'Travelport API error details',
     );
+
+    const { statusCode, code, message } = flightProviderFailure(operation, err.response?.status);
+    throw new AppError(message, statusCode, { code });
   }
 }

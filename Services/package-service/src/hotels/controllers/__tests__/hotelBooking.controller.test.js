@@ -5,7 +5,7 @@ import { buildHotelOffer, buildHotelOffers, buildSearchRequest, buildBookingRequ
 // ── Mock prisma ──────────────────────────────────────────────────────
 vi.mock('../../../db/client.js', () => ({
   default: {
-    hotelBooking: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    hotelBooking: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() },
   },
 }));
 

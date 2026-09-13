@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../../services/cloudinaryService', () => ({
   uploadItineraryImages: vi.fn(),
@@ -9,11 +10,29 @@ vi.mock('../ActivitySelector', () => ({ default: () => <div data-testid="activit
 vi.mock('../LocationSelector', () => ({ default: () => <div data-testid="location-selector" /> }));
 vi.mock('../form/TransportRowEditor', () => ({ default: () => <div data-testid="transport-row-editor" /> }));
 vi.mock('../../../shared', () => ({
-  FlightSelectionModal: () => null,
+  FlightSelectionModal: ({ onSelectTemplate }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onSelectTemplate({
+          origin: 'AAA',
+          destination: 'BBB',
+          cabinClass: 'Economy',
+          departureTime: 'morning',
+          airlinePreference: 'QR',
+          estimatedUnitPrice: 99,
+          tripType: 'roundTrip',
+        })
+      }
+    >
+      Submit Flight Leg
+    </button>
+  ),
   HotelSelectionModal: () => null,
 }));
 
 import ItineraryEditor from '../ItineraryEditor';
+import { uploadItineraryImages } from '../../../../services/cloudinaryService';
 
 const baseDay = {
   dayNumber: 1,
@@ -100,5 +119,83 @@ describe('ItineraryEditor — Day Images visibility', () => {
       />,
     );
     expect(screen.getByAltText('Day 1 Image 1')).toHaveAttribute('src', 'https://res.cloudinary.com/x/a.jpg');
+  });
+
+  it('hands the trimmed images array to onDayChange when a day image is removed', async () => {
+    const onDayChange = vi.fn();
+    const day = {
+      ...baseDay,
+      images: [
+        { url: 'https://res.cloudinary.com/x/a.jpg', publicId: 'day1/a' },
+        { url: 'https://res.cloudinary.com/x/b.jpg', publicId: 'day1/b' },
+      ],
+    };
+    render(
+      <ItineraryEditor
+        days={[day]}
+        onDayChange={onDayChange}
+        onAddDay={noop}
+        onRemoveDay={noop}
+        hideTitleAndDescription
+      />,
+    );
+
+    const removeButtons = screen.getAllByTitle('Remove image');
+    await userEvent.click(removeButtons[0]);
+
+    expect(onDayChange).toHaveBeenCalledWith(1, {
+      images: [{ url: 'https://res.cloudinary.com/x/b.jpg', publicId: 'day1/b' }],
+    });
+  });
+
+  it('appends newly uploaded images to the existing day images on upload', async () => {
+    const onDayChange = vi.fn();
+    uploadItineraryImages.mockResolvedValue([{ url: 'https://res.cloudinary.com/x/new.jpg', publicId: 'day1/new' }]);
+    const day = { ...baseDay, images: [{ url: 'https://res.cloudinary.com/x/a.jpg', publicId: 'day1/a' }] };
+
+    render(
+      <ItineraryEditor
+        days={[day]}
+        onDayChange={onDayChange}
+        onAddDay={noop}
+        onRemoveDay={noop}
+        hideTitleAndDescription
+      />,
+    );
+
+    const file = new File(['x'], 'new.jpg', { type: 'image/jpeg' });
+    const input = document.querySelector('input[type="file"][accept*="image"]');
+    await userEvent.upload(input, file);
+
+    await waitFor(() => expect(onDayChange).toHaveBeenCalledWith(1, {
+      images: [
+        { url: 'https://res.cloudinary.com/x/a.jpg', publicId: 'day1/a' },
+        { url: 'https://res.cloudinary.com/x/new.jpg', publicId: 'day1/new' },
+      ],
+    }));
+  });
+});
+
+describe('ItineraryEditor — day flights stay single-leg', () => {
+  it('never writes a submitted tripType into the day flight', async () => {
+    const onDayChange = vi.fn();
+    render(
+      <ItineraryEditor
+        days={[{ ...baseDay, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB' }] }]}
+        onDayChange={onDayChange}
+        onAddDay={noop}
+        onRemoveDay={noop}
+        hideTitleAndDescription
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /edit flight/i }));
+    await userEvent.click(screen.getByRole('button', { name: /submit flight leg/i }));
+
+    expect(onDayChange).toHaveBeenCalledTimes(1);
+    const [dayNumber, patch] = onDayChange.mock.calls[0];
+    expect(dayNumber).toBe(1);
+    expect(patch.flights[0]).not.toHaveProperty('tripType');
+    expect(patch.flights[0].origin).toBe('AAA');
   });
 });

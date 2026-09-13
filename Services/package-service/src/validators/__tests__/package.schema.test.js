@@ -3,9 +3,17 @@ import {
   createPackageSchema,
   updatePackageSchema,
   packageIdParamSchema,
+  packageImageParamSchema,
+  packageCoverParamSchema,
+  setPackageCoverSchema,
   listPackagesQuerySchema,
   createPlaceSchema,
   createActivitySchema,
+  generateAIPackageSchema,
+  generateFromTitleSchema,
+  generateDayPreviewSchema,
+  generateDaysRangePreviewSchema,
+  wizardTurnSchema,
 } from '../package.schema.js';
 
 const UUID_1 = 'b0000000-0000-4000-8000-000000000001';
@@ -65,6 +73,17 @@ describe('createPackageSchema', () => {
 
   it('rejects title over 255 chars', () => {
     const result = createPackageSchema.safeParse({ ...validPackage, title: 'x'.repeat(256) });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing destination', () => {
+    const { destination, ...rest } = validPackage;
+    const result = createPackageSchema.safeParse(rest);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty destination', () => {
+    const result = createPackageSchema.safeParse({ ...validPackage, destination: '' });
     expect(result.success).toBe(false);
   });
 
@@ -324,5 +343,237 @@ describe('transport validation', () => {
     };
     const result = createPackageSchema.safeParse(pkg);
     expect(result.success).toBe(true);
+  });
+});
+
+describe('image publicId + day images', () => {
+  it('accepts a package image with a publicId', () => {
+    const pkg = { ...validPackage, images: [{ url: 'a.jpg', publicId: 'travel-crm/packages/a' }] };
+    const result = createPackageSchema.safeParse(pkg);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an itinerary day with images', () => {
+    const pkg = {
+      ...validPackage,
+      itineraryDays: [{
+        ...validPackage.itineraryDays[0],
+        images: [{ url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' }],
+      }],
+    };
+    const result = createPackageSchema.safeParse(pkg);
+    expect(result.success).toBe(true);
+    expect(result.data.itineraryDays[0].images).toEqual([
+      { url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' },
+    ]);
+  });
+
+  it('defaults itinerary day images to an empty array', () => {
+    const result = createPackageSchema.safeParse(validPackage);
+    expect(result.success).toBe(true);
+    expect(result.data.itineraryDays[0].images).toEqual([]);
+  });
+
+  it('rejects a day image with no url', () => {
+    const pkg = {
+      ...validPackage,
+      itineraryDays: [{ ...validPackage.itineraryDays[0], images: [{ publicId: 'x' }] }],
+    };
+    const result = createPackageSchema.safeParse(pkg);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('packageImageParamSchema', () => {
+  it('accepts packageId and imageId', () => {
+    const result = packageImageParamSchema.safeParse({ packageId: 'pkg-1', imageId: 'img-1' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing imageId', () => {
+    const result = packageImageParamSchema.safeParse({ packageId: 'pkg-1', imageId: '' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('packageCoverParamSchema / setPackageCoverSchema', () => {
+  it('accepts a valid packageId param', () => {
+    expect(packageCoverParamSchema.safeParse({ packageId: 'pkg-1' }).success).toBe(true);
+  });
+
+  it('requires imageId in the body', () => {
+    expect(setPackageCoverSchema.safeParse({}).success).toBe(false);
+    expect(setPackageCoverSchema.safeParse({ imageId: 'img-1' }).success).toBe(true);
+  });
+});
+
+describe('generateAIPackageSchema', () => {
+  it('accepts the payload the Management AI dialog actually sends', () => {
+    const result = generateAIPackageSchema.safeParse({
+      destination: 'Bali',
+      packageType: 'Deluxe',
+      category: 'family',
+      duration: 5,
+      description: 'Include water sports, prefer beachside hotels',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing destination', () => {
+    expect(generateAIPackageSchema.safeParse({ duration: 5 }).success).toBe(false);
+  });
+
+  it('rejects duration above the sanity cap', () => {
+    expect(generateAIPackageSchema.safeParse({ destination: 'Bali', duration: 365 }).success).toBe(false);
+  });
+
+  it('rejects a zero or negative duration', () => {
+    expect(generateAIPackageSchema.safeParse({ destination: 'Bali', duration: 0 }).success).toBe(false);
+  });
+
+  it('coerces a numeric-string duration, matching how it arrives over JSON from the form', () => {
+    const result = generateAIPackageSchema.safeParse({ destination: 'Bali', duration: '5' });
+    expect(result.success).toBe(true);
+    expect(result.data.duration).toBe(5);
+  });
+});
+
+describe('generateFromTitleSchema', () => {
+  it('accepts a title-only payload', () => {
+    expect(generateFromTitleSchema.safeParse({ title: 'Kandy Getaway' }).success).toBe(true);
+  });
+
+  it('rejects an empty title', () => {
+    expect(generateFromTitleSchema.safeParse({ title: '' }).success).toBe(false);
+  });
+});
+
+describe('generateDayPreviewSchema', () => {
+  const base = { destination: 'Kandy', dayNumber: 3, totalDuration: 7 };
+
+  it('accepts a minimal payload', () => {
+    expect(generateDayPreviewSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('accepts existingDays context entries', () => {
+    const result = generateDayPreviewSchema.safeParse({
+      ...base,
+      existingDays: [{ dayNumber: 1, title: 'Arrival', locations: ['Ubud'], activities: ['Temple visit'] }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing destination', () => {
+    expect(generateDayPreviewSchema.safeParse({ dayNumber: 3, totalDuration: 7 }).success).toBe(false);
+  });
+
+  it('rejects dayNumber above the 30-day cap', () => {
+    expect(generateDayPreviewSchema.safeParse({ ...base, dayNumber: 31 }).success).toBe(false);
+  });
+
+  it('rejects a zero dayNumber', () => {
+    expect(generateDayPreviewSchema.safeParse({ ...base, dayNumber: 0 }).success).toBe(false);
+  });
+
+  it('rejects totalDuration above the 30-day cap', () => {
+    expect(generateDayPreviewSchema.safeParse({ ...base, totalDuration: 31 }).success).toBe(false);
+  });
+
+  it('coerces numeric-string dayNumber/totalDuration, matching how they arrive over JSON', () => {
+    const result = generateDayPreviewSchema.safeParse({ destination: 'Kandy', dayNumber: '3', totalDuration: '7' });
+    expect(result.success).toBe(true);
+    expect(result.data.dayNumber).toBe(3);
+    expect(result.data.totalDuration).toBe(7);
+  });
+
+  it('rejects an existingDays entry exceeding the 15-location cap', () => {
+    const result = generateDayPreviewSchema.safeParse({
+      ...base,
+      existingDays: [{ dayNumber: 1, locations: Array.from({ length: 16 }, (_, i) => `Place ${i}`) }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an existingDays entry with a location string over 100 chars', () => {
+    const result = generateDayPreviewSchema.safeParse({
+      ...base,
+      existingDays: [{ dayNumber: 1, locations: ['x'.repeat(101)] }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an existingDays entry missing dayNumber', () => {
+    const result = generateDayPreviewSchema.safeParse({ ...base, existingDays: [{ title: 'Arrival' }] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('generateDaysRangePreviewSchema', () => {
+  const base = { destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 };
+
+  it('accepts a minimal payload', () => {
+    expect(generateDaysRangePreviewSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('accepts non-contiguous dayNumbers', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: [2, 5, 6] }).success).toBe(true);
+  });
+
+  it('rejects dayNumbers: []', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: [] }).success).toBe(false);
+  });
+
+  it('rejects a dayNumbers array longer than 30', () => {
+    const result = generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: Array.from({ length: 31 }, (_, i) => i + 1) });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a dayNumbers entry of 0', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: [0, 1] }).success).toBe(false);
+  });
+
+  it('rejects totalDuration above the 30-day cap', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, totalDuration: 31 }).success).toBe(false);
+  });
+});
+
+describe('wizardTurnSchema', () => {
+  const baseMessage = { id: 'm1', role: 'user', content: 'hi', at: new Date().toISOString() };
+
+  it('accepts a minimal valid turn', () => {
+    const result = wizardTurnSchema.safeParse({ messages: [baseMessage] });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an optional sessionId and contact on wizardState', () => {
+    const result = wizardTurnSchema.safeParse({
+      sessionId: 'sess-1',
+      wizardState: { contact: { email: 'a@b.com', phone: '555' } },
+      messages: [baseMessage],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a message missing id', () => {
+    const { id, ...noId } = baseMessage;
+    const result = wizardTurnSchema.safeParse({ messages: [noId] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a message missing at', () => {
+    const { at, ...noAt } = baseMessage;
+    const result = wizardTurnSchema.safeParse({ messages: [noAt] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a non-ISO at timestamp', () => {
+    const result = wizardTurnSchema.safeParse({ messages: [{ ...baseMessage, at: 'not-a-date' }] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a 21-message array (over the max(20) cap)', () => {
+    const messages = Array.from({ length: 21 }, (_, i) => ({ ...baseMessage, id: `m${i}` }));
+    const result = wizardTurnSchema.safeParse({ messages });
+    expect(result.success).toBe(false);
   });
 });

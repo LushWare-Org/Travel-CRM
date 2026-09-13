@@ -1,9 +1,18 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import slugify from 'slugify';
+import { ROUTE_TYPE, PRICING_MODEL } from '../../../shared/constants/src/index.js';
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
-import { serializePackage } from '../services/package.service.js';
+import logger from '../config/logger.js';
+import { serializePackage, resolveActivityCatalogIds, buildItineraryDaysData, buildInclude } from '../services/package.service.js';
+import { generateStructured } from '../ai/geminiClient.js';
+import { buildGeneratePackagePrompt, generatePackageResponseSchema } from '../ai/prompts/generatePackage.v1.js';
+import { buildGenerateFromTitlePrompt, generateFromTitleResponseSchema } from '../ai/prompts/generateFromTitle.v1.js';
+import { buildPackageMarketingContentPrompt, packageMarketingContentResponseSchema } from '../ai/prompts/packageMarketingContent.v1.js';
+import { buildGenerateItineraryPreviewPrompt, generateItineraryPreviewResponseSchema } from '../ai/prompts/generateItineraryPreview.v1.js';
+import { buildItineraryChatPrompt, itineraryChatResponseSchema } from '../ai/prompts/itineraryChat.v1.js';
+import { buildGenerateDayPreviewPrompt, generateDayPreviewResponseSchema } from '../ai/prompts/generateDayPreview.v1.js';
+import { buildGenerateDaysRangePrompt, generateDaysRangeResponseSchema } from '../ai/prompts/generateDaysRange.v1.js';
 
 // Map frontend display categories to valid PackageCategory enum values.
 const CATEGORY_MAP = {
@@ -20,39 +29,6 @@ const toUpperCategory = (cat) => {
   return m || 'FAMILY';
 };
 
-// Map AI-generated legacy day shape → relational ItineraryDay rows.
-function mapDaysToRelational(normalizedDays) {
-  return normalizedDays.map((day, i) => ({
-    dayNumber: day.dayNumber || (i + 1),
-    title: day.title,
-    description: day.description,
-    breakfastCount: day.meals?.breakfast ? 1 : 0,
-    lunchCount: day.meals?.lunch ? 1 : 0,
-    dinnerCount: day.meals?.dinner ? 1 : 0,
-    places: {
-      create: (day.locations || []).map((loc, j) => ({
-        customName: loc,
-        orderIndex: j,
-      })),
-    },
-    activities: {
-      create: (day.activities || []).map((name, j) => ({
-        orderIndex: j,
-        // ActivityCatalog reference resolved by name later if needed; for AI draft,
-        // activities are created inline via a fallback — controller just stores the name.
-      })),
-    },
-    transports: day.transport ? {
-      create: [{
-        routeType: 'DAILY_ROUTING',
-        transportMode: mapTransportMode(day.transport),
-        pricingModel: 'PER_VEHICLE',
-        unitCost: 0, // AI cannot price — admin fills later
-      }],
-    } : undefined,
-  }));
-}
-
 function mapTransportMode(transport) {
   const t = (transport || '').toLowerCase();
   if (t.includes('flight') || t.includes('plane')) return 'FLIGHT';
@@ -62,107 +38,100 @@ function mapTransportMode(transport) {
   return 'CAR';
 }
 
+// AI response shape (locations/activities as plain name strings, meals as
+// booleans) → the canonical itineraryDay shape the rest of the app already
+// knows how to persist (same shape the manual package editor submits).
+function normalizeAIDays(aiDays) {
+  return aiDays.map((day, i) => ({
+    dayNumber: day.dayNumber || i + 1,
+    title: day.title,
+    description: day.description,
+    breakfastCount: day.meals?.breakfast ? 1 : 0,
+    lunchCount: day.meals?.lunch ? 1 : 0,
+    dinnerCount: day.meals?.dinner ? 1 : 0,
+    places: (day.locations || []).map((loc, j) => ({ customName: loc, orderIndex: j })),
+    activities: (day.activities || []).map((name, j) => ({ name, orderIndex: j })),
+    transports: day.transport ? [{
+      routeType: ROUTE_TYPE.DAILY_ROUTING,
+      transportMode: mapTransportMode(day.transport),
+      pricingModel: PRICING_MODEL.PER_VEHICLE,
+      unitCost: 0, // AI cannot price transport — admin fills in during review
+    }] : [],
+  }));
+}
+
 // ── Shared helper ─────────────────────────────────────────────
 
 async function buildAIContent(pkg) {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+  const prompt = buildPackageMarketingContentPrompt({
+    title: pkg.title,
+    destination: pkg.destination,
+    durationDays: pkg.durationDays,
+    category: pkg.category,
+  });
+  return generateStructured({ prompt, schema: packageMarketingContentResponseSchema });
+}
 
-  const prompt = `Generate compelling marketing content for a travel package with these details:
-  Title: "${pkg.title || 'Travel Package'}"
-  Destination: ${pkg.destination || 'Exotic destination'}
-  Duration: ${pkg.durationDays || '?'} days
-  Category: ${pkg.category || 'FAMILY'}
+// Scale the token budget with duration/day-count instead of a fixed cap (a
+// long itinerary's full JSON can exceed a small fixed cap and get silently
+// truncated by Gemini's constrained decoder), capped under the model's real
+// ceiling; geminiClient escalates further on its own if this still isn't
+// enough. Shared by generateDaysArray (full-trip/head-anchored generation)
+// and generateDaysRangePreview (sub-range generation) so the 700-tokens-
+// per-day slope and 60000 ceiling live in exactly one place.
+function dayTokenBudget(dayCount, base) {
+  return Math.min(60000, base + Number(dayCount) * 700);
+}
 
-  Return ONLY a JSON object (no markdown, no extra text):
-  {
-    "description": "2-3 engaging sentences about the package experience",
-    "inclusions": ["5-8 items included in the package"],
-    "exclusions": ["4-6 items not included"],
-    "termsAndConditions": "3-5 concise terms and conditions as a string"
-  }`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
-  let content;
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    content = match ? JSON.parse(match[0]) : null;
-  } catch {
-    throw new AppError('Failed to parse AI response', 500);
+// Pads the result to exactly `duration` days as a last-resort safety
+// net for a model that returns a handful fewer days than asked without
+// tripping truncation detection upstream.
+async function generateDaysArray({ prompt, schema, duration, tokenBudgetBase }) {
+  const d = Number(duration);
+  const maxOutputTokens = dayTokenBudget(d, tokenBudgetBase);
+  const data = await generateStructured({ prompt, schema, maxOutputTokens });
+  const days = Array.isArray(data.days) ? data.days.slice(0, d) : [];
+  const shortfall = d - days.length;
+  while (days.length < d) {
+    const n = days.length + 1;
+    days.push({ dayNumber: n, title: `Day ${n}`, description: '', locations: [], activities: [], meals: { breakfast: true, dinner: true } });
   }
-  if (!content) throw new AppError('AI did not return valid content', 500);
-  return content;
+  if (shortfall > 0) {
+    logger.warn({ requestedDuration: d, shortfall }, 'AI returned fewer days than requested — padded with blank placeholder days');
+  }
+  return { data, days };
 }
 
 // ── Create a full package + itinerary days from scratch ───────
 
 export const generateAIPackage = asyncHandler(async (req, res) => {
-  const { destination, duration, budget, travelers, preferences } = req.body;
+  const { destination, duration, budget, travelers, preferences, description, packageType } = req.body;
   const category = toValidCategory(req.body.category);
 
-  if (!destination || !duration) throw new AppError('destination and duration are required', 400);
-  if (!process.env.GEMINI_API_KEY) throw new AppError('AI package generation not configured', 503);
-
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-flash-latest',
-    generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+  const prompt = buildGeneratePackagePrompt({
+    destination,
+    duration,
+    category,
+    packageType,
+    budget,
+    travelers,
+    // The dialog's free-text field is called "description" on the wire —
+    // it's what actually drives itinerary customization, so it must reach the prompt.
+    preferences: preferences || description,
   });
 
-  const prompt = `You are an expert travel package designer. Generate a complete travel package for ${destination} for exactly ${duration} days. Category: ${category}. Budget: ${budget || 'moderate'}. Travelers: ${travelers || 2}. Preferences: ${preferences || 'general sightseeing'}.
-
-CRITICAL INSTRUCTIONS:
-1. Respond with ONLY a valid JSON object — no markdown code fences, no text before or after.
-2. The "days" array MUST contain exactly ${duration} entries, one per day, numbered 1 to ${duration}. Do not stop early or summarize remaining days.
-3. Each day must include "locations" (array of place names) and "activities" (array of activity names).
-
-Return a JSON object with these exact fields:
-{
-  "title": "Package title",
-  "description": "2-3 sentence description",
-  "destination": "${destination}",
-  "durationDays": ${duration},
-  "price": number,
-  "category": "${category}",
-  "inclusions": ["array", "of", "inclusions"],
-  "exclusions": ["array", "of", "exclusions"],
-  "days": [
-    {
-      "dayNumber": 1,
-      "title": "Day title",
-      "description": "Day description",
-      "locations": ["location1", "location2"],
-      "activities": ["activity1", "activity2"],
-      "meals": {"breakfast": true, "lunch": true, "dinner": true},
-      "transport": "car"
-    }
-  ]
-}`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
-  let packageData;
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    packageData = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-  } catch {
-    packageData = null;
-  }
-  if (!packageData) throw new AppError('AI did not return valid package data', 500);
-
-  const { days: aiDays, ...pkgBody } = packageData;
+  const { data: packageData, days } = await generateDaysArray({
+    prompt,
+    schema: generatePackageResponseSchema,
+    duration,
+    tokenBudgetBase: 1500,
+  });
+  const pkgBody = { ...packageData };
+  delete pkgBody.days;
   const d = Number(duration);
-  const days = Array.isArray(aiDays) ? aiDays.slice(0, d) : [];
 
-  // Pad to exactly `duration` days
-  while (days.length < d) {
-    const n = days.length + 1;
-    days.push({ dayNumber: n, title: `Day ${n}`, description: '', locations: [], activities: [], meals: { breakfast: true, dinner: true }, transport: '' });
-  }
-
+  const normalizedDays = normalizeAIDays(days);
+  const { days: resolvedDays } = await resolveActivityCatalogIds(normalizedDays);
   const slug = slugify(pkgBody.title || packageData.title || 'package', { lower: true, strict: true }) + '-' + Date.now();
 
   const pkg = await prisma.package.create({
@@ -184,62 +153,120 @@ Return a JSON object with these exact fields:
       isActive: false,
       isFeatured: false,
       createdBy: req.user.id,
-      itineraryDays: { create: mapDaysToRelational(days) },
+      itineraryDays: { create: buildItineraryDaysData(resolvedDays) },
     },
-    include: {
-      images: true,
-      itineraryDays: {
-        orderBy: { dayNumber: 'asc' },
-        include: {
-          places: { orderBy: { orderIndex: 'asc' } },
-          activities: { orderBy: { orderIndex: 'asc' } },
-          transports: true,
-        },
-      },
-    },
+    include: buildInclude(),
   });
 
   res.status(201).json({ success: true, data: serializePackage(pkg) });
+});
+
+// ── Public: non-persisting customer-facing itinerary preview ──
+
+export const generateItineraryPreview = asyncHandler(async (req, res) => {
+  const { destination, duration, travelers, budget, preferences } = req.body;
+  const prompt = buildGenerateItineraryPreviewPrompt({ destination, duration, travelers, budget, preferences });
+  const { days } = await generateDaysArray({
+    prompt,
+    schema: generateItineraryPreviewResponseSchema,
+    duration,
+    tokenBudgetBase: 800,
+  });
+  res.json({ success: true, data: { days } });
+});
+
+// ── Public: non-persisting single-day itinerary preview ───────
+
+export const generateDayPreview = asyncHandler(async (req, res) => {
+  const { destination, dayNumber, totalDuration, travelers, budget, preferences, existingDays } = req.body;
+  const prompt = buildGenerateDayPreviewPrompt({ destination, dayNumber, totalDuration, travelers, budget, preferences, existingDays });
+  // Single day is cheap relative to a full trip — the small fixed budget
+  // below (vs. generateDaysArray's duration-scaled formula) is intentional.
+  const data = await generateStructured({ prompt, schema: generateDayPreviewResponseSchema, maxOutputTokens: 1500 });
+  // Force dayNumber to the requested slot regardless of what the model
+  // returned — the client's positional merge depends on this, not on
+  // trusting model output.
+  const day = { ...data.day, dayNumber };
+  res.json({ success: true, data: { day } });
+});
+
+// ── Public: non-persisting multi-day (sub-range) itinerary preview ─
+
+export const generateDaysRangePreview = asyncHandler(async (req, res) => {
+  const { destination, dayNumbers, totalDuration, travelers, budget, preferences, existingDays } = req.body;
+  const prompt = buildGenerateDaysRangePrompt({ destination, dayNumbers, totalDuration, travelers, budget, preferences, existingDays });
+  const maxOutputTokens = dayTokenBudget(dayNumbers.length, 800);
+  const data = await generateStructured({ prompt, schema: generateDaysRangeResponseSchema, maxOutputTokens });
+  // generateDaysArray is NOT reusable here: its shortfall-padding logic
+  // numbers placeholders from `days.length + 1` (head-anchored), which
+  // corrupts non-head-anchored ranges (e.g. filling days 4-7 when the model
+  // returns only 3 days would produce a placeholder numbered 4, duplicating
+  // an existing day). Map returned days positionally onto the requested
+  // dayNumbers instead; an unfilled slot on shortfall is simply omitted —
+  // the client re-shows the CTA rather than getting a blank placeholder.
+  //
+  // Sort first: buildGenerateDaysRangePrompt always asks the model for days
+  // in ascending order regardless of request order, so positionally mapping
+  // onto the RAW request order (e.g. dayNumbers: [5, 4]) would silently
+  // swap day content between slots. The client's merge is keyed by
+  // dayNumber (a Map lookup), not array position, so returning the days
+  // pre-sorted here is fully compatible with any request order.
+  const sortedDayNumbers = [...dayNumbers].sort((a, b) => a - b);
+  const returned = Array.isArray(data.days) ? data.days : [];
+  const days = sortedDayNumbers
+    .map((dayNumber, i) => (returned[i] ? { ...returned[i], dayNumber } : null))
+    .filter(Boolean);
+  res.json({ success: true, data: { days } });
+});
+
+// ── Public: non-persisting conversational itinerary-chat turn ─
+
+export function pickDefined(obj) {
+  return Object.fromEntries(Object.entries(obj || {}).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+}
+
+// Re-validates the model's newly-learned slots against the same bounds the
+// request schema enforces (duration 1-30, string lengths) before merging
+// them into what's already known. A slot outside these bounds is dropped
+// (treated as not-yet-known) rather than surfaced as a 502, so one odd
+// model output degrades to "ask again next turn" instead of failing the turn.
+// Exported (not just used by itineraryChat below) because the Approach-C
+// trip-planning wizard's set_slot tool call reuses the exact same merge
+// path rather than inventing a second one — see wizard.controller.js.
+export function sanitizeSlots(rawSlots, previousSlots) {
+  const merged = { ...(previousSlots || {}), ...pickDefined(rawSlots) };
+  if (merged.duration !== undefined) {
+    const d = Number(merged.duration);
+    if (!Number.isInteger(d) || d < 1 || d > 30) delete merged.duration;
+    else merged.duration = d;
+  }
+  if (merged.travelers !== undefined) {
+    const t = Number(merged.travelers);
+    if (!Number.isInteger(t) || t < 1 || t > 50) delete merged.travelers;
+    else merged.travelers = t;
+  }
+  if (merged.destination !== undefined) merged.destination = String(merged.destination).slice(0, 255);
+  if (merged.budget !== undefined) merged.budget = String(merged.budget).slice(0, 100);
+  if (merged.preferences !== undefined) merged.preferences = String(merged.preferences).slice(0, 1000);
+  return merged;
+}
+
+export const itineraryChat = asyncHandler(async (req, res) => {
+  const { messages, slots } = req.body;
+  const prompt = buildItineraryChatPrompt({ messages, slots });
+  const data = await generateStructured({ prompt, schema: itineraryChatResponseSchema, maxOutputTokens: 1024 });
+  const mergedSlots = sanitizeSlots(data.slots, slots);
+  const readyToGenerate = Boolean(mergedSlots.destination && mergedSlots.duration);
+  res.json({ success: true, data: { reply: data.reply, slots: mergedSlots, readyToGenerate } });
 });
 
 // ── Generate content from title — does NOT create anything ────
 
 export const generateContentFromTitle = asyncHandler(async (req, res) => {
   const { title, destination, duration, category } = req.body;
-  if (!title) throw new AppError('title is required', 400);
-  if (!process.env.GEMINI_API_KEY) throw new AppError('AI not configured', 503);
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
-
-  const contextParts = [
-    destination ? `to ${destination}` : null,
-    duration    ? `(${duration} days)` : null,
-    category    ? `in the ${category} category` : null,
-  ].filter(Boolean).join(' ');
-
-  const prompt = `Generate marketing content for a travel package titled "${title}"${contextParts ? ' ' + contextParts : ''}.
-
-Return ONLY a JSON object (no markdown):
-{
-  "description": "2-3 engaging sentences about the experience",
-  "highlights": ["4-6 unique package highlights as short phrases"],
-  "inclusions": ["5-8 items included"],
-  "exclusions": ["4-6 items not included"],
-  "termsAndConditions": "3-5 key terms and conditions as a string"
-}`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
-  let content;
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    content = match ? JSON.parse(match[0]) : null;
-  } catch {
-    throw new AppError('Failed to parse AI response', 500);
-  }
-  if (!content) throw new AppError('AI did not return valid content', 500);
+  const prompt = buildGenerateFromTitlePrompt({ title, destination, duration, category });
+  const content = await generateStructured({ prompt, schema: generateFromTitleResponseSchema });
 
   res.json({ success: true, data: content });
 });
@@ -250,7 +277,6 @@ export const generateAndSaveAIContent = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const pkg = await prisma.package.findUnique({ where: { id } });
   if (!pkg) throw new AppError('Package not found', 404);
-  if (!process.env.GEMINI_API_KEY) throw new AppError('AI not configured', 503);
 
   const content = await buildAIContent(pkg);
 
@@ -277,7 +303,6 @@ export const previewAIContent = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const pkg = await prisma.package.findUnique({ where: { id } });
   if (!pkg) throw new AppError('Package not found', 404);
-  if (!process.env.GEMINI_API_KEY) throw new AppError('AI not configured', 503);
 
   const content = await buildAIContent(pkg);
   res.json({ success: true, data: content });

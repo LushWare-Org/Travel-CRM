@@ -4,6 +4,7 @@
  */
 
 import Swal from 'sweetalert2';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
@@ -108,7 +109,7 @@ export const uploadMultipleImages = async (files, preset = 'default', onProgress
     return data.data.images;
   } catch (error) {
     console.error('Multiple images upload error:', error);
-    Swal.fire('Error', error.message || 'Failed to upload images', 'error');
+    Swal.fire('Error', apiErrorMessage(error), 'error');
     throw error;
   }
 };
@@ -173,7 +174,7 @@ export const uploadPackageImages = async (files, onProgress = () => {}) => {
     return uploadedImages;
   } catch (error) {
     console.error('Package images upload error:', error);
-    Swal.fire('Error', error.message || 'Failed to upload package images', 'error');
+    Swal.fire('Error', apiErrorMessage(error), 'error');
     throw error;
   }
 };
@@ -229,7 +230,7 @@ export const uploadItineraryImages = async (files, onProgress = () => {}) => {
     return uploadedImages;
   } catch (error) {
     console.error('Itinerary images upload error:', error);
-    Swal.fire('Error', error.message || 'Failed to upload itinerary images', 'error');
+    Swal.fire('Error', apiErrorMessage(error), 'error');
     throw error;
   }
 };
@@ -266,7 +267,7 @@ export const uploadProfileImage = async (file) => {
     return data.data.image;
   } catch (error) {
     console.error('Profile image upload error:', error);
-    Swal.fire('Error', error.message || 'Failed to upload profile image', 'error');
+    Swal.fire('Error', apiErrorMessage(error), 'error');
     throw error;
   }
 };

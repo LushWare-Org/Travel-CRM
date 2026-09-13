@@ -24,7 +24,7 @@ class WebsiteUserService {
    * @param {string} params.search - Search query (searches name, email, phone)
    * @param {boolean} params.isActive - Filter by active status
    * @param {boolean} params.isEmailVerified - Filter by email verification status
-   * @returns {Promise<Object>} User list with pagination info
+   * @returns {Promise<any>} User list with pagination info
    */
   async getAllUsers(params = {}) {
     try {
@@ -64,7 +64,7 @@ class WebsiteUserService {
   /**
    * Get single website user by ID
    * @param {string} userId - User ID (MongoDB ObjectId)
-   * @returns {Promise<Object>} User data
+   * @returns {Promise<any>} User data
    */
   async getUserById(userId) {
     try {
@@ -84,7 +84,7 @@ class WebsiteUserService {
    * @param {string} userData.phone - User phone number in E.164 format (e.g., +94768952480)
    * @param {string} userData.phoneCountry - ISO 3166-1 alpha-2 country code (e.g., 'LK', 'US')
    * @param {string} userData.password - User password (required)
-   * @returns {Promise<Object>} Created user
+   * @returns {Promise<any>} Created user
    */
   async createUser(userData) {
     try {
@@ -112,7 +112,7 @@ class WebsiteUserService {
    * @param {string} updateData.phoneCountry - ISO country code
    * @param {string} updateData.email - Email address
    * @param {string} updateData.status - Active status
-   * @returns {Promise<Object>} Updated user
+   * @returns {Promise<any>} Updated user
    */
   async updateUser(userId, updateData) {
     try {
@@ -133,7 +133,7 @@ class WebsiteUserService {
   /**
    * Delete website user permanently
    * @param {string} userId - User ID
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async deleteUser(userId) {
     try {
@@ -149,7 +149,7 @@ class WebsiteUserService {
    * Toggle website user active status (soft deactivate/reactivate)
    * @param {string} userId - User ID
    * @param {boolean} isActive - Active status
-   * @returns {Promise<Object>} Updated user
+   * @returns {Promise<any>} Updated user
    */
   async toggleUserStatus(userId, isActive) {
     try {
@@ -163,7 +163,7 @@ class WebsiteUserService {
 
   /**
    * Get website user statistics for dashboard
-   * @returns {Promise<Object>} User statistics
+   * @returns {Promise<any>} User statistics
    */
   async getUserStats() {
     try {
@@ -182,7 +182,7 @@ class WebsiteUserService {
    * @param {string} params.sort - Sort field
    * @param {number} params.page - Page number
    * @param {number} params.limit - Items per page
-   * @returns {Promise<Object>} Search results
+   * @returns {Promise<any>} Search results
    */
   async searchUsers(params = {}) {
     try {
@@ -241,8 +241,8 @@ class WebsiteUserService {
 
   /**
    * Transform API user response to frontend format
-   * @param {Object} apiUser - User data from API
-   * @returns {Object} Formatted user data for frontend
+   * @param {any} apiUser - User data from API
+   * @returns {any} Formatted user data for frontend
    */
   transformUserData(apiUser) {
     return {
@@ -262,7 +262,7 @@ class WebsiteUserService {
   /**
    * Transform frontend user data to API format
    * @param {Object} frontendUser - User data from frontend form
-   * @returns {Object} Formatted user data for API
+   * @returns {any} Formatted user data for API
    */
   transformToApiFormat(frontendUser) {
     // Extract only digits from phone
@@ -305,7 +305,7 @@ class WebsiteUserService {
   /**
    * Validate user form data
    * @param {Object} userData - User data to validate
-   * @returns {Object} Validation result { valid: boolean, errors: Object }
+   * @returns {any} Validation result { valid: boolean, errors: Object }
    */
   validateUserData(userData) {
     const errors = {};

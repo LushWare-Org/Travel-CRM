@@ -99,6 +99,27 @@ describe('bookSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // Without this field travelling through, DuffelClient calls createOrder with
+  // its own invented pas_<idx> ids and the provider answers 422.
+  it("keeps the offer's passenger id on a traveler", () => {
+    const result = bookSchema.safeParse({
+      offer: { offerId: 'off_1' },
+      travelers: [{ type: 'adult', firstName: 'John', lastName: 'Doe', passengerId: 'pas_0001' }],
+      contact: { email: 'john@test.com' },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data.travelers[0].passengerId).toBe('pas_0001');
+  });
+
+  it('rejects an empty passenger id', () => {
+    const result = bookSchema.safeParse({
+      offer: { offerId: 'off_1' },
+      travelers: [{ type: 'adult', firstName: 'John', lastName: 'Doe', passengerId: '' }],
+      contact: { email: 'john@test.com' },
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('cancelBookingSchema', () => {

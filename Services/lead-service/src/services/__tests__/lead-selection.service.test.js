@@ -182,6 +182,34 @@ describe('materializeSelection', () => {
     });
     await expect(materializeSelection({ selectionId: 'ghost', prismaClient })).rejects.toThrow(AppError);
   });
+
+  it('returns the materialized selection when a concurrent caller wins the race (regression: P2002)', async () => {
+    // Two transfer-flight adds fired together both see a pristine selection and
+    // both try to create day 1. The loser must not fail its own write: the
+    // winner's derivation is identical, so re-read and return it.
+    const winnerRow = { id: 'sel-1', isManual: true, packageId: null, itineraryDays: [{ dayNumber: 1 }] };
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValueOnce(0).mockResolvedValue(1) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue(winnerRow),
+        update: vi.fn().mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })),
+      },
+    });
+
+    await expect(materializeSelection({ selectionId: 'sel-1', prismaClient })).resolves.toEqual(winnerRow);
+    expect(prismaClient.leadPackageSelection.update).toHaveBeenCalled();
+  });
+
+  it('rethrows a unique violation that did not leave the selection materialized', async () => {
+    const prismaClient = mockPrisma({
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'sel-1', isManual: true, packageId: null }),
+        update: vi.fn().mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })),
+      },
+    });
+
+    await expect(materializeSelection({ selectionId: 'sel-1', prismaClient })).rejects.toThrow('Unique constraint failed');
+  });
 });
 
 describe('refreshSelection', () => {
@@ -492,6 +520,91 @@ describe('snapshotSelectionQuotation', () => {
     const billingCall = fetchImpl.mock.calls.find((c) => c[0].includes('/billing/quotations/from-lead'));
     const body = JSON.parse(billingCall[1].body);
     expect(body.coverImage).toBe('https://res.cloudinary.com/x/lead-day1.jpg');
+  });
+
+  it('uses the selected package\'s destination over the lead\'s own inquiry-stage destination', async () => {
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },
+      leadPricing: { findUnique: vi.fn().mockResolvedValue({ id: 'pr-1' }) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'sel-1',
+          isManual: false,
+          packageId: 'pkg-1',
+          pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
+          costLines: [],
+          // A lead still comparing options at inquiry time is seeded with a
+          // placeholder destination like this — once a specific package is
+          // selected and quoted, the package's own destination must win so
+          // the PDF doesn't show "Multiple options" as the trip location.
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1, destination: 'Multiple options' },
+        }),
+      },
+    });
+    const fetchImpl = vi.fn().mockImplementation(async (url) =>
+      url.includes('/billing/quotations/from-lead')
+        ? { ok: true, json: async () => ({ success: true, data: { id: 'quote-1' } }) }
+        : { ok: true, json: async () => ({ success: true, data: { ...packageFixture, destination: 'Sigiriya, Sri Lanka' } }) },
+    );
+
+    await snapshotSelectionQuotation('sel-1', { fetchImpl, prismaClient });
+
+    const billingCall = fetchImpl.mock.calls.find((c) => c[0].includes('/billing/quotations/from-lead'));
+    const body = JSON.parse(billingCall[1].body);
+    expect(body.destination).toBe('Sigiriya, Sri Lanka');
+  });
+
+  it('uses the selection\'s destinationOverride over the package\'s own destination', async () => {
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },
+      leadPricing: { findUnique: vi.fn().mockResolvedValue({ id: 'pr-1' }) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'sel-1',
+          isManual: false,
+          packageId: 'pkg-1',
+          destinationOverride: 'Bali & Lombok (multi-city extension)',
+          pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
+          costLines: [],
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1, destination: 'Multiple options' },
+        }),
+      },
+    });
+    const fetchImpl = vi.fn().mockImplementation(async (url) =>
+      url.includes('/billing/quotations/from-lead')
+        ? { ok: true, json: async () => ({ success: true, data: { id: 'quote-1' } }) }
+        : { ok: true, json: async () => ({ success: true, data: { ...packageFixture, destination: 'Bali' } }) },
+    );
+
+    await snapshotSelectionQuotation('sel-1', { fetchImpl, prismaClient });
+
+    const billingCall = fetchImpl.mock.calls.find((c) => c[0].includes('/billing/quotations/from-lead'));
+    const body = JSON.parse(billingCall[1].body);
+    expect(body.destination).toBe('Bali & Lombok (multi-city extension)');
+  });
+
+  it('falls back to the lead\'s destination when there is no selected package', async () => {
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },
+      leadPricing: { findUnique: vi.fn().mockResolvedValue({ id: 'pr-1' }) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'sel-1',
+          isManual: true,
+          packageId: null,
+          pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
+          costLines: [],
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1, destination: 'Maldives' },
+        }),
+      },
+    });
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { id: 'quote-1' } }) });
+
+    await snapshotSelectionQuotation('sel-1', { fetchImpl, prismaClient });
+
+    const billingCall = fetchImpl.mock.calls.find((c) => c[0].includes('/billing/quotations/from-lead'));
+    const body = JSON.parse(billingCall[1].body);
+    expect(body.destination).toBe('Maldives');
   });
 
   it('throws when billing-service rejects the snapshot', async () => {

@@ -137,6 +137,7 @@ export class MockFlightClient {
       offerId: `MOCK-OFFER-${origin}${destination}-${departureDate}-${index}`,
       airline: airline.name,
       airlineCode: airline.code,
+      legCount: returnDate ? 2 : 1,
       cabinClass: cabinClass || 'Economy',
       currency: 'USD',
       baseFare,

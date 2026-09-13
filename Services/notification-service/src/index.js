@@ -17,10 +17,17 @@ app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
 // Request ID + structured logging (replaces morgan)
 app.use(correlationId);
 app.use(requestLogger);
-app.use(express.json());
 
-app.use(`${V1}/webhooks`, webhookRoutes);
-app.use(`${V1}/notifications`, notificationRoutes);
+// `verify` stashes the raw bytes on req.rawBody so webhook handlers can check
+// Meta's X-Hub-Signature-256 against what was actually signed, not a
+// re-serialized JSON.stringify(req.body) (which can silently mismatch).
+app.use(
+  `${V1}/webhooks`,
+  express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }),
+  webhookRoutes
+);
+// Higher limit than the default 100kb — internal/email accepts base64-encoded PDF attachments.
+app.use(`${V1}/notifications`, express.json({ limit: '15mb' }), notificationRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'notification-service' }));
 app.use(errorHandler);

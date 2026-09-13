@@ -3,18 +3,18 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const {
-  mockGetAllLeads, mockGetLeadStats, mockGetSalesReps, mockGetSettings, mockGetStoredUser,
+  mockGetAllLeads, mockGetLeadStats, mockGetSalesReps, mockGetAssignmentSettings, mockGetStoredUser,
 } = vi.hoisted(() => ({
   mockGetAllLeads: vi.fn(),
   mockGetLeadStats: vi.fn(),
   mockGetSalesReps: vi.fn(),
-  mockGetSettings: vi.fn(),
+  mockGetAssignmentSettings: vi.fn(),
   mockGetStoredUser: vi.fn(),
 }));
 
 vi.mock('../../services/api', () => ({
-  leadAPI: { getAllLeads: mockGetAllLeads, getLeadStats: mockGetLeadStats },
-  adminAPI: { getSalesReps: mockGetSalesReps, getSettings: mockGetSettings },
+  leadAPI: { getAllLeads: mockGetAllLeads, getLeadStats: mockGetLeadStats, getAssignmentSettings: mockGetAssignmentSettings },
+  adminAPI: { getSalesReps: mockGetSalesReps },
   authAPI: { getStoredUser: mockGetStoredUser },
 }));
 
@@ -23,7 +23,7 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -98,10 +98,12 @@ vi.mock('../../features/lead-management/components/ReceiptDialog', () => ({
 }));
 
 vi.mock('../../features/lead-management/components/VoucherDialog', () => ({
-  default: ({ lead, onClose }) => (
+  default: ({ lead, onClose, onEditLead, initialSelectionId }) => (
     <div data-testid="voucher-dialog">
       <span data-testid="voucher-dialog-lead">{lead?.name}</span>
+      <span data-testid="voucher-dialog-selection-id">{initialSelectionId ?? ''}</span>
       <button onClick={onClose}>Close Voucher</button>
+      <button onClick={() => onEditLead(lead, 'sel-active')}>Manage flights</button>
     </div>
   ),
 }));
@@ -120,7 +122,7 @@ beforeEach(() => {
   });
   mockGetLeadStats.mockResolvedValue({ success: true, summary: { total: 2 }, data: [] });
   mockGetSalesReps.mockResolvedValue({ success: true, data: [] });
-  mockGetSettings.mockResolvedValue({ success: true, data: {} });
+  mockGetAssignmentSettings.mockResolvedValue({ success: true, data: {} });
   mockGetStoredUser.mockReturnValue(null);
 });
 
@@ -198,5 +200,22 @@ describe('LeadManagement — shared billing dialog state', () => {
     await userEvent.click(screen.getByText('Close Editor'));
 
     expect(await screen.findByTestId('quotation-modal-selection-id')).toHaveTextContent('sel-active');
+  });
+
+  it('reopens Voucher on the same package selection after editing flights from within the voucher flow', async () => {
+    render(<LeadManagement />);
+    await screen.findByText('Voucher:Alice Traveller');
+
+    await userEvent.click(screen.getByText('Voucher:Alice Traveller'));
+    await screen.findByTestId('voucher-dialog');
+
+    await userEvent.click(screen.getByText('Manage flights'));
+    expect(await screen.findByTestId('edit-lead-selection-id')).toHaveTextContent('sel-active');
+    expect(screen.queryByTestId('voucher-dialog')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByText('Close Editor'));
+
+    expect(await screen.findByTestId('voucher-dialog-lead')).toHaveTextContent('Alice Traveller');
+    expect(await screen.findByTestId('voucher-dialog-selection-id')).toHaveTextContent('sel-active');
   });
 });

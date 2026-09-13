@@ -7,6 +7,7 @@ const cmd = (dir) => (files) =>
   `bash -c "cd ${dir} && npx eslint ${files.map((f) => `'${path.relative(path.resolve(dir), f)}'`).join(' ')}"`;
 
 export default {
+  'Client/**/*.{js,jsx,ts,tsx}': cmd('Client'),
   'Management/**/*.{js,jsx}': cmd('Management'),
   'Services/shared/contracts/**/*.js': cmd('Services/shared/contracts'),
   'Services/lead-service/**/*.js': cmd('Services/lead-service'),

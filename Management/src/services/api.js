@@ -1,7 +1,8 @@
 import { apiEnvelope, LeadPackageSelectionSummary, QuotePackageSelectionResult, QuotationSummary } from "@travel-crm/contracts";
 import { z } from "zod";
+import { apiErrorMessage, apiFieldErrors } from "../lib/apiErrorMessage";
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_URL || "https://api.lushtravelcloud.com/api/v1";
   // import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
 
@@ -25,6 +26,9 @@ class ApiService {
   }
 
   // Generic fetch method
+  /**
+   * @returns {Promise<any>} Parsed response body (raw envelope shape varies per endpoint)
+   */
   async fetch(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
@@ -41,7 +45,10 @@ class ApiService {
       // ✅ Handle blob responses FIRST (before any JSON parsing)
       if (options.responseType === "blob") {
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const blobError = new Error(apiErrorMessage({ status: response.status }));
+          blobError.status = response.status;
+          blobError.statusCode = response.status;
+          throw blobError;
         }
         return await response.blob();
       }
@@ -72,16 +79,6 @@ class ApiService {
       }
 
       if (!response.ok) {
-        // Extract detailed error information
-        let errorMessage =
-          data.message ||
-          data.error?.message ||
-          data.error ||
-          `HTTP error! status: ${response.status}`;
-
-        // Log full error response for debugging
-        console.log("Full error response:", data);
-
         // Special handling for 401 (authentication errors)
         if (response.status === 401) {
           // Clear invalid token
@@ -91,33 +88,19 @@ class ApiService {
           } catch (e) { }
           localStorage.removeItem("token");
           localStorage.removeItem("user");
-          errorMessage =
-            data.message || "Your session has expired. Please login again.";
         }
 
-        // Include validation errors if available
-        if (data.error?.errors && Array.isArray(data.error.errors)) {
-          const validationErrors = data.error.errors
-            .map((err) => `${err.field}: ${err.message}`)
-            .join("; ");
-          errorMessage = `${errorMessage} - ${validationErrors}`;
-        } else if (data.error?.details && Array.isArray(data.error.details)) {
-          const validationErrors = data.error.details
-            .map((err) => `${err.field}: ${err.message}`)
-            .join("; ");
-          errorMessage = `${errorMessage} - ${validationErrors}`;
-        } else if (data.details?.validation) {
-          // Handle new error format from backend
-          const validationErrors = Object.entries(data.details.validation)
-            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-            .join("; ");
-          errorMessage = `${errorMessage} - ${validationErrors}`;
-        }
-
-        const error = new Error(errorMessage);
+        // The sentence comes from the mapper, never from error.message: the backend
+        // marks which of its own messages are safe to show, and a response without
+        // one is reported as a status-appropriate generic. Field-level detail travels
+        // separately so a form can highlight the offending input instead of parsing
+        // it back out of a sentence.
+        const error = new Error(apiErrorMessage({ data, status: response.status }));
         error.status = response.status;
         error.statusCode = response.status;
+        error.code = data?.code;
         error.data = data;
+        error.fieldErrors = apiFieldErrors({ data });
         throw error;
       }
 
@@ -150,9 +133,7 @@ class ApiService {
         error.message.includes("ERR_CONNECTION_REFUSED") ||
         error.message.includes("NetworkError")
       ) {
-        const networkError = new Error(
-          "Cannot connect to server. Please check your network connection and ensure the API server is running."
-        );
+        const networkError = new Error(apiErrorMessage({ isNetworkError: true }));
         networkError.status = 0;
         networkError.statusCode = 0;
         networkError.isNetworkError = true;
@@ -278,6 +259,18 @@ export const leadAPI = {
     const api = new ApiService();
     return api.put(`/leads/${id}`, { lifecycleStatus: status });
   },
+  // Claim a PENDING_VERIFICATION lead (salesRep/admin): PENDING_VERIFICATION -> NEW
+  claimLead: async (id) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/claim`);
+  },
+
+  // Send a free-form WhatsApp reply to the lead (only valid within Meta's
+  // 24h session window — the caller/UI is responsible for that check).
+  sendWhatsappReply: async (id, text) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/whatsapp-reply`, { text });
+  },
 
   // Copy the package blueprint into the lead draft (NEW -> DRAFTING)
   draftLead: async (id) => {
@@ -318,6 +311,12 @@ export const leadAPI = {
   removePackageSelection: async (id, selectionId) => {
     const api = new ApiService();
     return api.delete(`/leads/${id}/packages/${selectionId}`);
+  },
+
+  // payload: { destinationOverride } — string to set, null to clear it
+  updatePackageSelection: async (id, selectionId, payload) => {
+    const api = new ApiService();
+    return api.patch(`/leads/${id}/packages/${selectionId}`, payload);
   },
 
   // Atomic itinerary + pricing edit for one selection (auto-drafts NEW/REVISION leads)
@@ -392,6 +391,16 @@ export const leadAPI = {
   getLeadStats: async () => {
     const api = new ApiService();
     return api.get("/leads/stats");
+  },
+
+  // Lead auto-assignment settings (admin only)
+  getAssignmentSettings: async () => {
+    const api = new ApiService();
+    return api.get("/leads/settings");
+  },
+  updateAssignmentSettings: async (data) => {
+    const api = new ApiService();
+    return api.put("/leads/settings", data);
   },
 
   // Add remark
@@ -496,29 +505,29 @@ export const adminAPI = {
   },
   getSalesReps: async () => {
     const api = new ApiService();
-    // fetch active sales reps, large limit to avoid pagination in UI
+    // fetch active sales reps, large limit to avoid pagination in UI (backend caps at 100)
     return api.get("/admin/users", {
       role: "salesRep",
       isActive: true,
-      limit: 200,
+      limit: 100,
       page: 1,
     });
   },
   getSalesRepsAndAdmins: async () => {
     const api = new ApiService();
-    // fetch both active sales reps and admins, large limit to avoid pagination in UI
+    // fetch both active sales reps and admins, large limit to avoid pagination in UI (backend caps at 100)
     // Make two separate calls and combine results
     const [salesRepsRes, adminsRes] = await Promise.all([
       api.get("/admin/users", {
         role: "salesRep",
         isActive: true,
-        limit: 200,
+        limit: 100,
         page: 1,
       }),
       api.get("/admin/users", {
         role: "admin",
         isActive: true,
-        limit: 200,
+        limit: 100,
         page: 1,
       }),
     ]);
@@ -581,6 +590,10 @@ export const quotationAPI = {
   getByLead: async (leadId) => {
     const api = new ApiService();
     return api.get("/billing/quotations/lead/" + leadId);
+  },
+  convertToInvoice: async (quotationId, payload = {}) => {
+    const api = new ApiService();
+    return api.post(`/billing/quotations/${quotationId}/convert`, payload);
   },
   update: async (quotationId, payload) => {
     const api = new ApiService();
@@ -750,6 +763,11 @@ export const voucherAPI = {
   sendEmail: async (voucherId, email) => {
     const api = new ApiService();
     return api.post(`/billing/vouchers/${voucherId}/send`, { email });
+  },
+
+  send: async (voucherId, payload = {}) => {
+    const api = new ApiService();
+    return api.post(`/billing/vouchers/${voucherId}/send`, payload);
   },
 
   downloadPDF: async (voucherId) => {

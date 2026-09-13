@@ -18,7 +18,7 @@ vi.mock('../../../../services/api', () => ({
   leadAPI: { getSelectionFlights: mockGetSelectionFlights, addSelectionFlight: mockAddSelectionFlight, deleteSelectionFlight: mockDeleteSelectionFlight },
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -36,6 +36,7 @@ vi.mock('../../../shared', async () => ({
         <span data-testid="modal-initial-airline">{props.initialData?.airlinePreference || ''}</span>
         <span data-testid="modal-initial-departure">{props.initialData?.departureTime || ''}</span>
         <span data-testid="modal-initial-price">{props.initialData?.estimatedUnitPrice ?? ''}</span>
+        <span data-testid="modal-initial-trip-type">{props.initialData?.tripType || ''}</span>
         <button
           type="button"
           onClick={() =>
@@ -51,12 +52,28 @@ vi.mock('../../../shared', async () => ({
         >
           Submit Flight
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            props.onSelectTemplate({
+              origin: 'AAA',
+              destination: 'BBB',
+              cabinClass: 'Economy',
+              departureTime: 'morning',
+              airlinePreference: 'QR',
+              estimatedUnitPrice: 99,
+              tripType: 'roundTrip',
+            })
+          }
+        >
+          Submit Round Trip
+        </button>
       </div>
     );
   },
 }));
 
-import LeadFlightBookingsSection from '../LeadFlightBookingsSection.jsx';
+import LeadFlightBookingsSection from '../LeadFlightBookingsSection';
 
 const toStartFixture = {
   id: 'flight-to-start',
@@ -67,6 +84,17 @@ const toStartFixture = {
   airlinePreference: 'EK',
   departureTime: 'morning',
   estimatedUnitPrice: 180,
+};
+
+const returnHomeFixture = {
+  id: 'flight-return-home',
+  flightType: 'RETURN_HOME',
+  origin: 'DXB',
+  destination: 'CMB',
+  cabinClass: 'Business',
+  airlinePreference: 'EK',
+  departureTime: '',
+  estimatedUnitPrice: 0,
 };
 
 beforeEach(() => {
@@ -388,6 +416,33 @@ describe('LeadFlightBookingsSection — itinerary-day flights are unaffected', (
     expect(screen.getByTestId('modal-initial-price')).toHaveTextContent('320');
   });
 
+  // The day row used to read first origin -> last destination, which collapses a
+  // return leg to "CMB -> CMB" and hides the turn-around city.
+  it('describes a booked day by its whole route, not its two ends', async () => {
+    mockGetByLead.mockResolvedValue({
+      data: [
+        {
+          id: 'booking-1',
+          dayNumber: 1,
+          flightType: 'itinerary',
+          status: 'confirmed',
+          pnr: 'ABC123',
+          segments: [
+            { sequence: 1, origin: 'CMB', destination: 'DXB', departureAt: '2026-01-01T08:00:00Z' },
+            { sequence: 101, origin: 'DXB', destination: 'CMB', departureAt: '2026-01-08T08:00:00Z' },
+          ],
+        },
+      ],
+    });
+
+    renderSection({
+      itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB' }] }],
+      leadStatus: 'APPROVED',
+    });
+
+    expect(await screen.findByText('CMB → DXB → CMB')).toBeInTheDocument();
+  });
+
   it('shows a $0-pricing warning on the day card when no cost has been set', async () => {
     renderSection({
       itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB' }] }],
@@ -395,5 +450,87 @@ describe('LeadFlightBookingsSection — itinerary-day flights are unaffected', (
     });
 
     expect(await screen.findByText(/no cost set/i)).toBeInTheDocument();
+  });
+});
+
+describe('LeadFlightBookingsSection — round trip fills both direction rows', () => {
+  it('saves the entered leg and a mirrored partner leg priced at 0', async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
+    await user.click(screen.getByRole('button', { name: /submit round trip/i }));
+
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledTimes(2));
+    expect(mockAddSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', {
+      flightType: 'TO_START',
+      origin: 'AAA',
+      destination: 'BBB',
+      cabinClass: 'Economy',
+      departureTime: 'morning',
+      airlinePreference: 'QR',
+      estimatedUnitPrice: 99,
+    });
+    expect(mockAddSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', {
+      flightType: 'RETURN_HOME',
+      origin: 'BBB',
+      destination: 'AAA',
+      cabinClass: 'Economy',
+      departureTime: undefined,
+      airlinePreference: 'QR',
+      estimatedUnitPrice: 0,
+    });
+  });
+
+  it('does not re-create the partner row when the other direction already exists', async () => {
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture, returnHomeFixture] });
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(await screen.findByRole('button', { name: /edit flight preferences: cmb to dxb/i }));
+    await user.click(screen.getByRole('button', { name: /submit round trip/i }));
+
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledTimes(1));
+    expect(mockAddSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({ flightType: 'TO_START' }));
+    expect(mockDeleteSelectionFlight).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens on Round Trip when the opposite direction already has a flight', async () => {
+    mockGetSelectionFlights.mockResolvedValue({ data: [returnHomeFixture] });
+    const user = userEvent.setup();
+    renderSection();
+
+    await screen.findByText('DXB → CMB');
+    await user.click(screen.getByRole('button', { name: /add flight preferences to start/i }));
+
+    expect(screen.getByTestId('modal-initial-trip-type')).toHaveTextContent('roundTrip');
+  });
+
+  it('opens on One Way when neither direction has a flight', async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
+
+    expect(screen.getByTestId('modal-initial-trip-type')).toHaveTextContent('oneWay');
+  });
+
+  it('keeps a day-linked flight single-leg and tripType-free', async () => {
+    const onUpdateDay = vi.fn();
+    const user = userEvent.setup();
+    renderSection({
+      itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: '', destination: '' }] }],
+      leadStatus: 'APPROVED',
+      onUpdateDay,
+    });
+
+    await user.click(await screen.findByRole('button', { name: /book flight/i }));
+    expect(lastFlightModalProps.allowRoundTrip).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: /submit round trip/i }));
+
+    await waitFor(() => expect(onUpdateDay).toHaveBeenCalledTimes(1));
+    expect(onUpdateDay.mock.calls[0][1].flights[0]).not.toHaveProperty('tripType');
+    expect(mockAddSelectionFlight).not.toHaveBeenCalled();
   });
 });

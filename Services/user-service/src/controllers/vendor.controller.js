@@ -3,33 +3,53 @@ import crypto from 'crypto';
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { idParamSchema, formatZodError, SERVICE_TYPES } from '../validators/common.js';
+import {
+  createVendorSchema, updateVendorSchema, updateVendorStatusSchema,
+  updateVendorRatingSchema, listVendorsQuerySchema,
+} from '../validators/vendor.validator.js';
+import { z } from 'zod';
 
 const safeUser = (u) => { if (!u) return null; const { password, ...r } = u; return r; };
 
+function parseOrThrow(schema, value) {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new AppError(formatZodError(parsed.error), 400);
+  return parsed.data;
+}
+
+const serviceTypeParamSchema = z.object({ serviceType: z.enum(SERVICE_TYPES) });
+
 export const getAllVendors = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, search, isActive, serviceType } = req.query;
+  const { page = 1, limit = 10, search, isActive, serviceType, vendorStatus } = parseOrThrow(listVendorsQuerySchema, req.query);
   const where = { role: 'vendor' };
   if (isActive !== undefined) where.isActive = isActive === 'true';
   if (search) where.OR = [{ name: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }];
-  const vpWhere = serviceType ? { vendorProfile: { serviceType } } : {};
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const vpWhere = {};
+  if (serviceType || vendorStatus) {
+    vpWhere.vendorProfile = {
+      ...(serviceType && { serviceType }),
+      ...(vendorStatus && { vendorStatus }),
+    };
+  }
+  const skip = (page - 1) * limit;
   const [vendors, total] = await Promise.all([
-    prisma.user.findMany({ where: { ...where, ...vpWhere }, skip, take: parseInt(limit), orderBy: { name: 'asc' }, include: { vendorProfile: true } }),
+    prisma.user.findMany({ where: { ...where, ...vpWhere }, skip, take: limit, orderBy: { name: 'asc' }, include: { vendorProfile: true } }),
     prisma.user.count({ where: { ...where, ...vpWhere } }),
   ]);
-  res.json({ status: 'success', data: vendors.map(safeUser), pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) } });
+  res.json({ status: 'success', data: vendors.map(safeUser), pagination: { total, page, limit, pages: Math.ceil(total / limit) } });
 });
 
 export const getVendorById = asyncHandler(async (req, res) => {
-  const vendor = await prisma.user.findFirst({ where: { id: req.params.id, role: 'vendor' }, include: { vendorProfile: true } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const vendor = await prisma.user.findFirst({ where: { id, role: 'vendor' }, include: { vendorProfile: true } });
   if (!vendor) throw new AppError('Vendor not found', 404);
   res.json({ status: 'success', data: { vendor: safeUser(vendor) } });
 });
 
 export const createVendor = asyncHandler(async (req, res) => {
   const { name, email, phone, businessName, serviceType, businessRegistrationNumber,
-    taxIdentificationNumber, address, contactPerson, bankDetails } = req.body;
-  if (!name || !email) throw new AppError('Name and email are required', 400);
+    taxIdentificationNumber, address, contactPerson, bankDetails } = parseOrThrow(createVendorSchema, req.body);
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new AppError('User with this email already exists', 400);
@@ -39,7 +59,7 @@ export const createVendor = asyncHandler(async (req, res) => {
 
   const vendor = await prisma.user.create({
     data: {
-      name, email: email.toLowerCase().trim(), phone: phone || null,
+      name, email, phone: phone || null,
       password: hashed, role: 'vendor',
       createdById: req.user.id,
       isTempPassword: true, mustChangePassword: true,
@@ -73,9 +93,10 @@ export const createVendor = asyncHandler(async (req, res) => {
 });
 
 export const updateVendor = asyncHandler(async (req, res) => {
-  const { name, phone, businessName, serviceType, address, contactPerson, bankDetails, taxIdentificationNumber } = req.body;
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { name, phone, businessName, serviceType, address, contactPerson, bankDetails, taxIdentificationNumber } = parseOrThrow(updateVendorSchema, req.body);
   const vendor = await prisma.user.update({
-    where: { id: req.params.id },
+    where: { id },
     data: {
       ...(name && { name }), ...(phone !== undefined && { phone }),
       vendorProfile: {
@@ -97,9 +118,10 @@ export const updateVendor = asyncHandler(async (req, res) => {
 });
 
 export const deleteVendor = asyncHandler(async (req, res) => {
-  const vendor = await prisma.user.findFirst({ where: { id: req.params.id, role: 'vendor' } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const vendor = await prisma.user.findFirst({ where: { id, role: 'vendor' } });
   if (!vendor) throw new AppError('Vendor not found', 404);
-  await prisma.user.delete({ where: { id: req.params.id } });
+  await prisma.user.delete({ where: { id } });
   res.json({ status: 'success', data: {} });
 });
 
@@ -113,39 +135,44 @@ export const getVendorStats = asyncHandler(async (req, res) => {
 });
 
 export const toggleVendorStatus = asyncHandler(async (req, res) => {
-  const vendor = await prisma.user.findFirst({ where: { id: req.params.id, role: 'vendor' } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const vendor = await prisma.user.findFirst({ where: { id, role: 'vendor' } });
   if (!vendor) throw new AppError('Vendor not found', 404);
-  const updated = await prisma.user.update({ where: { id: req.params.id }, data: { isActive: !vendor.isActive } });
+  const updated = await prisma.user.update({ where: { id }, data: { isActive: !vendor.isActive } });
   res.json({ status: 'success', data: { vendor: safeUser(updated) } });
 });
 
 export const resetVendorPassword = asyncHandler(async (req, res) => {
+  const { id } = parseOrThrow(idParamSchema, req.params);
   const tempPassword = crypto.randomBytes(8).toString('hex');
   const hashed = await bcrypt.hash(tempPassword, 12);
-  await prisma.user.update({ where: { id: req.params.id }, data: { password: hashed, isTempPassword: true, mustChangePassword: true } });
+  await prisma.user.update({ where: { id }, data: { password: hashed, isTempPassword: true, mustChangePassword: true } });
   res.json({ status: 'success', message: 'Password reset', data: { tempPassword } });
 });
 
 export const getVendorPerformance = asyncHandler(async (req, res) => {
-  const vendor = await prisma.user.findFirst({ where: { id: req.params.id, role: 'vendor' }, include: { vendorProfile: true } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const vendor = await prisma.user.findFirst({ where: { id, role: 'vendor' }, include: { vendorProfile: true } });
   if (!vendor) throw new AppError('Vendor not found', 404);
-  res.json({ status: 'success', data: { vendorId: req.params.id, profile: vendor.vendorProfile } });
+  res.json({ status: 'success', data: { vendorId: id, profile: vendor.vendorProfile } });
 });
 
 export const updateVendorStatus = asyncHandler(async (req, res) => {
-  const { vendorStatus } = req.body;
-  const profile = await prisma.vendorProfile.update({ where: { userId: req.params.id }, data: { vendorStatus } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { vendorStatus } = parseOrThrow(updateVendorStatusSchema, req.body);
+  const profile = await prisma.vendorProfile.update({ where: { userId: id }, data: { vendorStatus } });
   res.json({ status: 'success', data: { vendorProfile: profile } });
 });
 
 export const updateVendorRating = asyncHandler(async (req, res) => {
-  const { rating } = req.body;
-  const profile = await prisma.vendorProfile.update({ where: { userId: req.params.id }, data: { rating: parseFloat(rating) } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { rating } = parseOrThrow(updateVendorRatingSchema, req.body);
+  const profile = await prisma.vendorProfile.update({ where: { userId: id }, data: { rating } });
   res.json({ status: 'success', data: { vendorProfile: profile } });
 });
 
 export const getVendorsByServiceType = asyncHandler(async (req, res) => {
-  const { serviceType } = req.params;
+  const { serviceType } = parseOrThrow(serviceTypeParamSchema, req.params);
   const vendors = await prisma.user.findMany({
     where: { role: 'vendor', vendorProfile: { serviceType } },
     include: { vendorProfile: true },

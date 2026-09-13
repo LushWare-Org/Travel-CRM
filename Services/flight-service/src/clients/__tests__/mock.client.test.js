@@ -18,6 +18,7 @@ describe('MockFlightClient', () => {
       expect(offers[0]).toHaveProperty('airline');
       expect(offers[0]).toHaveProperty('segments');
       expect(offers[0].segments).toHaveLength(1);
+      expect(offers[0].legCount).toBe(1);
     });
 
     it('should include return segment for round trip', async () => {
@@ -29,6 +30,7 @@ describe('MockFlightClient', () => {
       });
 
       expect(offers[0].segments).toHaveLength(2);
+      expect(offers[0].legCount).toBe(2);
     });
 
     it('should multiply fare by passenger count', async () => {

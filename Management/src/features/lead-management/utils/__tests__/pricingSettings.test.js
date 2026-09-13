@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { carryPricingSettingsAcrossPackageSwitch } from '../pricingSettings.js';
+import { carryPricingSettingsAcrossPackageSwitch } from '../pricingSettings';
 
 describe('carryPricingSettingsAcrossPackageSwitch', () => {
   it('keeps marginType and marginValue unchanged', () => {

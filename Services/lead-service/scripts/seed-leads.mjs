@@ -1,9 +1,10 @@
 /**
  * Seed sample leads for the multi-package-per-lead model.
  *
- * Prerequisite: `npm run db:push` + `npm run db:generate` against the current
- * schema, and package-service already seeded with real packages (run
- * package-service's own seed first if `Package.findMany()` comes back empty).
+ * Prerequisite: `npm run db:migrate:deploy` + `npm run db:generate` against
+ * the current schema, and package-service already seeded with real packages
+ * (run package-service's own seed first if `Package.findMany()` comes back
+ * empty).
  *
  * Idempotent — leads are keyed by email; existing ones are skipped.
  *
@@ -13,6 +14,10 @@
  *   - a manual (no-package) selection
  *   - multiple selections on the same lead, mixed pristine/edited/manual
  *   - a selection that's already been quoted, alongside one that hasn't
+ *   - a selection with an explicit destinationOverride, on a lead whose own
+ *     destination is still a placeholder ("Multiple options") — exercises
+ *     the full destinationOverride > package.destination > lead.destination
+ *     precedence in one scenario (see seedThreePackages)
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -93,7 +98,7 @@ async function createPristineSelection(leadId, blueprint) {
  * sourcePackageId (customized); `edited: false` leaves it pointing at the
  * blueprint (freshly materialized, not yet touched).
  */
-async function createMaterializedSelection(leadId, blueprint, { edited = true } = {}) {
+async function createMaterializedSelection(leadId, blueprint, { edited = true, destinationOverride = null } = {}) {
   const { packageName, days, costLines, pricing } = buildDraftData(blueprint);
   return prisma.leadPackageSelection.create({
     data: {
@@ -102,6 +107,7 @@ async function createMaterializedSelection(leadId, blueprint, { edited = true } 
       packageName,
       isManual: false,
       sourcePackageId: edited ? null : blueprint.id,
+      destinationOverride,
       itineraryDays: { create: days },
       costLines: { create: costLines },
       pricing: { create: pricing },
@@ -335,17 +341,28 @@ async function seedThreePackages() {
   const europe = await loadPackage('European Grand Tour');
   const japan = await loadPackage('Japan Cultural Journey');
   const maldives = await loadPackage('Maldives Luxury Escape');
+  // Still comparing options at inquiry time — exactly the "Multiple options"
+  // placeholder the destination precedence fix protects against. This
+  // scenario also exercises the next tier up: the primary (edited) selection
+  // below sets an explicit destinationOverride, which must win over both
+  // this lead-level placeholder AND the Japan package's own destination.
   const lead = await createBaseLead({
     email, name: 'Dilani Gunasekara', phone: '+94776677889', destination: 'Multiple options', numberOfTravelers: 2, lifecycleStatus: 'DRAFTING',
   });
 
   await createPristineSelection(lead.id, europe);
-  const edited = await createMaterializedSelection(lead.id, japan, { edited: true });
+  const edited = await createMaterializedSelection(lead.id, japan, {
+    edited: true,
+    // Rep-entered override, set with confirmation in Management since it
+    // differs from the package's own destination ("Japan") — a customized
+    // multi-city itinerary within the country.
+    destinationOverride: 'Kyoto & Osaka, Japan (custom itinerary)',
+  });
   await recomputePricing(edited.id, 2, { marginType: japan.defaultMarginType, marginValue: japan.defaultMarginInput, depositType: 'PERCENTAGE', depositValue: 30 });
   await createPristineSelection(lead.id, maldives);
 
   await setPrimarySelection(lead.id, edited.id);
-  console.log(`SEEDED ${email} — DRAFTING, 3 packages (1 edited + 2 pristine)`);
+  console.log(`SEEDED ${email} — DRAFTING, 3 packages (1 edited + destinationOverride + 2 pristine)`);
 }
 
 async function seedApprovedPaidDeposit() {

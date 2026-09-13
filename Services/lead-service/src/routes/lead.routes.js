@@ -1,5 +1,6 @@
 import express from 'express';
 import { extractUser, requireAuth, authorize } from '../middleware/auth.js';
+import { intakeLead, claimLead } from '../controllers/leadIntake.controller.js';
 import {
   createLead, getLeads, getLead, updateLead, deleteLead,
   addRemark, getLeadRemarks, assignLead, unassignLead,
@@ -7,14 +8,17 @@ import {
   downloadLeadItineraryPDF,
   createWebsiteContactLead,
   handleInternalEvent, draftLead,
+  handleFacebookLeadEvent,
+  logCommunication, sendWhatsappReply,
 } from '../controllers/lead.controller.js';
 import {
-  listPackageSelections, getPackageSelection, createPackageSelection, deletePackageSelection,
+  listPackageSelections, getPackageSelection, createPackageSelection, updatePackageSelection, deletePackageSelection,
   updateSelectionItinerary, refreshPackageSelection, quotePackageSelection,
   getSelectionPricing, calculateSelectionPricing, applySelectionPricing,
   listSelectionFlights, addSelectionFlight, deleteSelectionFlight,
 } from '../controllers/lead-package-selection.controller.js';
 import { previewPricing } from '../controllers/pricing.controller.js';
+import { getAssignmentSettings, updateAssignmentSettings } from '../controllers/settings.controller.js';
 
 const router = express.Router();
 router.use(extractUser);
@@ -23,13 +27,17 @@ router.use(extractUser);
 router.post('/website-contact', createWebsiteContactLead);
 
 // Service-to-service webhooks (token-authenticated, not user auth)
-router.post('/internal/events', (req, res, next) => {
+const internalTokenAuth = (req, res, next) => {
   const token = req.headers['x-internal-token'];
   if (!token || token !== process.env.INTERNAL_EVENTS_TOKEN) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   next();
-}, handleInternalEvent);
+};
+router.post('/internal/events', internalTokenAuth, handleInternalEvent);
+router.post('/internal/facebook-lead', internalTokenAuth, handleFacebookLeadEvent);
+router.post('/internal/communication-logs', internalTokenAuth, logCommunication);
+router.post('/internal/intake', internalTokenAuth, intakeLead);
 
 // Protected
 router.use(requireAuth);
@@ -38,13 +46,18 @@ router.route('/').post(authorize('admin', 'salesRep'), createLead).get(authorize
 router.get('/search', authorize('admin', 'salesRep'), searchLeads);
 router.get('/my-leads', authorize('salesRep'), getMyLeads);
 router.get('/stats', authorize('admin', 'salesRep'), getLeadStats);
+router.route('/settings')
+  .get(authorize('admin'), getAssignmentSettings)
+  .put(authorize('admin'), updateAssignmentSettings);
 router.get('/status/:status', authorize('admin', 'salesRep'), getLeadsByStatus);
 router.route('/:id').get(authorize('admin', 'salesRep'), getLead).put(authorize('admin', 'salesRep'), updateLead).delete(authorize('admin'), deleteLead);
 router.post('/:id/draft', authorize('admin', 'salesRep'), draftLead);
 router.route('/:id/remarks').post(authorize('admin', 'salesRep'), addRemark).get(authorize('admin', 'salesRep'), getLeadRemarks);
-router.patch('/:id/assign', authorize('admin'), assignLead);
-router.patch('/:id/unassign', authorize('admin'), unassignLead);
+router.patch('/:id/assign', authorize('admin', 'salesRep'), assignLead);
+router.patch('/:id/unassign', authorize('admin', 'salesRep'), unassignLead);
 router.get('/:id/itinerary/pdf', authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
+router.post('/:id/whatsapp-reply', authorize('admin', 'salesRep'), sendWhatsappReply);
+router.post('/:id/claim', authorize('admin', 'salesRep'), claimLead);
 
 // Per-package selections — a lead can hold many packages (plus one manual
 // slot) at once; each owns its own itinerary/cost-lines/pricing/quote state.
@@ -53,6 +66,7 @@ router.route('/:id/packages')
   .post(authorize('admin', 'salesRep'), createPackageSelection);
 router.route('/:id/packages/:selectionId')
   .get(authorize('admin', 'salesRep'), getPackageSelection)
+  .patch(authorize('admin', 'salesRep'), updatePackageSelection)
   .delete(authorize('admin', 'salesRep'), deletePackageSelection);
 router.put('/:id/packages/:selectionId/itinerary', authorize('admin', 'salesRep'), updateSelectionItinerary);
 router.post('/:id/packages/:selectionId/refresh', authorize('admin', 'salesRep'), refreshPackageSelection);

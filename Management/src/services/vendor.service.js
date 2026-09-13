@@ -1,4 +1,5 @@
 import api from './api';
+import { apiErrorMessage } from '../lib/apiErrorMessage';
 
 /**
  * Vendor Service
@@ -40,7 +41,7 @@ class VendorService {
    * @param {string} params.serviceType - Filter by service type
    * @param {string} params.vendorStatus - Filter by verification status (pending_verification, verified, suspended, rejected)
    * @param {string} params.isActive - Filter by active status (true/false)
-   * @returns {Promise<Object>} Vendors list with pagination info
+   * @returns {Promise<any>} Vendors list with pagination info
    */
   async getAllVendors(params = {}) {
     try {
@@ -55,7 +56,7 @@ class VendorService {
   /**
    * Get single vendor by ID
    * @param {string} vendorId - Vendor ID (MongoDB ObjectId)
-   * @returns {Promise<Object>} Vendor data with full details
+   * @returns {Promise<any>} Vendor data with full details
    */
   async getVendorById(vendorId) {
     try {
@@ -95,7 +96,7 @@ class VendorService {
    * @param {string} vendorData.bankDetails.branchName - Branch name
    * @param {string} vendorData.bankDetails.ifscCode - IFSC code
    * @param {string} vendorData.bankDetails.swiftCode - SWIFT code (international)
-   * @returns {Promise<Object>} Created vendor with temporary password
+   * @returns {Promise<any>} Created vendor with temporary password
    */
   async createVendor(vendorData) {
     try {
@@ -122,7 +123,7 @@ class VendorService {
    * @param {Object} updateData.address - Address object
    * @param {Object} updateData.contactPerson - Contact person object
    * @param {Object} updateData.bankDetails - Bank details object
-   * @returns {Promise<Object>} Updated vendor
+   * @returns {Promise<any>} Updated vendor
    */
   async updateVendor(vendorId, updateData) {
     try {
@@ -141,7 +142,7 @@ class VendorService {
    * @param {string} vendorId - Vendor ID
    * @param {string} vendorStatus - New status: pending_verification, verified, suspended, rejected
    * @param {string} reason - Optional reason for status change (especially for rejection/suspension)
-   * @returns {Promise<Object>} Success response with email notification
+   * @returns {Promise<any>} Success response with email notification
    */
   async updateVendorStatus(vendorId, vendorStatus, reason = '') {
     try {
@@ -161,7 +162,7 @@ class VendorService {
    * @param {string} vendorId - Vendor ID
    * @param {number} rating - Rating value (0-5)
    * @param {string} feedback - Optional feedback
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async updateVendorRating(vendorId, rating, feedback = '') {
     try {
@@ -180,7 +181,7 @@ class VendorService {
    * Toggle vendor active/inactive status (soft deactivate)
    * @param {string} vendorId - Vendor ID
    * @param {boolean} isActive - Active status
-   * @returns {Promise<Object>} Updated status
+   * @returns {Promise<any>} Updated status
    */
   async toggleVendorStatus(vendorId, isActive) {
     try {
@@ -198,7 +199,7 @@ class VendorService {
   /**
    * Force password reset for vendor
    * @param {string} vendorId - Vendor ID
-   * @returns {Promise<Object>} Success response with email notification
+   * @returns {Promise<any>} Success response with email notification
    */
   async resetVendorPassword(vendorId) {
     try {
@@ -214,7 +215,7 @@ class VendorService {
 
   /**
    * Get vendor statistics for dashboard
-   * @returns {Promise<Object>} Statistics data
+   * @returns {Promise<any>} Statistics data
    */
   async getVendorStats() {
     try {
@@ -230,7 +231,7 @@ class VendorService {
    * Get vendors by service type
    * @param {string} serviceType - Service type: hotel, transport, activity, restaurant, guide, other
    * @param {Object} params - Additional query parameters (page, limit, sort, search)
-   * @returns {Promise<Object>} Filtered vendors
+   * @returns {Promise<any>} Filtered vendors
    */
   async getVendorsByServiceType(serviceType, params = {}) {
     try {
@@ -248,7 +249,7 @@ class VendorService {
   /**
    * Get vendor performance metrics
    * @param {string} vendorId - Vendor ID
-   * @returns {Promise<Object>} Performance data (bookings, ratings, reviews, earnings)
+   * @returns {Promise<any>} Performance data (bookings, ratings, reviews, earnings)
    */
   async getVendorPerformance(vendorId) {
     try {
@@ -263,7 +264,7 @@ class VendorService {
   /**
    * Delete vendor permanently
    * @param {string} vendorId - Vendor ID
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async deleteVendor(vendorId) {
     try {
@@ -283,7 +284,7 @@ class VendorService {
    * Clean vendor data by removing empty strings from nested objects
    * Joi validator doesn't allow empty strings in optional fields
    * @param {Object} data - Vendor data to clean
-   * @returns {Object} Cleaned vendor data
+   * @returns {any} Cleaned vendor data
    */
   cleanVendorData(data) {
     const cleaned = { ...data };
@@ -432,7 +433,7 @@ class VendorService {
   /**
    * Handle API errors with user-friendly messages
    * @param {Object} error - Axios/Fetch error object
-   * @returns {Object} Formatted error object
+   * @returns {any} Formatted error object
    */
   handleError(error) {
     const errorMessage = {
@@ -444,11 +445,8 @@ class VendorService {
     // Check if error has data property (from ApiService)
     if (error.data) {
       errorMessage.status = error.status || 'error';
-      errorMessage.message = error.data.message || error.message;
+      errorMessage.message = apiErrorMessage({ data: error.data, status: error.status });
       errorMessage.details = error.data;
-
-      // Log detailed error for debugging
-      console.log('Backend error response:', error.data);
 
       // Handle specific error codes
       switch (error.status) {
@@ -481,7 +479,7 @@ class VendorService {
           } else if (error.data?.details?.message) {
             errorMessage.userMessage = error.data.details.message;
           } else {
-            errorMessage.userMessage = error.message || 'Invalid input. Please check your data.';
+            errorMessage.userMessage = apiErrorMessage({ data: error.data, status: error.status });
           }
           break;
         case 401:
@@ -500,17 +498,13 @@ class VendorService {
           errorMessage.userMessage = 'Server error. Please try again later.';
           break;
         default:
-          errorMessage.userMessage = error.data?.message || error.message || 'An error occurred.';
+          errorMessage.userMessage = apiErrorMessage({ data: error.data, status: error.status });
       }
     } else if (error.message) {
-      // Error thrown by ApiService or network error
-      errorMessage.message = error.message;
-      
-      if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
-        errorMessage.userMessage = 'Network error. Please check your internet connection and ensure the server is running.';
-      } else {
-        errorMessage.userMessage = error.message || 'An unexpected error occurred.';
-      }
+      // Thrown by ApiService or the network layer. The mapper never returns
+      // error.message — that is where fetch and axios put their own strings.
+      errorMessage.message = apiErrorMessage(error);
+      errorMessage.userMessage = apiErrorMessage(error);
     } else {
       // Unknown error format
       errorMessage.message = 'Unknown error occurred';
@@ -524,7 +518,7 @@ class VendorService {
    * Validate vendor form data
    * @param {Object} data - Form data to validate
    * @param {boolean} isUpdate - Whether this is an update operation
-   * @returns {Object} Validation result with errors (if any)
+   * @returns {any} Validation result with errors (if any)
    */
   validateVendorData(data, isUpdate = false) {
     const errors = {};

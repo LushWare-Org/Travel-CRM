@@ -112,6 +112,7 @@ vi.mock('../../services/gatekeeper.service.js', () => ({ gatekeeperInputs: mockG
 import {
   listPackageSelections,
   createPackageSelection,
+  updatePackageSelection,
   deletePackageSelection,
   refreshPackageSelection,
   quotePackageSelection,
@@ -278,6 +279,58 @@ describe('createPackageSelection', () => {
   });
 });
 
+describe('updatePackageSelection', () => {
+  beforeEach(resetAll);
+
+  it('sets destinationOverride on the owned selection', async () => {
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1' });
+    mockSelectionUpdate.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', destinationOverride: 'Sigiriya, Sri Lanka' });
+
+    const { req, res, next } = buildReqRes({ body: { destinationOverride: 'Sigiriya, Sri Lanka' } });
+    await updatePackageSelection(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockSelectionUpdate).toHaveBeenCalledWith({
+      where: { id: 'sel-1' },
+      data: { destinationOverride: 'Sigiriya, Sri Lanka' },
+    });
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      data: { id: 'sel-1', leadId: 'lead-1', destinationOverride: 'Sigiriya, Sri Lanka' },
+    });
+  });
+
+  it('clears destinationOverride when sent as null', async () => {
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1' });
+    mockSelectionUpdate.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', destinationOverride: null });
+
+    const { req, res, next } = buildReqRes({ body: { destinationOverride: null } });
+    await updatePackageSelection(req, res, next);
+
+    expect(mockSelectionUpdate).toHaveBeenCalledWith({ where: { id: 'sel-1' }, data: { destinationOverride: null } });
+  });
+
+  it('rejects a selection belonging to a different lead', async () => {
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'other-lead' });
+
+    const { req, res, next } = buildReqRes({ body: { destinationOverride: 'Bali' } });
+    await updatePackageSelection(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(mockSelectionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty-string destinationOverride', async () => {
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1' });
+
+    const { req, res, next } = buildReqRes({ body: { destinationOverride: '' } });
+    await updatePackageSelection(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(mockSelectionUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('deletePackageSelection', () => {
   beforeEach(resetAll);
 
@@ -338,6 +391,7 @@ describe('quotePackageSelection', () => {
 
   it('moves the lead to QUOTED on its first quote and points primarySelectionId at the selection', async () => {
     mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', lifecycleStatus: 'DRAFTING' });
+    mockIsSelectionMaterialized.mockResolvedValue(true);
     mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', pricing: { sellSubtotal: 500 }, costLines: [], itineraryDays: [] });
     mockGatekeeperInputs.mockReturnValue({ sellSubtotal: 500 });
     mockSnapshotSelectionQuotation.mockResolvedValue({ id: 'quote-1' });
@@ -357,6 +411,7 @@ describe('quotePackageSelection', () => {
 
   it('quoting a second package on an already-QUOTED lead does not re-trigger the status history entry', async () => {
     mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', lifecycleStatus: 'QUOTED' });
+    mockIsSelectionMaterialized.mockResolvedValue(true);
     mockSelectionFindUnique.mockResolvedValue({ id: 'sel-2', leadId: 'lead-1', pricing: { sellSubtotal: 300 }, costLines: [], itineraryDays: [] });
     mockGatekeeperInputs.mockReturnValue({ sellSubtotal: 300 });
     mockSnapshotSelectionQuotation.mockResolvedValue({ id: 'quote-2' });
@@ -371,6 +426,37 @@ describe('quotePackageSelection', () => {
     expect(data.lifecycleStatus).toBeUndefined();
     expect(data.statusHistory).toBeUndefined();
     expect(data.primarySelectionId).toBe('sel-2');
+  });
+
+  it('materializes a pristine selection, recomputes pricing, then auto-promotes a NEW lead through DRAFTING to QUOTED', async () => {
+    // Pristine selection: nothing persisted, yet the UI showed a real subtotal
+    // (a computed preview). The gatekeeper must see the materialized numbers,
+    // not a 0-sellSubtotal bare row.
+    mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', lifecycleStatus: 'NEW' });
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', pricing: null, costLines: [], itineraryDays: [] });
+    mockIsSelectionMaterialized.mockResolvedValue(false);
+    mockMaterializeSelection.mockResolvedValue({ id: 'sel-1' });
+    mockRecomputeSelectionPricing.mockResolvedValue({ id: 'sel-1', sellSubtotal: 500 });
+    mockGatekeeperInputs.mockReturnValue({ sellSubtotal: 500 });
+    mockSnapshotSelectionQuotation.mockResolvedValue({ id: 'quote-1' });
+    mockSelectionUpdate.mockResolvedValue({ id: 'sel-1', currentQuoteId: 'quote-1' });
+    mockLeadUpdate.mockResolvedValue({ id: 'lead-1', lifecycleStatus: 'QUOTED' });
+
+    const { req, res, next } = buildReqRes();
+    await quotePackageSelection(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockIsSelectionMaterialized).toHaveBeenCalledWith('sel-1');
+    expect(mockMaterializeSelection).toHaveBeenCalledWith(expect.objectContaining({ selectionId: 'sel-1' }));
+    expect(mockRecomputeSelectionPricing).toHaveBeenCalledWith('sel-1');
+    expect(mockValidateTransition).toHaveBeenCalledWith(expect.objectContaining({ currentStatus: 'NEW', nextStatus: 'DRAFTING' }));
+    expect(mockValidateTransition).toHaveBeenCalledWith(expect.objectContaining({ currentStatus: 'DRAFTING', nextStatus: 'QUOTED' }));
+    const [{ data }] = mockLeadUpdate.mock.calls[0];
+    expect(data.lifecycleStatus).toBe('QUOTED');
+    expect(data.statusHistory.create).toEqual([
+      expect.objectContaining({ status: 'DRAFTING' }),
+      expect.objectContaining({ status: 'QUOTED' }),
+    ]);
   });
 });
 

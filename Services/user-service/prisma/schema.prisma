@@ -144,9 +144,11 @@ model OrganizationSettings {
   id String @id @default(uuid())
 
   // Company identity
-  companyName      String  @default("Travel CRM")
+  companyName      String  @default("Lush Travel Cloud")
   companyShortName String?
   companyLegalName String?
+  companyAddress   String? @db.Text
+  companyGstNumber String?
   tagline          String?
   logoUrl          String?
 
@@ -171,6 +173,8 @@ model OrganizationSettings {
   quotationValidityDays    Int      @default(30)
   quotationTerms           String?  @db.Text
   cancellationPolicy       String?  @db.Text
+  invoicePaymentTerms        String? @db.Text
+  invoicePaymentInstructions String? @db.Text
   ratingTagline            String?
   paymentMethods           String[]
   docNumberPrefixes        Json? // { quotation, invoice, receipt, payment, creditNote, voucher }
@@ -191,5 +195,26 @@ model OrganizationSettings {
   updatedAt DateTime @updatedAt
   // Only one row allowed — enforced by getOrCreateSingleton() in service layer
 
+  @@schema("crm_users")
+}
+
+// ─── Policy documents (RAG-retrievable, admin-editable) ─────────
+// Extends OrganizationSettings' existing single-string cancellationPolicy
+// pattern into multiple, citable documents — what makes server-verified
+// snippet citation possible for the trip-planning wizard's
+// answer_policy_question tool (docs/designs/ai-trip-planning-assistant.md).
+// Owner of editing these docs is the same admin/superAdmin role that already
+// edits cancellationPolicy via PUT /admin/settings — no new role.
+model PolicyDocument {
+  id    String @id @default(uuid())
+  title String @db.VarChar(255)
+  body  String @db.Text
+
+  updatedById String? // → users.User.id
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([title])
   @@schema("crm_users")
 }

@@ -69,6 +69,7 @@ web_modules/
 .env
 .env.*
 !.env.example
+!.env.lush.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -143,3 +144,21 @@ CLAUDE.local.md
 .claude/settings.local.json
 
 planning/
+# Terraform (infra/terraform — per-company deployments; tfvars hold secrets)
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+*.tfvars
+!*.tfvars.example
+
+# Local scratch / IDE / customer PII exports — never commit
+.idea/
+secret/
+
+# Local env backups — never commit (they contain live keys/secrets)
+env_backup/
+env_backup.zip
+
+# Local Deployment Skill
+.claude/skills/deploy-travelcrm/

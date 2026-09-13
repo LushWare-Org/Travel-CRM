@@ -5,6 +5,10 @@ export class StateMachineError extends Error {
     super(message);
     this.code = code;
     this.name = 'StateMachineError';
+    // A gatekeeper rule written for the caller, so the error handler may show it
+    // verbatim. Recording that here keeps the decision with the message it is about.
+    this.statusCode = 400;
+    this.isOperational = true;
   }
 }
 

@@ -14,9 +14,9 @@ import { PrismaClient as LeadClient }    from './lead-service/node_modules/@pris
 import { PrismaClient as BookClient }    from './booking-service/node_modules/@prisma/client/index.js';
 import { PrismaClient as BillClient }    from './billing-service/node_modules/@prisma/client/index.js';
 import { PrismaClient as CareerClient }  from './career-service/node_modules/@prisma/client/index.js';
+import { requireDatabaseUrl } from './database-url.mjs';
 
-const DB_URL     = 'postgresql://postgres.javgkcjscdhrnlnsgczs:KZ9MNnBwR4eslIsI@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
-const DIRECT_URL = 'postgresql://postgres.javgkcjscdhrnlnsgczs:KZ9MNnBwR4eslIsI@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres';
+const DB_URL     = requireDatabaseUrl('seed.mjs');
 
 const opts = { datasources: { db: { url: DB_URL } } };
 
@@ -232,7 +232,8 @@ async function seedPackages() {
   });
 
   // ── Packages ───────────────────────────────────────────────
-  await pkg.package.createMany({
+  await pkg.package.
+  createMany({
     data: [
       {
         id: ID.pkg1,
@@ -323,7 +324,7 @@ async function seedPackages() {
 
   await pkg.itineraryDay.createMany({
     data: [
-      { id: dayIds.sl1, packageId: ID.pkg1, dayNumber: 1, title: 'Arrival in Colombo', description: 'Airport pickup and city tour', breakfastCount: 0, lunchCount: 0, dinnerCount: 1 },
+      { id: dayIds.sl1, packageId: ID.pkg1, dayNumber: 1, title: 'Arrival in Colombo', description: 'Airport pickup and city tour', breakfastCount: 0, lunchCount: 0, dinnerCount: 1, images: [{ url: 'https://picsum.photos/seed/colombo-day1/800/500', publicId: 'travel-crm/itineraries/seed-colombo-day1' }] },
       { id: dayIds.sl2, packageId: ID.pkg1, dayNumber: 2, title: 'Sigiriya Rock Fortress', description: 'UNESCO Heritage site visit', breakfastCount: 1, lunchCount: 1, dinnerCount: 1 },
       { id: dayIds.sl3, packageId: ID.pkg1, dayNumber: 3, title: 'Kandy & Tea Estates', description: 'Temple of Tooth and tea plantation', breakfastCount: 1, lunchCount: 0, dinnerCount: 1 },
       { id: dayIds.sl4, packageId: ID.pkg1, dayNumber: 4, title: 'Beach Day at Bentota', description: 'Relax on pristine beaches', breakfastCount: 1, lunchCount: 1, dinnerCount: 1 },
@@ -333,6 +334,26 @@ async function seedPackages() {
     ],
     skipDuplicates: true,
   });
+
+  // Reconcile dayIds with whatever actually exists for (packageId, dayNumber).
+  // Real usage (e.g. editing one of these seeded packages in Management)
+  // can create ItineraryDay rows with fresh UUIDs that collide with these
+  // fixed seed ids on the @@unique([packageId, dayNumber]) constraint —
+  // skipDuplicates then silently skips our insert, leaving a *different* id
+  // in place. Remap so every downstream place/activity/transport insert
+  // below references a row that actually exists, instead of failing with a
+  // foreign key violation against the original fixed id.
+  const dayKeyByPackageAndNumber = {
+    [`${ID.pkg1}:1`]: 'sl1', [`${ID.pkg1}:2`]: 'sl2', [`${ID.pkg1}:3`]: 'sl3', [`${ID.pkg1}:4`]: 'sl4',
+    [`${ID.pkg2}:1`]: 'mv1', [`${ID.pkg2}:2`]: 'mv2', [`${ID.pkg2}:3`]: 'mv3',
+  };
+  const existingDays = await pkg.itineraryDay.findMany({
+    where: { packageId: { in: [ID.pkg1, ID.pkg2] } },
+  });
+  for (const day of existingDays) {
+    const key = dayKeyByPackageAndNumber[`${day.packageId}:${day.dayNumber}`];
+    if (key) dayIds[key] = day.id;
+  }
 
   // ── Day Places ─────────────────────────────────────────────
   await pkg.packageDayPlace.createMany({
@@ -411,19 +432,19 @@ async function seedLeads() {
     lead3: 'e1000000-0000-0000-0000-000000000003',
   };
 
-  await leads.settings.createMany({
-    data: [
-      {
-        assignmentMode: 'auto',
-        autoStrategy: 'round_robin',
-        enabledSalesRepIds: [ID.salesRep1, ID.salesRep2],
-        roundRobinIndex: 0,
-        maxOpenLeadsPerRep: 50,
-        skipInactive: true,
-        updatedById: ID.superAdmin,
-      },
-    ],
-    skipDuplicates: true,
+  await leads.settings.upsert({
+    where: { singletonKey: 1 },
+    update: {},
+    create: {
+      singletonKey: 1,
+      assignmentMode: 'auto',
+      autoStrategy: 'round_robin',
+      enabledSalesRepIds: [ID.salesRep1, ID.salesRep2],
+      roundRobinIndex: 0,
+      maxOpenLeadsPerRep: 50,
+      skipInactive: true,
+      updatedById: ID.superAdmin,
+    },
   });
 
   const lead1 = await leads.lead.upsert({

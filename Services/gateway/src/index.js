@@ -8,6 +8,7 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import { correlationId, requestLogger } from './middleware/requestLogger.js';
 import logger from './config/logger.js';
+import { GoogleAuth } from 'google-auth-library';
 
 const app = express();
 
@@ -42,7 +43,19 @@ app.use(cookieParser());
 // ─── Rate limiting ─────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+// Stricter than authLimiter: each request is a real, billed Gemini call, not a login attempt.
+const aiItineraryPreviewLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
+// Higher ceiling than aiItineraryPreviewLimiter: a single conversation to
+// "ready" plus a couple of follow-up messages is several billed Gemini
+// calls, not one — 30/15min gives roughly 3x a typical conversation's
+// turn count while still bounding cost per IP.
+const itineraryChatLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30 });
 app.use(globalLimiter);
+
+// ─── Health check ──────────────────────────────────────────────────────────────
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', service: 'api-gateway', timestamp: new Date().toISOString() })
+);
 
 // ─── Service URLs ──────────────────────────────────────────────────────────────
 const SERVICES = {
@@ -56,6 +69,7 @@ const SERVICES = {
   career:       process.env.CAREER_SERVICE_URL        || 'http://localhost:3007',
   notification: process.env.NOTIFICATION_SERVICE_URL  || 'http://localhost:3008',
   analytics:    process.env.ANALYTICS_SERVICE_URL     || 'http://localhost:3009',
+  assistant:    process.env.ASSISTANT_SERVICE_URL     || 'http://localhost:3011',
 };
 
 // ─── Public routes (no JWT required) ──────────────────────────────────────────
@@ -75,9 +89,20 @@ const PUBLIC_PATTERNS = [
   [/^\/api\/v1\/bookings\/website$/, 'POST'],
   [/^\/api\/v1\/bookings\/recent$/, 'GET'],
   [/^\/api\/v1\/leads\/website-contact$/, 'POST'],
+  [/^\/api\/v1\/customized-packages\/website$/, 'POST'],
+  [/^\/api\/v1\/manual-itineraries\/website$/, 'POST'],
+  [/^\/api\/v1\/packages\/generate-itinerary-preview$/, 'POST'],
+  [/^\/api\/v1\/packages\/itinerary-chat$/, 'POST'],
+  [/^\/api\/v1\/packages\/wizard-turn$/, 'POST'],
+  [/^\/api\/v1\/packages\/generate-day-preview$/, 'POST'],
+  [/^\/api\/v1\/packages\/generate-days-preview$/, 'POST'],
+  [/^\/api\/v1\/assistant\/turn$/, 'POST'],
+  [/^\/api\/v1\/assistant\/events$/, 'POST'],
   [/^\/api\/v1\/careers\/apply$/, 'POST'],
   [/^\/api\/v1\/vacancies\/?$/, 'GET'],
-  [/^\/api\/v1\/vacancies\/admin\/all$/, 'GET'],
+  // NOTE: /api/v1/vacancies/admin/all is deliberately NOT public. It was listed
+  // here and the downstream route was registered above its own auth gate, which
+  // together made the admin vacancy list reachable without a token at all.
   // Upload public
   [/^\/api\/v1\/upload\/optimize$/, 'GET'],
   // Webhooks
@@ -118,44 +143,87 @@ app.use((req, res, next) => {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Token expired. Please login again.' });
+      return res.status(401).json({
+        success: false,
+        status: 'fail',
+        code: 'UNAUTHENTICATED',
+        message: 'Token expired. Please login again.',
+        ...(req.requestId && { requestId: req.requestId }),
+      });
     }
-    return res.status(401).json({ success: false, message: 'Invalid token.' });
+    return res.status(401).json({
+      success: false,
+      status: 'fail',
+      code: 'UNAUTHENTICATED',
+      message: 'Invalid token.',
+      ...(req.requestId && { requestId: req.requestId }),
+    });
   }
 });
+
+// ─── Cloud Run backend auth ────────────────────────────────────────────────────
+// Backend Cloud Run services are deployed with allow_unauthenticated = false;
+// only the gateway's service account holds run.invoker. Each proxied request
+// therefore needs a Google-signed ID token for the target service's audience.
+const googleAuth = new GoogleAuth();
+const idTokenClients = new Map();
+
+const getAuthHeader = async (target) => {
+  if (!process.env.K_SERVICE) return null; // not running on Cloud Run (local/dev/CI) — behave exactly as today
+  if (!idTokenClients.has(target)) {
+    idTokenClients.set(target, await googleAuth.getIdTokenClient(target));
+  }
+  const client = idTokenClients.get(target);
+  const headers = await client.getRequestHeaders(target);
+  return headers['Authorization'];
+};
 
 // ─── Proxy factory ─────────────────────────────────────────────────────────────
 // pathRewrite restores req.originalUrl because Express strips the mount prefix
 // from req.url before passing control to the middleware (e.g. app.use('/api/v1/auth/login', ...)
 // makes req.url === '/' inside the handler). Services expect the full path.
-const proxy = (target) => createProxyMiddleware({
-  target,
-  changeOrigin: true,
-  pathRewrite: (_path, req) => req.originalUrl,
-  on: {
-    proxyRes: (proxyRes) => {
-      // Strip service-level CORS headers so the gateway's cors() middleware wins.
-      // Services set their own Access-Control-Allow-Origin (often hardcoded to one
-      // origin); leaving those headers in the proxied response would override the
-      // gateway's correctly-reflected origin and block other allowed clients.
-      delete proxyRes.headers['access-control-allow-origin'];
-      delete proxyRes.headers['access-control-allow-credentials'];
-      delete proxyRes.headers['access-control-allow-methods'];
-      delete proxyRes.headers['access-control-allow-headers'];
+const proxy = (target) => {
+  const middleware = createProxyMiddleware({
+    target,
+    changeOrigin: true,
+    pathRewrite: (_path, req) => req.originalUrl,
+    on: {
+      proxyReq: (proxyReq, req) => {
+        if (req.cloudRunAuthHeader) proxyReq.setHeader('Authorization', req.cloudRunAuthHeader);
+      },
+      proxyRes: (proxyRes) => {
+        // Strip service-level CORS headers so the gateway's cors() middleware wins.
+        // Services set their own Access-Control-Allow-Origin (often hardcoded to one
+        // origin); leaving those headers in the proxied response would override the
+        // gateway's correctly-reflected origin and block other allowed clients.
+        delete proxyRes.headers['access-control-allow-origin'];
+        delete proxyRes.headers['access-control-allow-credentials'];
+        delete proxyRes.headers['access-control-allow-methods'];
+        delete proxyRes.headers['access-control-allow-headers'];
+      },
+      error: (err, req, res) => {
+        (req.log || logger).error({ err, target, requestId: req.requestId }, 'Proxy error');
+        if (!res.headersSent) {
+          res.status(502).json({
+            success: false,
+            status: 'error',
+            code: 'DEPENDENCY_UNAVAILABLE',
+            message: 'Service temporarily unavailable',
+            ...(req.requestId && { requestId: req.requestId }),
+          });
+        }
+      },
     },
-    error: (err, req, res) => {
-      (req.log || logger).error({ err, target, requestId: req.requestId }, 'Proxy error');
-      if (!res.headersSent) {
-        res.status(502).json({ success: false, message: 'Service temporarily unavailable' });
-      }
-    },
-  },
-});
-
-// ─── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (req, res) =>
-  res.json({ status: 'ok', service: 'api-gateway', timestamp: new Date().toISOString() })
-);
+  });
+  return async (req, res, next) => {
+    try {
+      req.cloudRunAuthHeader = await getAuthHeader(target);
+    } catch (err) {
+      (req.log || logger).error({ err, target, requestId: req.requestId }, 'Failed to mint Cloud Run ID token');
+    }
+    return middleware(req, res, next);
+  };
+};
 
 // ─── Route table ───────────────────────────────────────────────────────────────
 const V1 = '/api/v1';
@@ -176,6 +244,17 @@ app.use(`${V1}/sales-reps`, proxy(SERVICES.user));
 app.use(`${V1}/vendors`,    proxy(SERVICES.user));
 
 // Packages → package-service
+app.use(`${V1}/packages/generate-itinerary-preview`, aiItineraryPreviewLimiter, proxy(SERVICES.package));
+app.use(`${V1}/packages/itinerary-chat`, itineraryChatLimiter, proxy(SERVICES.package));
+// Reuses itineraryChatLimiter (not a separate, stricter ceiling): a wizard
+// walkthrough is several turns, same order of magnitude as a chat
+// conversation — see docs/designs/ai-trip-planning-assistant.md.
+app.use(`${V1}/packages/wizard-turn`, itineraryChatLimiter, proxy(SERVICES.package));
+// Reuses itineraryChatLimiter (not a separate, stricter ceiling): per-day
+// regeneration is several small calls per session, same order of magnitude
+// as a chat conversation — see docs/designs/granular-ai-itinerary-generation.md.
+app.use(`${V1}/packages/generate-day-preview`, itineraryChatLimiter, proxy(SERVICES.package));
+app.use(`${V1}/packages/generate-days-preview`, itineraryChatLimiter, proxy(SERVICES.package));
 app.use(`${V1}/packages`,    proxy(SERVICES.package));
 app.use(`${V1}/reviews`,     proxy(SERVICES.package));
 app.use(`${V1}/places`,      proxy(SERVICES.package));
@@ -185,6 +264,8 @@ app.use(`${V1}/upload`,      proxy(SERVICES.package));
 
 // Leads → lead-service
 app.use(`${V1}/leads`, proxy(SERVICES.lead));
+app.use(`${V1}/customized-packages`, proxy(SERVICES.lead));
+app.use(`${V1}/manual-itineraries`, proxy(SERVICES.lead));
 
 // Bookings → booking-service
 app.use(`${V1}/bookings`, proxy(SERVICES.booking));
@@ -209,9 +290,24 @@ app.use(`${V1}/notifications`, proxy(SERVICES.notification));
 app.use(`${V1}/analytics`, proxy(SERVICES.analytics));
 app.use(`${V1}/dashboard`, proxy(SERVICES.analytics));
 
+// Site-wide floating assistant → assistant-service. Reuses itineraryChatLimiter
+// (not a separate ceiling): a turn here is the same order of magnitude billed
+// Gemini cost as a wizard-turn call — see docs/designs/site-wide-floating-assistant.md.
+// /events is telemetry-only (no Gemini call), left on the default globalLimiter.
+app.use(`${V1}/assistant/turn`, itineraryChatLimiter, proxy(SERVICES.assistant));
+app.use(`${V1}/assistant`, proxy(SERVICES.assistant));
+
 // ─── 404 ───────────────────────────────────────────────────────────────────────
+// Generic rather than echoing the method and path back: the response should not
+// describe the routing table to whoever asked.
 app.use((req, res) =>
-  res.status(404).json({ success: false, message: `Route ${req.method} ${req.path} not found` })
+  res.status(404).json({
+    success: false,
+    status: 'fail',
+    code: 'NOT_FOUND',
+    message: "We couldn't find what you were looking for.",
+    ...(req.requestId && { requestId: req.requestId }),
+  })
 );
 
 const PORT = process.env.PORT || 3000;

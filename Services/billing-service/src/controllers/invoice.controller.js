@@ -1,7 +1,14 @@
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import logger from '../config/logger.js';
 import { nextInvoiceNumber } from '../utils/docNumber.js';
+import { generateInvoicePDF } from '../utils/invoicePDFGenerator.js';
+import { sendInvoiceEmail } from '../utils/emailService.js';
+import { sendInvoiceWhatsapp } from '../utils/whatsappService.js';
+import { uploadPdfBuffer } from '../utils/cloudinary.js';
+import { sendInvoiceSchema } from '../validators/invoice.validator.js';
+import { logLeadCommunication } from '../services/events.client.js';
 
 const invoiceInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -136,11 +143,49 @@ export const cancelInvoice = asyncHandler(async (req, res) => {
 });
 
 export const sendInvoice = asyncHandler(async (req, res) => {
-  const invoice = await prisma.invoice.update({
-    where: { id: req.params.id },
-    data: { status: 'sent', sentAt: new Date(), emailSent: true },
-  });
-  res.json({ success: true, message: 'Invoice sent', data: invoice });
+  const { channel, email, phone } = sendInvoiceSchema.parse(req.body || {});
+
+  const invoice = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: invoiceInclude });
+  if (!invoice) throw new AppError('Invoice not found', 404);
+
+  const pdf = await generateInvoicePDF(invoice);
+  const now = new Date();
+
+  try {
+    if (channel === 'whatsapp') {
+      const recipient = phone || invoice.customerPhone;
+      if (!recipient) throw new AppError('No phone number available for this invoice', 400);
+      const mediaUrl = await uploadPdfBuffer(pdf, `invoice-${invoice.invoiceNumber}`);
+      await sendInvoiceWhatsapp({ invoice, phone: recipient, mediaUrl });
+      const updated = await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { status: 'sent', sentAt: now, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
+      });
+      try {
+        await logLeadCommunication({
+          leadId: invoice.leadId, type: 'whatsapp', notes: `WhatsApp: Invoice ${invoice.invoiceNumber} sent`,
+        });
+      } catch (err) {
+        req.log.error({ err, leadId: invoice.leadId }, 'Failed to log WhatsApp send on lead timeline');
+      }
+      return res.json({ success: true, message: 'Invoice sent via WhatsApp', data: updated });
+    }
+
+    const recipient = email || invoice.customerEmail;
+    if (!recipient) throw new AppError('No email address available for this invoice', 400);
+    await sendInvoiceEmail({ invoice, recipientEmail: recipient, pdfBuffer: pdf });
+    const updated = await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { status: 'sent', sentAt: now, emailSent: true },
+    });
+    return res.json({ success: true, message: 'Invoice sent via email', data: updated });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    // Configuration / delivery failures surface as a clean 400, not a 500. The
+    // transport's own message is logged here and never echoed to the client.
+    logger.error({ err }, 'Failed to send invoice');
+    throw new AppError("We couldn't send that invoice. Please try again.", 400);
+  }
 });
 
 export const markInvoiceViewed = asyncHandler(async (req, res) => {
@@ -183,5 +228,10 @@ export const getOverdueInvoices = asyncHandler(async (req, res) => {
 export const downloadInvoicePDF = asyncHandler(async (req, res) => {
   const invoice = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: invoiceInclude });
   if (!invoice) throw new AppError('Invoice not found', 404);
-  res.json({ success: true, message: 'PDF generation not yet implemented', data: invoice });
+
+  const pdf = await generateInvoicePDF(invoice);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="invoice-${invoice.invoiceNumber}.pdf"`);
+  res.setHeader('Content-Length', pdf.length);
+  res.send(pdf);
 });

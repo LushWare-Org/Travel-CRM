@@ -270,4 +270,11 @@ describe('generateQuotationPDF', () => {
     });
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
+
+  it('renders a longer cover when destination is present vs. absent', async () => {
+    const withDestination = await generateQuotationPDF({ ...baseQuotation, destination: 'Maldives' });
+    const withoutDestination = await generateQuotationPDF({ ...baseQuotation, destination: null });
+    expect(withDestination.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(withDestination.length).not.toBe(withoutDestination.length);
+  });
 });

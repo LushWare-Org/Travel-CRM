@@ -80,15 +80,31 @@ export const book = asyncHandler(async (req, res) => {
 });
 
 export const listBookings = asyncHandler(async (req, res) => {
+  const { status, page = 1, limit, sortBy = 'createdAt', order = 'desc' } = req.query;
   const isScoped = req.user?.role === SALES_REP && !req.user?.isSuperAdmin;
-  const bookings = await prisma.hotelBooking.findMany({
-    where: {
-      ...(isScoped && { createdById: req.user.id }),
-      ...(req.query.status && { status: req.query.status }),
+  const where = {
+    ...(isScoped && { createdById: req.user.id }),
+    ...(status && { status }),
+  };
+
+  const [bookings, total] = await Promise.all([
+    prisma.hotelBooking.findMany({
+      where,
+      orderBy: { [sortBy]: order },
+      ...(limit && { skip: (page - 1) * limit, take: limit }),
+    }),
+    prisma.hotelBooking.count({ where }),
+  ]);
+  res.json({
+    success: true,
+    data: bookings,
+    pagination: {
+      total,
+      page,
+      limit: limit ?? total,
+      pages: limit ? Math.ceil(total / limit) : total > 0 ? 1 : 0,
     },
-    orderBy: { createdAt: 'desc' },
   });
-  res.json({ success: true, data: bookings });
 });
 
 export const getBooking = asyncHandler(async (req, res) => {

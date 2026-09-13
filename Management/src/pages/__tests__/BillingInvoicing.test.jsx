@@ -27,11 +27,11 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/toast';
 import BillingInvoicing from '../BillingInvoicing';
 
 const quotation = {

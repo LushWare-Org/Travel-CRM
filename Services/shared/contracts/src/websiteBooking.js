@@ -1,0 +1,57 @@
+import { z } from 'zod';
+import { moneyField } from './money.js';
+
+// Confirmed against BookingModal.tsx's actual submitted payload
+// (PackageDetailsContainer.test.tsx) and booking-service's
+// createWebsiteBooking controller: `name` is optional client- and
+// server-side (backend defaults to 'Website Traveler' when absent) — do
+// not tighten it back to required without re-checking both sides.
+export const WebsiteBookingRequest = z.object({
+  packageId: z.string(),
+  name: z.string().optional(),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  travelers: z.number().int().min(1).optional(),
+  travelDate: z.string().optional(),
+  endDate: z.string().optional(),
+  message: z.string().optional(),
+});
+
+export const WebsiteBookingResult = z
+  .object({
+    bookingId: z.string().optional(),
+  })
+  .passthrough();
+
+// Mirrors booking-service's getUserBookings/getRecentBookings raw-SQL rows
+// (Services/booking-service/src/controllers/booking.controller.js) — flat,
+// with package fields prefixed `package*`. There is no nested `package`
+// object on the wire. confirmedAt/userName/userEmail only appear on
+// getRecentBookings' rows; packageMarginType/etc. never survive
+// withPackageSellPrice() (replaced by packagePrice).
+export const UserBooking = z
+  .object({
+    id: z.string().optional(),
+    userId: z.string().optional(),
+    packageId: z.string().optional(),
+    travelDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional(),
+    confirmedAt: z.string().nullable().optional(),
+    numberOfTravelers: z.number().optional(),
+    totalAmount: moneyField.optional(),
+    paidAmount: moneyField.optional(),
+    paymentStatus: z.string().optional(),
+    bookingStatus: z.string().optional(),
+    specialRequests: z.string().nullable().optional(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
+    packageName: z.string().nullable().optional(),
+    packageDestination: z.string().nullable().optional(),
+    packageDuration: z.number().nullable().optional(),
+    packageCoverImage: z.string().nullable().optional(),
+    packageSlug: z.string().nullable().optional(),
+    packagePrice: moneyField.nullable().optional(),
+    userName: z.string().nullable().optional(),
+    userEmail: z.string().nullable().optional(),
+  })
+  .passthrough();

@@ -1,0 +1,184 @@
+// =============================================================
+// assistant-service — PostgreSQL schema: "crm_assistant"
+// Shared DB, isolated namespace.
+//
+// Design decisions:
+//   • AssistantEvent is a telemetry sink only (impression/opened/turn/
+//     response/nav_click/error). The turn protocol is NOT stateless any more:
+//     AssistantSession/AssistantMessage below are the conversation, and the
+//     client's resent message window is only a fallback for a store that could
+//     not be read. This reverses the Eng Review decision in
+//     docs/designs/site-wide-floating-assistant.md, because a booking request
+//     has to be gated on a confirmation the client cannot forge.
+//   • eventType is a plain String (validated at the Zod layer, not a
+//     Postgres enum) so new event types can be added without a migration.
+//   • No cross-schema FKs — sessionId is opaque client-generated.
+// =============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_assistant"]
+}
+
+// ─── AssistantEvent (site-wide assistant telemetry) ───────────
+
+model AssistantEvent {
+  id        String   @id @default(uuid())
+  sessionId String
+  turnId    String?
+  eventType String
+  tool      String?
+  route     String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([sessionId, turnId])
+  @@index([createdAt])
+  @@schema("crm_assistant")
+}
+
+// ─── ManagementLastSeen (Management copilot delta window) ─────
+// Server-authoritative per-actor/page/scope last-seen timestamp, so the
+// `since=last_visit` delta is correct across devices/sessions (the client's
+// local lastSeenAt is only a display hint). Not a chat transcript — this is
+// the only server-side client state the copilot keeps.
+
+model ManagementLastSeen {
+  id               String   @id @default(uuid())
+  actorId          String
+  pageKey          String
+  scopeFingerprint String
+  lastSeenAt       DateTime
+  updatedAt        DateTime @updatedAt
+
+  @@unique([actorId, pageKey, scopeFingerprint])
+  @@index([actorId])
+  @@schema("crm_assistant")
+}
+
+// ─── InsightState (per-insight acknowledgement and novelty) ───
+// Generalizes ManagementLastSeen from "when did this operator last look at this
+// scope" to "when did they last see THIS insight, and has it changed since".
+// Suppression needs the second question answered: a scope-level timestamp cannot
+// tell an unchanged repeat from news.
+//
+// `lastMaterialValue` is what makes novelty honest. Without it, suppression
+// either hides an insight forever or re-shows it on every load; with it, "changed"
+// means the insight's own value moved (an amount, a count of days, a status),
+// not that time passed.
+//
+// Keyed on `insightKey`, which comes from src/insights/keys.js and survives a
+// descriptor reorder. Keying on the legacy index-prefixed id would have baked a
+// developer's array order into stored state.
+model InsightState {
+  id                String    @id @default(uuid())
+  actorId           String
+  pageKey           String
+  scopeFingerprint  String
+  insightKey        String
+  firstSeenAt       DateTime  @default(now())
+  lastSurfacedAt    DateTime?
+  surfacedCount     Int       @default(0)
+  acknowledgedAt    DateTime?
+  snoozedUntil      DateTime?
+  lastMaterialValue String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([actorId, pageKey, scopeFingerprint, insightKey])
+  @@index([actorId, pageKey])
+  @@schema("crm_assistant")
+}
+
+// ─── InsightDecision (why the panel shows what it shows) ───
+// One row per candidate that got past the structural layers. A dropped insight
+// is a recorded fact with a reason code, not a silent filter, which is what makes
+// "why is this not showing" answerable at all.
+//
+// L0-L2 drops (bad shape, no citation, unauthorized) are deliberately NOT stored
+// per row: they are structural and would swamp the table with noise. They belong
+// in aggregate counters. The volume decision is recorded in the ranking design
+// (PERF-2/3A) and enforced by `decisionsWorthPersisting`.
+//
+// No foreign keys and no joins, same as AssistantEvent: this is a log, addressed
+// by ids that may refer to rows in other services' schemas.
+model InsightDecision {
+  id               String   @id @default(uuid())
+  requestId        String?
+  actorId          String
+  pageKey          String
+  scopeFingerprint String
+  insightKey       String
+  ruleId           String?
+  entityKind       String?
+  entityId         String?
+  severity         String
+  rankScore        Float?
+  decision         String
+  reason           String
+  rankingVersion   String?
+  createdAt        DateTime @default(now())
+
+  @@index([actorId, pageKey, createdAt])
+  @@index([requestId])
+  @@schema("crm_assistant")
+}
+
+// ─── AssistantSession (the visitor's conversation) ────────────
+// `id` is the client's opaque sessionId — the same value the telemetry rows
+// already carry, generated once per browser in localStorage. This is the only
+// table in the service that stores what a visitor said, and the only one whose
+// rows are PII (the booking draft holds an email address). Expiry is lazy: a
+// session read after SESSION_TTL_MS is reset in place, and nothing sweeps rows
+// nobody comes back to — this repo has no scheduler.
+//
+// The booking fields are the reason this exists. `bookingStatus` is the
+// server's own record that it asked for confirmation, `bookingAskedTurn` makes
+// that confirmation mean *this* turn's question, and `bookingId` is what stops
+// a second "yes" from writing twice.
+model AssistantSession {
+  id               String   @id
+  createdAt        DateTime @default(now())
+  lastSeenAt       DateTime
+  shownPackageIds  String[] @default([])
+  bookingDraft     Json?
+  bookingStatus    String?
+  bookingId        String?
+  bookingAskedTurn Int?
+  // Completed turns, incremented once per turn. A monotonic counter rather than
+  // a message seq, because seq advances by two per turn (user + assistant) and
+  // "was the confirmation the very next thing the visitor heard?" has to be an
+  // equality, not arithmetic a later reader has to re-derive.
+  turnCount        Int      @default(0)
+
+  @@index([lastSeenAt])
+  @@schema("crm_assistant")
+}
+
+// ─── AssistantMessage (one turn's messages) ───────────────────
+// `id` is the client's own message id, and it is the dedupe key: a retried turn
+// re-sends the same ids and `createMany({ skipDuplicates: true })` then appends
+// nothing. Same idea as lead-service's LeadCommunicationLog.externalMessageId.
+//
+// `seq` orders the transcript. A timestamp cannot, because both messages of one
+// turn are written together.
+model AssistantMessage {
+  id        String   @id
+  sessionId String
+  seq       Int
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, seq])
+  @@index([sessionId, seq])
+  @@schema("crm_assistant")
+}

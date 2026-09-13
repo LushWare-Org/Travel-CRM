@@ -28,7 +28,7 @@ vi.mock('../../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', role: 'admin', name: 'Admin User' } }),
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -73,12 +73,27 @@ vi.mock('../../../shared', async () => ({
         >
           Submit Flight
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            props.onSelectTemplate({
+              origin: 'AAA',
+              destination: 'BBB',
+              cabinClass: 'Economy',
+              departureTime: 'morning',
+              airlinePreference: 'QR',
+              tripType: 'roundTrip',
+            })
+          }
+        >
+          Submit Round Trip
+        </button>
       </div>
     );
   },
 }));
 
-import NewLeadDialog from '../NewLeadDialog.jsx';
+import NewLeadDialog from '../NewLeadDialog';
 
 const PKG_A = 'pkg-a';
 const packagesFixture = [{ _id: PKG_A, title: 'Sri Lanka Explorer', destination: 'Sri Lanka' }];
@@ -314,5 +329,70 @@ describe('NewLeadDialog — manual itinerary option', () => {
       expect.objectContaining({ isManualItinerary: false, packageId: PKG_A })
     ));
     expect(mockUpdatePackageSelectionItinerary).not.toHaveBeenCalled();
+  });
+});
+
+describe('NewLeadDialog — round trip fills both direction rows', () => {
+  it('renders the outbound card with the flipped route and no cost set', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await expandTransfers(user);
+
+    await user.click(screen.getByRole('button', { name: /add inbound flight preferences/i }));
+    await user.click(screen.getByRole('button', { name: /submit round trip/i }));
+
+    expect(screen.getByRole('button', { name: /edit flight preferences: aaa to bbb/i })).toBeInTheDocument();
+    const outboundCard = screen.getByRole('button', { name: /edit flight preferences: bbb to aaa/i });
+    expect(within(outboundCard).getByText('BBB → AAA')).toBeInTheDocument();
+    expect(within(outboundCard).getByText(/no cost set/i)).toBeInTheDocument();
+  });
+
+  it('saves both rows on create, with the mirror priced 0 and no tripType on the wire', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await expandTransfers(user);
+
+    await user.click(screen.getByRole('button', { name: /add inbound flight preferences/i }));
+    await user.click(screen.getByRole('button', { name: /submit round trip/i }));
+
+    await user.type(screen.getByPlaceholderText('Enter full name'), 'Jane Doe');
+    await user.type(screen.getByPlaceholderText('Enter phone number'), '+94771234567');
+    await user.click(screen.getByRole('button', { name: /create lead/i }));
+
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledTimes(2));
+    expect(mockAddSelectionFlight).toHaveBeenCalledWith('new-lead-1', 'sel-1', expect.objectContaining({
+      flightType: 'TO_START',
+      origin: 'AAA',
+      destination: 'BBB',
+    }));
+    expect(mockAddSelectionFlight).toHaveBeenCalledWith('new-lead-1', 'sel-1', expect.objectContaining({
+      flightType: 'RETURN_HOME',
+      origin: 'BBB',
+      destination: 'AAA',
+      estimatedUnitPrice: 0,
+    }));
+    for (const call of mockAddSelectionFlight.mock.calls) {
+      expect(call[2]).not.toHaveProperty('tripType');
+    }
+  });
+
+  it('does not overwrite a leg already saved in the other direction', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await expandTransfers(user);
+
+    await user.click(screen.getByRole('button', { name: /add outbound flight preferences/i }));
+    await user.click(screen.getByRole('button', { name: /submit flight/i }));
+
+    await user.click(screen.getByRole('button', { name: /add inbound flight preferences/i }));
+    await user.click(screen.getByRole('button', { name: /submit round trip/i }));
+
+    await user.type(screen.getByPlaceholderText('Enter full name'), 'Jane Doe');
+    await user.type(screen.getByPlaceholderText('Enter phone number'), '+94771234567');
+    await user.click(screen.getByRole('button', { name: /create lead/i }));
+
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledTimes(2));
+    const returnHomeSave = mockAddSelectionFlight.mock.calls.find(([, , payload]) => payload.flightType === 'RETURN_HOME');
+    expect(returnHomeSave[2]).toMatchObject({ origin: 'AAA', destination: 'BBB' });
   });
 });
