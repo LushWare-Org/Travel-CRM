@@ -18,14 +18,14 @@ import { capabilitySummary, toolsForActor } from '../insights/catalogue.js';
 import { MANAGEMENT_GENERATION_DEADLINE_MS, MANAGEMENT_MIN_CALL_TIMEOUT_MS } from '../constants/managementCopilot.js';
 import prisma from '../db/client.js';
 
-// The whole turn runs inside one 45s server deadline. The Management client holds
-// a 50s endpoint timeout WITH AbortSignal support: a scope change aborts the
+// The whole turn runs inside one 17s server deadline. The Management client holds
+// a 20s endpoint timeout WITH AbortSignal support: a scope change aborts the
 // in-flight request, and a timeout surfaces as a recoverable failure with Retry
 // rather than an endless loading state (see design §1). The deadline is defined
 // once in constants/managementCopilot.js and is the turn's budget — the
 // evidence-bundle load and the ask's aggregate precompute are charged to it, so
 // every generation is handed only what is left (`remainingTurnBudgetMs`) instead
-// of a fresh 45s stacked on top of the load.
+// of a fresh 17s stacked on top of the load.
 //
 // The briefing is allowed a SECOND attempt, but strictly inside that same
 // remaining budget (`deadlineMs`), so worst-case latency does not grow: a
