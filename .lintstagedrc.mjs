@@ -9,6 +9,7 @@ const cmd = (dir) => (files) =>
 export default {
   'Client/**/*.{js,jsx,ts,tsx}': cmd('Client'),
   'Management/**/*.{js,jsx}': cmd('Management'),
+  'Landing/**/*.{js,jsx}': cmd('Landing'),
   'Services/shared/contracts/**/*.js': cmd('Services/shared/contracts'),
   'Services/lead-service/**/*.js': cmd('Services/lead-service'),
   'Services/billing-service/**/*.js': cmd('Services/billing-service'),

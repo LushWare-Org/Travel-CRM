@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- The marketing Landing page now deploys to Firebase Hosting as its own site (`lush-ware-landing-dev`). It ships both by hand (`scripts/deploy-landing.sh`) and automatically from CI's `deploy-hosting` job on every push to `microservices`. Its links to the Client and Management portals are set per environment at build time, so a dev deploy no longer points visitors at production.
+
 ## [0.6.0.0] - 2026-09-11
 
 ### Added

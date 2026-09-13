@@ -8,11 +8,12 @@ Status: accepted. This document is the durable architecture record for Travel-CR
 |---|---|---|
 | Client SPA | Firebase Hosting — one site per environment (`Client/dist`) | First-party customer-facing SPA served as a static build; gets real custom domains (`lushtravelcloud.com`, `www.lushtravelcloud.com`) via Firebase Hosting's region-independent, free custom-domain feature. |
 | Management SPA | Firebase Hosting — one site per environment (`Management/dist`) | First-party admin SPA served as a static build; gets `manage.lushtravelcloud.com` the same way; no server-side compute. |
+| Landing page | Firebase Hosting — one site per environment (`Landing/dist`) | Standalone marketing page (Vite + React + Tailwind) with no backend of its own; every CTA links out to the Client/Management sites, whose URLs are baked in at build time. |
 | Services (gateway + 11 microservices) | Cloud Run ×12 + Supabase Postgres | All stateless Express apps — one Cloud Run service per `Services/*` directory (11 services) plus `Services/gateway`; they share one Supabase Postgres database with one schema per service, matching the existing `schema.prisma` `schemas` arrays with zero schema changes. |
 
 **Compute.** Cloud Run, one service per `Services/*` directory (11 services) + `Services/gateway` = 12 Cloud Run services. All are stateless Express apps; no code changes needed for Cloud Run compatibility except the gateway ID-token change (see "Service exposure").
 
-**Static hosting.** Firebase Hosting, two sites in one Firebase project — `Client/dist` and `Management/dist`.
+**Static hosting.** Firebase Hosting, three sites per environment in one Firebase project — `Client/dist`, `Management/dist` and `Landing/dist` (`Landing/` is the backendless marketing page; `infra/README.md` records the deployed dev URLs).
 
 **Database.** Supabase Postgres (not Cloud SQL) — external managed Postgres, region `ap-south-1` (Mumbai) to match Cloud Run region `asia-south1`. Single database, one Postgres schema per service (`crm_assistant`, `crm_auth`, `crm_users`, `crm_packages`, `crm_leads`, `crm_bookings`, `crm_billing`, `crm_careers`, `crm_flights`), exactly matching the existing `schema.prisma` `schemas` arrays — zero schema changes. Supabase's Supavisor pooler (port 6543, `?pgbouncer=true`) is `DATABASE_URL`; the direct connection (port 5432) is `DIRECT_URL`, used only by `prisma migrate deploy`. This is not new design — `Services/booking-service/.env.example`, `Services/flight-service/.env.example`, and `Services/analytics-service/.env.example` already document exactly this pattern; the other 6 DB-backed services' `.env.example` files are stale and were brought in line by this plan.
 

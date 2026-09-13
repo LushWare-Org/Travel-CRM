@@ -31,16 +31,19 @@ Verified: `GET /health` on the gateway returns `200 {"status":"ok","service":"ap
 
 **Image tag currently deployed:** `dev-a1c28de` (all 12 services built from `Services/` at commit `a1c28de`, pushed via CI's `build-and-push` job), pushed to the shared Artifact Registry repo.
 
-**Frontend (Client, Management):** both apps are built and deployed to Firebase Hosting.
+**Frontend (Client, Management, Landing):** all three apps are built and deployed to Firebase Hosting.
 
 | App | URL |
 |---|---|
 | Client | https://lush-ware-client-dev.web.app |
 | Management | https://lush-ware-management-dev.web.app |
+| Landing | https://lush-ware-landing-dev.web.app |
 
-Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`. Deployed both manually (`firebase deploy --only hosting:client-dev,hosting:management-dev`) and via CI's `deploy-hosting` job (WIF-authenticated, no stored key). Verified live in a real browser: Client loads with zero console errors and live package data; Management's superadmin login (`superadmin@travelcrm.com` / seeded password) reaches the full dashboard.
+Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`. Client and Management were deployed manually (`firebase deploy --only hosting:client-dev,hosting:management-dev`) and via CI's `deploy-hosting` job (WIF-authenticated, no stored key). Verified live in a real browser: Client loads with zero console errors and live package data; Management's superadmin login (`superadmin@travelcrm.com` / seeded password) reaches the full dashboard.
 
-`.firebaserc` maps the `client-dev`/`management-dev` targets in `firebase.json` to the real Firebase Hosting site IDs `lush-ware-client-dev`/`lush-ware-management-dev`. Backend `CLIENT_URL`/`MANAGEMENT_URL` env vars now point at these real domains (previously `https://client-dev.web.app` / `https://management-dev.web.app`, which were never-created placeholders).
+`.firebaserc` maps the `client-dev`/`management-dev`/`landing-dev` targets in `firebase.json` to the real Firebase Hosting site IDs `lush-ware-client-dev`/`lush-ware-management-dev`/`lush-ware-landing-dev`. Backend `CLIENT_URL`/`MANAGEMENT_URL` env vars now point at these real domains (previously `https://client-dev.web.app` / `https://management-dev.web.app`, which were never-created placeholders).
+
+Landing is a standalone marketing page with no backend. `scripts/deploy-landing.sh [dev|staging|prod]` builds it and deploys it; CI's `deploy-hosting` job does the same for the target environment on every push to `microservices`. Its only build-time inputs are the two portal URLs it links out to (`VITE_MANAGEMENT_URL`/`VITE_CLIENT_URL`) — both the script and CI set them explicitly, because a non-prod build that leaves them unset would point visitors at the production custom domains.
 
 ### Gateway ID-token race fix
 
