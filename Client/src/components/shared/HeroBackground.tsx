@@ -16,10 +16,15 @@ interface HeroBackgroundProps {
 const toWebp = (src: string): string | null => (src.endsWith('.jpg') ? src.replace(/\.jpg$/, '.webp') : null);
 
 export default function HeroBackground({ item, isActive = true, eager = false }: HeroBackgroundProps) {
+  // React 18.3 does not map the camelCase `fetchPriority` — that spelling
+  // arrived with React 19 — so it warns and drops the attribute, which also
+  // costs the hero image its LCP priority hint. The lowercase attribute is what
+  // React passes through to the DOM, so it is set that way. `@types/react`
+  // declares only the camelCase spelling, hence the widening on the one key.
   const commonImgProps = {
     loading: eager ? ('eager' as const) : ('lazy' as const),
     decoding: eager ? ('auto' as const) : ('async' as const),
-    ...(eager ? { fetchPriority: 'high' as const } : {}),
+    ...(eager ? ({ fetchpriority: 'high' } as Record<string, string>) : {}),
   };
 
   if (item.kind === 'video') {
