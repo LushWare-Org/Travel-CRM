@@ -63,7 +63,12 @@ export default function PageCopilot({
           renderInsights ? (
             renderInsights(api)
           ) : (
-            <CollectionInsights session={api.session} scopeLabel={scopeLabel} onCollapse={api.collapse} />
+            <CollectionInsights
+              session={api.session}
+              scopeLabel={scopeLabel}
+              onCollapse={api.collapse}
+              onShowConversation={api.showConversation}
+            />
           )
         }
       </ManagementContextCopilot>

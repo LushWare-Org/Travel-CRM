@@ -102,7 +102,10 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
       // The composer is the deterministic driver — the user turn is committed
       // before the request starts, so the transcript holds the token without
       // waiting on model output.
-      const surface = page.locator(SURFACE_SELECTOR);
+      // One surface per tab panel, and the inactive panel is kept mounted so a
+      // tab switch cannot discard its scroll offset — so there are two in the
+      // DOM. Assert on the visible one, never on the count.
+      const surface = page.locator(`${SURFACE_SELECTOR}:visible`);
       await expect(surface).toHaveCount(1);
       await surface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
       await surface.getByRole('button', { name: 'Ask' }).click();
@@ -185,7 +188,7 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
     await test.step('a 120-character token wraps inside the drawer instead of widening it', async () => {
       // The drawer hosts the same CopilotSurface below `xl`, so the same token
       // must wrap there too — asserted on the scroller, never on the dialog.
-      const drawerSurface = page.locator(`[role="dialog"] ${SURFACE_SELECTOR}`);
+      const drawerSurface = page.locator(`[role="dialog"] ${SURFACE_SELECTOR}:visible`);
       await expect(drawerSurface).toHaveCount(1);
       await drawerSurface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
       await drawerSurface.getByRole('button', { name: 'Ask' }).click();

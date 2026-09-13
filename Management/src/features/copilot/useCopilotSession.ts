@@ -10,6 +10,8 @@ import type {
   ClaimSection,
   ClaimSeverity,
   CopilotClaim,
+  InsightProducer,
+  PriorClaimContext,
   CopilotContext,
   CopilotFact,
   CopilotSession,
@@ -142,6 +144,13 @@ type InsightsState = {
   receivedAt: number;
   /** True when the result settled while the surface was open (checked, not kept). */
   settledWhileOpen: boolean;
+  /**
+   * The server reported this response as a deterministic fallback rather than a
+   * model result. Rule-computed claims arrive through the insights transport
+   * when generation fails (`respondWithFallback`), so authorship cannot be read
+   * off the request that produced the list.
+   */
+  fallback: boolean;
 };
 
 type Session = {
@@ -154,6 +163,8 @@ type Session = {
   ackRunId: number | null;
   ackFailedRunId: number | null;
   turns: CopilotTurn[];
+  /** The finding the composer is attached to, until the turn that consumes it. */
+  pendingContext: PriorClaimContext | null;
   input: string;
   asking: boolean;
 };
@@ -162,6 +173,16 @@ export type UseCopilotSessionOptions = {
   pageKey?: string;
   /** Whether the dock or drawer is actually open for this session. */
   open?: boolean;
+  /**
+   * Whether the FINDINGS are the thing on screen, as opposed to the surface
+   * merely being open.
+   *
+   * The two diverged when the panel gained tabs: with the conversation active a
+   * result can arrive, be marked seen, and advance `lastSeenAt` without ever
+   * having been presented — silently shrinking the next visit's change window.
+   * Defaults to `open`, which is the pre-tabs behaviour.
+   */
+  insightsPresented?: boolean;
 };
 
 // Null => dormant. No record key => "__collection__". Non-empty leadId => record key. Blank => dormant.
@@ -189,11 +210,13 @@ function createSession(scopeKey: string | null): Session {
       generatedAt: null,
       receivedAt: 0,
       settledWhileOpen: false,
+      fallback: false,
     },
     armed: false,
     ackRunId: null,
     ackFailedRunId: null,
     turns: [],
+    pendingContext: null,
     input: "",
     asking: false,
   };
@@ -202,6 +225,40 @@ function createSession(scopeKey: string | null): Session {
 function messageOf(err: unknown, fallback: string): string {
   const message = (err as { message?: string } | null)?.message;
   return typeof message === "string" && message.trim() ? message : fallback;
+}
+
+/**
+ * The wire shape for an anchored finding.
+ *
+ * `evidenceId` is dropped and `facts` is capped at 20 because `PriorClaimSchema`
+ * and its fact schema are both `.strict()` and its `facts` array is `.max(20)`,
+ * while a claim may carry 50 — an uncapped copy 400s on the richest findings,
+ * which are exactly the ones worth asking about.
+ */
+function toPriorClaim(claim: CopilotClaim): PriorClaimContext {
+  return {
+    text: claim.text,
+    facts: claim.facts.slice(0, 20).map(({ kind, value }) => ({ kind, value })),
+  };
+}
+
+/**
+ * The conversation so far, for the next turn's `messages`.
+ *
+ * Without it a follow-up arrives carrying nothing but its own sentence, so
+ * "who owns it?" has no referent and the question is answered as if it were
+ * about the whole page. Capped below the schema's own `max(10)` so the question
+ * actually being asked always fits.
+ */
+function transcriptOf(turns: CopilotTurn[]): Array<{ role: "user" | "assistant"; content: string }> {
+  return turns
+    .filter((turn) => turn.status === "answered" && (turn.answer?.length ?? 0) > 0)
+    .flatMap((turn) => [
+      { role: "user" as const, content: turn.question },
+      { role: "assistant" as const, content: (turn.answer ?? []).map((claim) => claim.text).join(" ") },
+    ])
+    .filter((message) => message.content.trim().length > 0)
+    .slice(-8);
 }
 
 let turnSeq = 0;
@@ -230,6 +287,7 @@ export function useCopilotSession(
 ): CopilotSession {
   const pageKey = options.pageKey ?? "leads";
   const open = options.open ?? false;
+  const insightsPresented = options.insightsPresented ?? open;
   const scopeKey = deriveScopeKey(scope);
 
   const [sessionState, setSessionState] = useState<Session>(() => createSession(scopeKey));
@@ -427,6 +485,7 @@ export function useCopilotSession(
             generatedAt: result.context?.generatedAt ?? null,
             receivedAt: Date.now(),
             settledWhileOpen: openRef.current,
+            fallback: Boolean(result.fallback),
           },
         }));
       })
@@ -512,7 +571,7 @@ export function useCopilotSession(
   // Acknowledgement: once, at presentation time, only for grounded content that
   // is actually on screen for the still-active lead.
   useEffect(() => {
-    if (!scopeKey || !open) return undefined;
+    if (!scopeKey || !insightsPresented) return undefined;
     const current = sessionRef.current;
     const insights = current.insights;
     if (insights.status !== "ready") return undefined;
@@ -547,7 +606,7 @@ export function useCopilotSession(
     return undefined;
   }, [
     scopeKey,
-    open,
+    insightsPresented,
     session.insights.status,
     session.insights.runId,
     session.insights.claims.length,
@@ -560,7 +619,7 @@ export function useCopilotSession(
   ]);
 
   const runTurn = useCallback(
-    (turnId: string, question: string) => {
+    (turnId: string, question: string, priorClaims?: PriorClaimContext[]) => {
       const capturedKey = activeKeyRef.current;
       if (!capturedKey || sessionRef.current.unsupported) return;
       const capturedScope = activeScopeRef.current ?? {};
@@ -572,7 +631,11 @@ export function useCopilotSession(
         pageKey,
         scope: capturedScope,
         since,
-        messages: [{ role: "user", content: question }],
+        // The conversation, not just the question. A follow-up about an answer
+        // has to arrive with the exchange that produced it, or it is answered as
+        // a fresh question about the page.
+        messages: [...transcriptOf(sessionRef.current.turns), { role: "user", content: question }],
+        priorClaims: priorClaims ?? undefined,
         signal: controller.signal,
       })
         .then((result) => {
@@ -613,13 +676,18 @@ export function useCopilotSession(
       if (sessionRef.current.deterministic.noAccess || sessionRef.current.unsupported) return;
       if (sessionRef.current.asking) return;
       const turnId = nextTurnId();
+      // Captured before the commit clears it, and carried ON the turn so a retry
+      // can re-send it. A turn that forgets what it was about is the one thing
+      // the anchor exists to prevent.
+      const anchor = sessionRef.current.pendingContext;
       // The user turn exists before the request starts.
       commit((current) => ({
         ...current,
         input: "",
-        turns: [...current.turns, { id: turnId, question, status: "pending" }],
+        pendingContext: null,
+        turns: [...current.turns, { id: turnId, question, status: "pending", context: anchor ?? undefined }],
       }));
-      runTurn(turnId, question);
+      runTurn(turnId, question, anchor ? [anchor] : undefined);
     },
     [commit, runTurn]
   );
@@ -634,7 +702,9 @@ export function useCopilotSession(
           candidate.id === turnId ? { ...candidate, status: "pending", error: undefined, answer: undefined } : candidate
         ),
       }));
-      runTurn(turnId, turn.question);
+      // Re-send the anchor, or Retry drops the finding and answers a different
+      // question than the one that failed.
+      runTurn(turnId, turn.question, turn.context ? [turn.context] : undefined);
     },
     [commit, runTurn]
   );
@@ -654,9 +724,64 @@ export function useCopilotSession(
     [commit]
   );
 
+  /**
+   * Drop the transcript.
+   *
+   * Aborts anything in flight first, so a turn still generating cannot commit its
+   * result into a conversation the operator has just cleared. Leaves the findings
+   * untouched: the findings are not chat, and clearing the conversation must
+   * never look like clearing the panel.
+   */
+  const clearConversation = useCallback(() => {
+    for (const controller of controllersRef.current) controller.abort();
+    controllersRef.current.clear();
+    commit((current) => ({
+      ...current,
+      turns: [],
+      asking: false,
+      input: "",
+      pendingContext: null,
+    }));
+  }, [commit]);
+
+  /**
+   * Attach a finding to the next question.
+   *
+   * Deliberately does NOT submit. Auto-sending a canned question spends a
+   * request before the operator has asked anything, and any wording it invents
+   * ("what should I do about this?") collides with the ask prompt's prohibition
+   * on recommending mutations. Attaching and focusing gives them the instrument,
+   * not a guess at their question.
+   */
+  const chatAbout = useCallback(
+    (claim: CopilotClaim) => {
+      if (!activeKeyRef.current) return;
+      if (sessionRef.current.deterministic.noAccess || sessionRef.current.unsupported) return;
+      commit((current) => ({ ...current, pendingContext: toPriorClaim(claim) }));
+    },
+    [commit]
+  );
+
+  /**
+   * Drop the attachment.
+   *
+   * Clears `pendingContext` and nothing else. The draft the operator has typed is
+   * theirs, and the transcript is a record of questions already asked — neither is
+   * the attachment's to discard.
+   */
+  const detachFinding = useCallback(() => {
+    commit((current) => ({ ...current, pendingContext: null }));
+  }, [commit]);
+
   return useMemo<CopilotSession>(() => {
     const modelClaims = session.insights.status === "ready" ? session.insights.claims : [];
     const claims = modelClaims.length > 0 ? modelClaims : session.deterministic.insights;
+
+    // Authorship travels on its own. A non-empty model phase says the model
+    // produced claims; `fallback` says the server handed rule-computed claims
+    // back through that same response, which is the case the label must not miss.
+    const producer: InsightProducer =
+      modelClaims.length > 0 && !session.insights.fallback ? "model" : "rule";
     const turnSources = session.turns.flatMap((turn) => turn.sources ?? []);
     // The deterministic phase's sources are included on purpose. They are what
     // the cold-open evidence action renders from and what carries the per-source
@@ -685,6 +810,7 @@ export function useCopilotSession(
           }
         : null,
       claims,
+      producer,
       ranked: session.deterministic.ranked,
       suppressedCount: session.deterministic.suppressedCount,
       suppressedCriticals: session.deterministic.suppressedCriticals,
@@ -699,14 +825,18 @@ export function useCopilotSession(
       hasAttention: claims.some((claim) => claim.severity === "warning" || claim.severity === "critical"),
       generatedWhileOpen: session.insights.settledWhileOpen,
       turns: session.turns,
+      pendingContext: session.pendingContext,
       asking: session.asking,
       input: session.input,
       canAsk: hasScope && !noAccess && session.deterministic.status === "ready",
       setInput,
       submit,
+      chatAbout,
+      detachFinding,
+      clearConversation,
       retryTurn,
       retryInsights,
       retryDeterministic,
     };
-  }, [session, setInput, submit, retryTurn, retryInsights, retryDeterministic]);
+  }, [session, setInput, submit, chatAbout, detachFinding, clearConversation, retryTurn, retryInsights, retryDeterministic]);
 }

@@ -14,6 +14,7 @@ vi.mock('../ManagementContextCopilot', () => ({
         session: {} as CopilotSectionApi['session'],
         open: true,
         scopeLabel: 'Leads',
+        showConversation: vi.fn(),
       })}
     </>
   ),

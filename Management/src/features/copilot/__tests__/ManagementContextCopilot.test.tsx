@@ -412,12 +412,15 @@ describe('ManagementContextCopilot — conversation on every scope', () => {
     const { rerender } = renderShell({ scope: {} });
 
     // The shell owns the conversation, so a collection page (no leadId) has the
-    // composer the record insights used to own — and it lives in the panel's
-    // single scroll container, after the insights.
+    // composer the record insights used to own. What changed with the tab split:
+    // the composer now lives in the CONVERSATION panel's own surface, not the
+    // insights one — one scroller per panel, so each tab keeps its own scroll
+    // position. Asserting against the first surface in the document would be
+    // asserting the insights panel, which is the bug this comment records.
     const composer = await screen.findByLabelText('Ask about Alice Traveller');
-    const surface = document.querySelector('[data-copilot-surface="surface"]');
+    const surface = composer.closest('[data-copilot-surface="surface"]');
     expect(surface).not.toBeNull();
-    expect(surface?.contains(composer)).toBe(true);
+    expect(document.querySelectorAll('[data-copilot-surface="surface"]')).toHaveLength(2);
 
     // No transcript region before the first question; the composer is enough.
     expect(screen.queryByRole('region', { name: 'Conversation' })).not.toBeInTheDocument();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useOptionalAuth } from "@/contexts/AuthContext";
-import { useCopilotSession } from "./useCopilotSession";
+import { deriveScopeKey, useCopilotSession } from "./useCopilotSession";
 import { useCopilotVisibility } from "./useCopilotVisibility";
 import { useIsDesktopDock } from "./useMediaQuery";
 import CopilotDock from "./CopilotDock";
@@ -8,6 +8,7 @@ import CopilotDrawer from "./CopilotDrawer";
 import CopilotRail from "./CopilotRail";
 import CopilotTrigger from "./CopilotTrigger";
 import CopilotConversation from "./CopilotConversation";
+import CopilotTabs, { type CopilotTab } from "./CopilotTabs";
 import type { CopilotSession, CopilotScope, SinceWindow } from "./types";
 
 const INSIGHTS_HEADING_ID = "copilot-insights-heading";
@@ -19,6 +20,14 @@ export type CopilotSectionApi = {
   scopeLabel: string;
   /** Collapse the persistent dock. Undefined below `xl`, where the drawer closes instead. */
   collapse?: () => void;
+  /**
+   * Bring the conversation forward.
+   *
+   * Threaded to `SuggestedQuestions` through each panel, because submitting a
+   * question from the Insights tab would otherwise create a turn on a tab the
+   * operator is not looking at.
+   */
+  showConversation: () => void;
 };
 
 type ManagementContextCopilotProps = {
@@ -77,7 +86,25 @@ export default function ManagementContextCopilot({
   const dockOpen = isDesktop && ready && visibility === "open";
   const surfaceOpen = isDesktop ? dockOpen : drawerOpen;
 
-  const session = useCopilotSession(scope, since, { pageKey, open: surfaceOpen });
+  const [activeTab, setActiveTab] = useState<CopilotTab>("insights");
+  const showConversation = useCallback(() => setActiveTab("conversation"), []);
+
+  // Acknowledgement follows PRESENTATION, not the surface merely being open. With
+  // the Copilot tab active a result would otherwise be marked seen while hidden,
+  // and the next visit's "since you were here" would silently lose it.
+  const insightsPresented = surfaceOpen && activeTab === "insights";
+
+  const session = useCopilotSession(scope, since, { pageKey, open: surfaceOpen, insightsPresented });
+
+  // A scope change resets the view. The transcript is already cleared by the
+  // scope key, so a kept tab would land the operator on an empty conversation
+  // and hide the new lead's findings — the same rule first-open already follows
+  // at `xl`. Keyed on the derived scope rather than on the session object so the
+  // reset cannot fire on an unrelated session identity change.
+  const activeScopeKey = deriveScopeKey(scope);
+  useEffect(() => {
+    setActiveTab("insights");
+  }, [activeScopeKey]);
 
   // Discovery: the first valid lead opens the dock once, only at `xl` and wider.
   // No-lead visits do not count, and a stored choice is never overridden.
@@ -125,16 +152,20 @@ export default function ManagementContextCopilot({
     open: surfaceOpen,
     scopeLabel,
     collapse: isDesktop && dockOpen ? collapse : undefined,
+    showConversation,
   });
 
-  // The panel's two children, in reading order: the page-owned insights first,
-  // then one hairline, then the shell's conversation, whose composer sticks to
-  // `CopilotSurface`'s scrollport.
+  // Findings and conversation stop competing for one scroll column. Each tab
+  // panel owns its own `CopilotSurface`, so the two keep independent scroll
+  // positions across a switch.
   const body = (
-    <>
-      {content}
-      <CopilotConversation session={session} scopeLabel={scopeLabel} />
-    </>
+    <CopilotTabs
+      insights={content}
+      conversation={<CopilotConversation session={session} scopeLabel={scopeLabel} />}
+      active={activeTab}
+      onActiveChange={setActiveTab}
+      pending={session.asking}
+    />
   );
 
   return (

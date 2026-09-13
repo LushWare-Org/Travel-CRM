@@ -106,6 +106,102 @@ describe('CopilotConversation — an empty answer is recoverable', () => {
   });
 });
 
+describe('CopilotConversation — who said what', () => {
+  const paired = () =>
+    turn({ status: 'answered', answer: [claim({ text: 'The deposit is paid.' })] });
+
+  const context = {
+    text: 'Invoice f0000000 is overdue.',
+    facts: [{ kind: 'currency', value: '1200' }],
+  };
+
+  it('makes the operator turn a bubble and leaves the answer unboxed', () => {
+    render(<CopilotConversation session={makeSession({ turns: [paired()] })} scopeLabel="Billing" />);
+
+    const user = document.querySelector('[data-copilot-turn="user"]');
+    const assistant = document.querySelector('[data-copilot-turn="assistant"]');
+
+    expect(user).not.toBeNull();
+    expect(assistant).not.toBeNull();
+    expect(user?.className).toContain('justify-end');
+
+    // The operator's own turn is the one that gets a surface: the accent wash,
+    // with the bottom-right corner tailed.
+    const bubble = user?.querySelector('.bg-accent');
+    expect(bubble).not.toBeNull();
+    expect(bubble?.className).toContain('rounded-br-sm');
+
+    // The answer is NOT boxed: `claim-row` is documented with no container, and
+    // its evidence actions sit inside the claim text.
+    expect(assistant?.querySelector('.bg-accent')).toBeNull();
+    expect(screen.getByText('The deposit is paid.')).toBeInTheDocument();
+  });
+
+  it('nests the referenced finding in its own inset box inside the bubble', () => {
+    render(<CopilotConversation session={makeSession({ turns: [turn({ context })] })} scopeLabel="Billing" />);
+
+    const bubble = document.querySelector<HTMLElement>('[data-copilot-turn="user"] .bg-accent');
+    const box = document.querySelector<HTMLElement>('[data-copilot-quote="in-bubble"]');
+
+    expect(bubble).not.toBeNull();
+    expect(box).not.toBeNull();
+    // The box lives inside the bubble rather than beside it.
+    expect(bubble?.contains(box)).toBe(true);
+
+    expect(box?.className).toContain('bg-accent-foreground/20');
+    expect(box).toHaveTextContent('Finding referenced');
+    expect(box).toHaveTextContent(context.text);
+    // A fill, never an outline - the boundary rule permits the former only.
+    expect(box?.className).not.toMatch(/\bborder(-[a-z]+)?\b/);
+
+    // The operator's own words stay outside the box: the box is the reference.
+    expect(bubble).toHaveTextContent('Is the deposit paid?');
+    expect(box).not.toHaveTextContent('Is the deposit paid?');
+  });
+
+  it('insets the pending attachment against the composer surface instead', () => {
+    render(<CopilotConversation session={makeSession({ pendingContext: context })} scopeLabel="Billing" />);
+
+    const box = document.querySelector<HTMLElement>('[data-copilot-quote="above-composer"]');
+
+    expect(box).not.toBeNull();
+    // Its own surface is `bg-card`, so it needs a fill that reads against THAT -
+    // a different one from the in-bubble tone.
+    expect(box?.className).toContain('bg-foreground/15');
+    // The invisible token must not come back: `bg-muted` sits 1.087:1 from the
+    // composer's card in dark, which is the "no box" state this test exists for.
+    expect(box?.className).not.toContain('bg-muted');
+    expect(box).toHaveTextContent('Finding referenced');
+    expect(box).toHaveTextContent(context.text);
+  });
+
+  it('gives the answer more room than the gap between turns', () => {
+    render(<CopilotConversation session={makeSession({ turns: [paired()] })} scopeLabel="Billing" />);
+
+    const section = document.querySelector('[aria-label="Conversation"]');
+    const turnWrapper = document.querySelector('[data-copilot-turn="user"]')?.parentElement;
+
+    // 12px inside a turn against 24px between turns - the ratio is what keeps a
+    // turn reading as one exchange.
+    expect(turnWrapper?.className).toContain('space-y-3');
+    expect(section?.className).toContain('space-y-6');
+  });
+
+  it('keeps both speakers attributable to a screen reader', () => {
+    render(<CopilotConversation session={makeSession({ turns: [turn()] })} scopeLabel="Billing" />);
+
+    expect(screen.getByText('You said:')).toBeInTheDocument();
+    expect(screen.getByText('Copilot said:')).toBeInTheDocument();
+  });
+
+  it('drops the visible speaker labels', () => {
+    render(<CopilotConversation session={makeSession({ turns: [paired()] })} scopeLabel="Billing" />);
+
+    expect(screen.queryByText('You')).not.toBeInTheDocument();
+    expect(screen.queryByText('Copilot')).not.toBeInTheDocument();
+  });
+});
+
 describe('CopilotConversation — composer', () => {
   it('sticks to the surface scrollport and spans its full width', () => {
     render(<CopilotConversation session={makeSession({})} scopeLabel="Billing" />);
@@ -160,5 +256,45 @@ describe('CopilotConversation — composer', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('CopilotConversation — detaching the attachment', () => {
+  const context = { text: 'Invoice f0000000 is overdue.', facts: [{ kind: 'currency', value: '1200' }] };
+
+  it('removes the attachment on a single click, with no confirmation', async () => {
+    const user = userEvent.setup();
+    const detachFinding = vi.fn();
+    render(
+      <CopilotConversation session={makeSession({ pendingContext: context, detachFinding })} scopeLabel="Billing" />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Remove attached finding' }));
+
+    expect(detachFinding).toHaveBeenCalledTimes(1);
+    // Reversible, so unlike clearing the transcript it must not ask first.
+    expect(screen.queryByText('Clear this conversation? The findings stay.')).not.toBeInTheDocument();
+  });
+
+  it('offers no detach when nothing is attached', () => {
+    render(<CopilotConversation session={makeSession({ turns: [turn({ context })] })} scopeLabel="Billing" />);
+
+    expect(screen.queryByRole('button', { name: 'Remove attached finding' })).not.toBeInTheDocument();
+  });
+
+  it('puts the detach on the composer, never inside a submitted turn', () => {
+    render(
+      <CopilotConversation
+        session={makeSession({
+          pendingContext: context,
+          turns: [turn({ context, status: 'answered', answer: [claim({ text: 'The deposit is paid.' })] })],
+        })}
+        scopeLabel="Billing"
+      />
+    );
+
+    const buttons = screen.getAllByRole('button', { name: 'Remove attached finding' });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].closest('[data-copilot-quote="above-composer"]')).not.toBeNull();
   });
 });

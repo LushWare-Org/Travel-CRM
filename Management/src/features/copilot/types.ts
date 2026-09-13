@@ -14,6 +14,28 @@ export type ClaimSeverity = "info" | "warning" | "critical";
 
 export type CopilotScope = Record<string, unknown>;
 
+/**
+ * Which pipeline produced a rendered list.
+ *
+ * Deliberately not the same question as which request produced it. A
+ * deterministic fallback arrives through the insights response when generation
+ * fails, and the client marks that as a completed model phase unless the server
+ * says otherwise — so authorship has to travel on its own, not be inferred from
+ * transport. `origin` on a claim cannot answer it: that field exists only on
+ * `DeterministicInsightSchema`, so no model claim carries one.
+ */
+export type InsightProducer = "rule" | "model";
+
+/**
+ * A rendered list and the pipeline that produced it, held together as one value.
+ *
+ * The pairing is the point. Every write to panel state writes both halves, so no
+ * code path can pair a producer label with rows that did not come from it — which
+ * is what the deferral queue and the fallback path each did when they carried a
+ * bare claims array.
+ */
+export type RenderedInsights = { producer: InsightProducer; claims: CopilotClaim[] };
+
 export type CopilotFact = {
   kind: string;
   value: string;
@@ -71,6 +93,20 @@ export type CopilotContext = {
   notAuthorizedSources?: string[];
 };
 
+/**
+ * The finding a turn is anchored to.
+ *
+ * Mirrors `PriorClaimSchema` exactly and deliberately carries no `evidenceId`:
+ * that schema and its fact schema are both `.strict()`, so an extra key is a
+ * parse failure rather than a silent strip, and the server documents the payload
+ * as client-asserted continuity that never satisfies grounding. `facts` is capped
+ * at 20 because the schema caps it there while a claim may carry 50.
+ */
+export type PriorClaimContext = {
+  text: string;
+  facts: Array<{ kind: string; value: string }>;
+};
+
 export type CopilotTurn = {
   id: string;
   question: string;
@@ -78,6 +114,8 @@ export type CopilotTurn = {
   answer?: CopilotClaim[];
   sources?: CopilotSource[];
   error?: string;
+  /** The finding this turn was started from, when it was started from a row. */
+  context?: PriorClaimContext;
 };
 
 export type CopilotSession = {
@@ -106,6 +144,8 @@ export type CopilotSession = {
   context: CopilotContext | null;
   /** The claims to render: model claims once ready and non-empty, else deterministic. */
   claims: CopilotClaim[];
+  /** Which pipeline produced `claims`. Read the label off this, never off the phase. */
+  producer: InsightProducer;
   /** True while `claims` are the deterministic provisional list. */
   provisional: boolean;
   modelPending: boolean;
@@ -121,6 +161,22 @@ export type CopilotSession = {
   /** The rendered result settled while the surface was open (vs. a kept result). */
   generatedWhileOpen: boolean;
   turns: CopilotTurn[];
+  /** The finding the composer is currently attached to, if any. */
+  pendingContext: PriorClaimContext | null;
+  /** Attach a finding to the next question and move focus into the composer. */
+  chatAbout: (claim: CopilotClaim) => void;
+  /**
+   * Drop the finding attached to the next question, leaving the draft and the
+   * transcript untouched. Trivially reversible — the operator can re-attach from
+   * the row — so unlike `clearConversation` it needs no confirmation.
+   */
+  detachFinding: () => void;
+  /**
+   * Drop the transcript. Aborts anything in flight and leaves the findings
+   * untouched — the findings are not chat, and clearing the conversation must
+   * never look like it cleared the panel.
+   */
+  clearConversation: () => void;
   asking: boolean;
   input: string;
   /** The composer may send for the active scope. */
