@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ASSISTANT_TOOLS } from '../ai/prompts/assistantTurn.v1.js';
 import prisma from '../db/client.js';
 import logger from '../config/logger.js';
 
@@ -13,17 +14,11 @@ export const assistantResolutionMetadataSchema = z
     confidenceBucket: z.enum(['low', 'medium', 'high']).optional(),
     committed: z.boolean().optional(),
     abstainReason: boundedString.optional(),
-    finalStageTwoTool: z
-      .enum([
-        'navigate',
-        'answer_faq_policy',
-        'answer_packages',
-        'hand_off',
-        'request_booking',
-        'respond_conversationally',
-        'redirect_off_topic',
-      ])
-      .optional(),
+    // Derived from the one tool list. Both schemas here are `.strict()`, so a
+    // tool missing from either drops the event with nothing but a logged parse
+    // error — the quietest possible way to lose the telemetry a new outcome
+    // exists to produce.
+    finalStageTwoTool: z.enum(ASSISTANT_TOOLS).optional(),
     stageOneLatencyMs: z.number().int().nonnegative().max(27_000).optional(),
     stageTwoLatencyMs: z.number().int().nonnegative().max(27_000).optional(),
     fallbackUsed: z.boolean().optional(),
@@ -35,17 +30,7 @@ const assistantResolutionEventSchema = z
   .object({
     sessionId: boundedString,
     turnId: boundedString,
-    tool: z
-      .enum([
-        'navigate',
-        'answer_faq_policy',
-        'answer_packages',
-        'hand_off',
-        'request_booking',
-        'respond_conversationally',
-        'redirect_off_topic',
-      ])
-      .nullable(),
+    tool: z.enum(ASSISTANT_TOOLS).nullable(),
     route: boundedString.nullable(),
     metadata: assistantResolutionMetadataSchema,
   })

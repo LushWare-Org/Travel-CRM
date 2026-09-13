@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mockPost = vi.hoisted(() => vi.fn());
 vi.mock('../../http/client', () => ({ default: { post: mockPost } }));
 
+import { ASSISTANT_PAGE_ACTIONS, ASSISTANT_SEARCH_TOOL } from '@travel-crm/contracts';
 import { ASSISTANT_TURN_TIMEOUT_MS, sendAssistantTurn } from '../assistantTurn';
 
 const MESSAGE = { id: 'msg-1', role: 'user' as const, content: 'Where are the refund rules?', at: '2026-01-01T00:00:00.000Z' };
@@ -109,6 +110,44 @@ describe('sendAssistantTurn', () => {
     // typing so the runtime zod guard (sessionId is required) is exercised.
     await expect(sendAssistantTurn({ messages: [MESSAGE], availableRoutes: AVAILABLE_ROUTES } as never)).rejects.toThrow();
     expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it.each(ASSISTANT_PAGE_ACTIONS)('accepts %s as a tool the server can return', async (tool) => {
+    // The regression this exists for: the vocabulary was split into one tool per
+    // trip detail, the server and its contract were updated, and the client's
+    // enum was not — so every one of those turns came back 200 and the client
+    // rejected the response, showing "Failed to reach the assistant".
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          toolCall: { tool, args: { message: 'On it.' } },
+          serverResult: { action: { tool }, revision: 'planner', surface: 'planner' },
+          message: 'On it.',
+        },
+      },
+    });
+
+    const result = await sendAssistantTurn({ sessionId: 'sess-1', messages: [MESSAGE], availableRoutes: AVAILABLE_ROUTES });
+
+    expect(result.toolCall.tool).toBe(tool);
+  });
+
+  it('accepts the grounded search tool the server can return', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          toolCall: { tool: ASSISTANT_SEARCH_TOOL, args: { query: 'weather in Bali' } },
+          serverResult: { searched: true, query: 'weather in Bali', citations: [] },
+          message: 'Here is what I found.',
+        },
+      },
+    });
+
+    const result = await sendAssistantTurn({ sessionId: 'sess-1', messages: [MESSAGE], availableRoutes: AVAILABLE_ROUTES });
+
+    expect(result.toolCall.tool).toBe('search_travel_info');
   });
 
   it('rejects when the response fails AssistantTurnResult validation (missing message)', async () => {

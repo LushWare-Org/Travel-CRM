@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ASSISTANT_TOOLS } from '../ai/prompts/assistantTurn.v1.js';
 
 export const routerCorpusRowSchema = z
   .object({
@@ -16,19 +17,9 @@ export const routerCorpusRowSchema = z
     ]),
     expectedSocialSubtype: z.enum(['greeting', 'thanks', 'farewell', 'repair', 'none']),
     directResponseAllowed: z.boolean(),
-    allowedFinalTools: z
-      .array(
-        z.enum([
-          'navigate',
-          'answer_faq_policy',
-          'answer_packages',
-          'hand_off',
-          'request_booking',
-          'respond_conversationally',
-          'redirect_off_topic',
-        ]),
-      )
-      .min(1),
+    // Derived from the one tool list: a corpus row naming a tool this enum has
+    // not learned would fail the row's strict parse rather than being counted.
+    allowedFinalTools: z.array(z.enum(ASSISTANT_TOOLS)).min(1),
   })
   .strict();
 

@@ -29,6 +29,17 @@ vi.mock('../../assistantParamValues', () => ({
   loadAssistantParamValues: mockLoadAssistantParamValues,
 }));
 
+// The widget reads the mounted page's registration through this module. Mocked
+// rather than provided, so a test can hand the hook any registration it likes
+// without rendering a page: `mockPageRegistration.current` is what the hook's
+// getter returns.
+const mockPageRegistration = vi.hoisted(() => ({ current: null as unknown }));
+
+vi.mock('../../capabilities/AssistantCapabilityProvider', () => ({
+  useAssistantCapabilities: () => () => mockPageRegistration.current,
+  useAssistantPageRegistration: vi.fn(),
+}));
+
 // The search string is included because a handoff lands on
 // `/package/<id>?book=1`, and the query is the whole of what opens the booking
 // form on the other side.
@@ -61,6 +72,10 @@ const renderWidget = (path: string) =>
               <LocationProbe />
               <NavTo to="/planner" />
               <NavTo to="/packages" />
+              {/* An excluded route, for the test that drives the widget through
+                  one and back: /planner used to be the example, and is not one
+                  any more. */}
+              <NavTo to="/my-account" />
             </>
           }
         />
@@ -125,17 +140,27 @@ describe('AssistantWidget', () => {
   });
 
   it.each([
-    '/planner',
-    '/planner/', // trailing slash must still match — React Router treats it as the same route
-    '/package/123/customize',
-    '/package/123/customize/',
     '/login',
+    '/login/', // trailing slash must still match — React Router treats it as the same route
     '/my-account',
+    '/my-account/',
   ])('renders nothing on the excluded route %s', (path) => {
     renderWidget(path);
     expect(dialog()).not.toBeInTheDocument();
     expect(mockSendAssistantEvent).not.toHaveBeenCalled();
   });
+
+  it.each(['/planner', '/planner/', '/package/123/customize', '/package/123/customize/'])(
+    'mounts on the assistant-enabled planner/customize route %s',
+    (path) => {
+      renderWidget(path);
+
+      // No panel until the launcher opens it, exactly as on every other page —
+      // and the impression event proves the widget did not self-exclude.
+      expect(dialog()).not.toBeInTheDocument();
+      expect(eventsOf('impression')).toHaveLength(1);
+    },
+  );
 
   it('fires exactly one impression event on mount on an eligible route', () => {
     renderWidget('/');
@@ -170,6 +195,88 @@ describe('AssistantWidget', () => {
     // Anchor bottom edge is 16px, anchor is 64px tall, 12px gap — the panel
     // clears the anchor at 92px instead of covering it.
     expect(wrapper).toHaveStyle({ bottom: '92px' });
+  });
+
+  it('shows what the page did under the reply, and only once the page has done it', async () => {
+    let resolveAction: (line: string) => void = () => {};
+    mockPageRegistration.current = {
+      surface: 'planner',
+      revision: 'planner',
+      pageContext: { surface: 'planner', revision: 'planner', step: 3 },
+      actions: ['edit_day'],
+      runAction: vi.fn(() => new Promise<string>((resolve) => { resolveAction = resolve; })),
+    };
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'edit_day', args: { dayNumber: 3, operation: 'add_activities', values: ['whale watching'] } },
+      serverResult: {
+        action: { tool: 'edit_day', dayNumber: 3, operation: 'add_activities', values: ['whale watching'] },
+        revision: 'planner',
+        surface: 'planner',
+      },
+      message: 'Updating that day now.',
+    });
+
+    renderWidget('/planner');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'add whale watching to day 3');
+    await user.click(sendButton());
+
+    // The page is still working: the bubble claims nothing yet.
+    expect(await screen.findByText('Updating that day now.')).toBeInTheDocument();
+    expect(screen.queryByText('Updated Day 3: activities.')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveAction('Updated Day 3: activities.');
+    });
+
+    expect(await screen.findByText('Updated Day 3: activities.')).toBeInTheDocument();
+  });
+
+  it('says so when there is no page that can run the action', async () => {
+    mockPageRegistration.current = null;
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'edit_day', args: { dayNumber: 3, operation: 'add_activities', values: ['whale watching'] } },
+      serverResult: { action: { tool: 'edit_day', dayNumber: 3 }, revision: null, surface: null },
+      message: 'Updating that day now.',
+    });
+
+    renderWidget('/packages');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'add whale watching to day 3');
+    await user.click(sendButton());
+
+    expect(
+      await screen.findByText('I can only change the trip on the trip planner and the customize pages — open one and ask me there.'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a grounded answer\u2019s sources as links and refuses a non-link citation', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'search_travel_info', args: { query: 'best time to visit Kandy' } },
+      serverResult: {
+        searched: true,
+        query: 'best time to visit Kandy',
+        citations: [
+          { title: 'example.com', uri: 'https://example.com/kandy-weather' },
+          { title: 'not a link', uri: 'javascript:alert(1)' },
+        ],
+      },
+      message: 'December to March is the driest stretch.',
+    });
+
+    renderWidget('/packages');
+    const user = userEvent.setup();
+    openPanel();
+    await user.type(input(), 'best time to visit Kandy?');
+    await user.click(sendButton());
+
+    const source = await screen.findByRole('link', { name: 'example.com' });
+    expect(source).toHaveAttribute('href', 'https://example.com/kandy-weather');
+    expect(source).toHaveAttribute('target', '_blank');
+    expect(source).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByRole('link', { name: 'not a link' })).not.toBeInTheDocument();
   });
 
   it('a booking handoff renders a chip that opens the booking form for that package', async () => {
@@ -400,8 +507,10 @@ describe('AssistantWidget', () => {
     // The widget never unmounts (App.tsx mounts it unconditionally) — it
     // just renders null on an excluded route, so the store's open state
     // would otherwise survive the round trip and pop back open unprompted.
-    await user.click(screen.getByRole('button', { name: 'go-to-/planner' }));
-    expect(screen.getByTestId('location-probe').textContent).toBe('/planner');
+    // /my-account is the excluded route this exercises: /planner stopped being
+    // one when the planner pages gained an action surface.
+    await user.click(screen.getByRole('button', { name: 'go-to-/my-account' }));
+    expect(screen.getByTestId('location-probe').textContent).toBe('/my-account');
     expect(dialog()).not.toBeInTheDocument();
     expect(getAssistantLauncherOpen()).toBe(false);
 

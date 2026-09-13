@@ -3,6 +3,15 @@ import { act, renderHook } from '@testing-library/react';
 
 const mockSendAssistantTurn = vi.hoisted(() => vi.fn());
 const mockSendAssistantEvent = vi.hoisted(() => vi.fn());
+// What the mounted page reports this turn. Mocked rather than provided so the
+// hook can be exercised with and without a page, which is the difference that
+// decides whether a turn carries a capability manifest at all.
+const mockPageRegistration = vi.hoisted(() => ({ current: null as unknown }));
+
+vi.mock('../../capabilities/AssistantCapabilityProvider', () => ({
+  useAssistantCapabilities: () => () => mockPageRegistration.current,
+  useAssistantPageRegistration: vi.fn(),
+}));
 const mockLoadAssistantParamValues = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../services/api/assistantTurn', () => ({
@@ -33,6 +42,9 @@ const NAVIGATE_RESULT = {
 beforeEach(() => {
   mockSendAssistantTurn.mockReset();
   mockSendAssistantEvent.mockReset();
+  // No page mounted unless a test says so — the state every pre-existing case in
+  // this file was written against.
+  mockPageRegistration.current = null;
   mockLoadAssistantParamValues.mockReset();
   mockLoadAssistantParamValues.mockResolvedValue({
     packages: { destination: [{ value: 'uae', label: 'Dubai' }] },
@@ -465,5 +477,137 @@ describe('useAssistantChat', () => {
     expect(mockSendAssistantEvent).not.toHaveBeenCalled();
     expect(result.current.messages).toHaveLength(0);
     expect(result.current.error).toBe('');
+  });
+});
+
+describe('useAssistantChat — page capabilities', () => {
+  const REGISTRATION = {
+    surface: 'planner' as const,
+    revision: 'planner',
+    pageContext: { surface: 'planner' as const, revision: 'planner', step: 3, destination: 'Kandy', duration: 3 },
+    actions: ['edit_day' as const],
+    runAction: vi.fn(async () => 'Updated Day 3: activities.'),
+  };
+
+  const EDIT_DAY_RESULT = {
+    toolCall: { tool: 'edit_day', args: { dayNumber: 3, operation: 'add_activities', values: ['whale watching'] } },
+    serverResult: {
+      action: { tool: 'edit_day', dayNumber: 3, operation: 'add_activities', values: ['whale watching'] },
+      revision: 'planner',
+      surface: 'planner',
+    },
+    message: 'Updating that day now.',
+  };
+
+  it('sends the page manifest and its state on every turn while a page is mounted', async () => {
+    mockPageRegistration.current = REGISTRATION;
+    mockSendAssistantTurn.mockResolvedValue(NAVIGATE_RESULT);
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('redo day 2');
+    });
+
+    expect(mockSendAssistantTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capabilities: { version: 1, surface: 'planner', actions: ['edit_day'] },
+        pageContext: expect.objectContaining({ revision: 'planner', step: 3, destination: 'Kandy' }),
+      }),
+    );
+  });
+
+  it('sends no manifest at all on a page that registers nothing', async () => {
+    mockPageRegistration.current = null;
+    mockSendAssistantTurn.mockResolvedValue(NAVIGATE_RESULT);
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('show me packages');
+    });
+
+    const payload = mockSendAssistantTurn.mock.calls[0][0];
+    expect(payload.capabilities).toBeUndefined();
+    expect(payload.pageContext).toBeUndefined();
+  });
+
+  it('runs the page action and reports what the page did under the reply', async () => {
+    const runAction = vi.fn(async () => 'Updated Day 3: activities.');
+    mockPageRegistration.current = { ...REGISTRATION, runAction };
+    mockSendAssistantTurn.mockResolvedValue(EDIT_DAY_RESULT);
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('add whale watching to day 3');
+    });
+
+    expect(runAction).toHaveBeenCalledWith({
+      tool: 'edit_day',
+      dayNumber: 3,
+      operation: 'add_activities',
+      values: ['whale watching'],
+    });
+    expect(result.current.turns[0].data).toEqual({
+      tool: 'page_action',
+      revision: 'planner',
+      announcement: 'Updated Day 3: activities.',
+    });
+    // The announcement belongs to the turn, not to the transcript: a second
+    // message would otherwise carry it back to the server as something the
+    // assistant said.
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({ role: 'assistant', content: 'Updating that day now.' }),
+    ]);
+  });
+
+  it('refuses an action chosen against a page that has since been replaced', async () => {
+    const runAction = vi.fn(async () => 'never');
+    mockPageRegistration.current = { ...REGISTRATION, revision: 'customize:p2', runAction };
+    mockSendAssistantTurn.mockResolvedValue({
+      ...EDIT_DAY_RESULT,
+      serverResult: { ...EDIT_DAY_RESULT.serverResult, revision: 'customize:p1' },
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('add whale watching to day 3');
+    });
+
+    expect(runAction).not.toHaveBeenCalled();
+    expect(result.current.turns[0].data).toEqual({
+      tool: 'page_action',
+      revision: 'customize:p1',
+      announcement: 'The page changed, so I did not touch it — ask me again.',
+    });
+  });
+
+  it('gives a grounded answer its sources, dropping anything that is not a link', async () => {
+    mockPageRegistration.current = null;
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'search_travel_info', args: { query: 'best time to visit Kandy' } },
+      serverResult: {
+        searched: true,
+        query: 'best time to visit Kandy',
+        citations: [
+          { title: 'example.com', uri: 'https://example.com/kandy' },
+          { title: 'bad', uri: 'javascript:alert(1)' },
+          { title: 'travel.state.gov', uri: 'https://travel.state.gov/kandy' },
+        ],
+      },
+      message: 'December to March is driest.',
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('what is the best time to visit Kandy');
+    });
+
+    expect(result.current.turns[0].data).toEqual({
+      tool: 'search_travel_info',
+      citations: [
+        { title: 'example.com', uri: 'https://example.com/kandy' },
+        { title: 'travel.state.gov', uri: 'https://travel.state.gov/kandy' },
+      ],
+    });
   });
 });

@@ -86,3 +86,16 @@ export {
   DeterministicInsightSchema,
   ManagementDeterministicResult,
 } from './managementCopilot.js';
+export {
+  ASSISTANT_PAGE_ACTIONS,
+  ASSISTANT_SEARCH_TOOL,
+  ASSISTANT_ACTION_TOOLS,
+  ASSISTANT_PAGE_SURFACES,
+  ASSISTANT_DAY_OPERATIONS,
+  ASSISTANT_CONTACT_FIELDS,
+  assistantIsoDate,
+  AssistantPageCapabilities,
+  AssistantPageDay,
+  AssistantPageContext,
+  AssistantAction,
+} from './assistantActions.js';

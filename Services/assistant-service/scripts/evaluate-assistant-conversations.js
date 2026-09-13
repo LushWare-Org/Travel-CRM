@@ -83,11 +83,11 @@ const ROUTE_PATHS = AVAILABLE_ROUTES.map((route) => route.path);
 // is stricter than intended, not looser.
 const SERVER_OWNED_MESSAGES = new Set([
   FALLBACK_POLICY_MESSAGE,
-  'Hi! I can help you explore destinations, find packages, navigate the site, or answer LushWare policy questions.',
+  'Hi! I can help you explore destinations, find packages, build a custom trip with AI, or answer LushWare policy questions.',
   "You're welcome! If you need anything else for your trip, just ask.",
   'Safe travels! Come back anytime you need help planning your trip.',
   "No problem. Tell me what you're trying to do, and I'll help you find the right travel option or page.",
-  'I can take you to any page on the site, filter the packages list by destination, budget, trip length and rating, and answer questions about LushWare policies. Try "packages in Dubai under 1000" or "what is your cancellation policy".',
+  'I can take you to any page on the site, find and filter packages by destination, budget, trip length and rating, and answer questions about LushWare policies. For a trip we do not have, I can take you to the planner, where AI drafts a day-by-day itinerary from your destination and dates, and you can shape it with me right there — our specialists review it before you book. Try "build me a custom trip to Japan", "packages in Dubai under 1000" or "what is your cancellation policy".',
   'I’m here to help with travel and LushWare trips. I can help you explore destinations, find packages, navigate the site, or answer a company-policy question.',
   'I can’t provide guidance on visas, entry requirements, health, safety, legal, emergency, or financial matters. Please check the relevant official authority or contact the LushWare team.',
   'I could not pick one for you from that. Tell me a destination, a budget or a trip length and I will show you what matches, or say "packages" to see them all.',

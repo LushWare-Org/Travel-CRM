@@ -187,6 +187,10 @@ locals {
         ASSISTANT_ROUTER_OFF_TOPIC_ENABLED        = "false"
         ASSISTANT_ROUTER_SOCIAL_THRESHOLD         = "0.95"
         ASSISTANT_ROUTER_OFF_TOPIC_THRESHOLD      = "0.95"
+        # Grounded travel search. Billed per search query the model executes, and
+        # scoped by src/ai/travelDomain.js rather than by this flag; set it to
+        # "false" to switch the tool off in an environment entirely.
+        ASSISTANT_TRAVEL_SEARCH_ENABLED           = "true"
       }
       allow_unauthenticated = false
     }

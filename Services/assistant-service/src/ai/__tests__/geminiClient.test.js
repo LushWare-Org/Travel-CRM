@@ -126,6 +126,31 @@ describe('geminiClient (assistant-service)', () => {
     await expect(generateStructured({ prompt: 'p', schema: {} })).rejects.toMatchObject({ statusCode: 502 });
     expect(mockGenerateContent).toHaveBeenCalledTimes(3);
   });
+
+  it('returns a truncated response when the caller accepts a partial answer', async () => {
+    // The resolver's case: a cut-off answer that still parses is re-validated
+    // against the strict tool union downstream, so a partial one beats a 502.
+    mockGenerateContent.mockResolvedValue({
+      text: '{"tool":"navigate","args":{"route":"packages"}}',
+      candidates: [{ finishReason: 'MAX_TOKENS' }],
+    });
+    const { generateStructured } = await import('../geminiClient.js');
+
+    await expect(
+      generateStructured({ prompt: 'p', schema: {}, allowTruncated: true }),
+    ).resolves.toEqual({ tool: 'navigate', args: { route: 'packages' } });
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('still retries a truncated answer the decoder could not close, then gives up', async () => {
+    mockGenerateContent.mockResolvedValue({ text: '{"tool":"navigate",', candidates: [{ finishReason: 'MAX_TOKENS' }] });
+    const { generateStructured } = await import('../geminiClient.js');
+
+    await expect(
+      generateStructured({ prompt: 'p', schema: {}, allowTruncated: true, maxAttempts: 2 }),
+    ).rejects.toMatchObject({ statusCode: 502 });
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+  });
   it('honors a caller-supplied one-attempt budget for retryable failures', async () => {
     mockGenerateContent.mockRejectedValueOnce(Object.assign(new Error('rate limited'), { status: 429 }));
     const { generateStructured } = await import('../geminiClient.js');
