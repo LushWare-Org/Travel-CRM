@@ -26,7 +26,10 @@ import { SURFACE_SELECTOR, surfacesWithHorizontalOverflow } from './utils/copilo
 // Without these the assertions below would have to scrape prose, which breaks on
 // every copy edit and proves nothing about order.
 
-const DOCK = 'section[aria-labelledby="copilot-insights-heading"]';
+// The PANEL, despite the name: it is the element carrying `data-copilot-panel`,
+// and it renders both inside the desktop dock and inside the drawer. It used to
+// be found by the heading that named it, which the tab strip replaced.
+const DOCK = '[data-copilot-panel]';
 const ITEM = '[data-copilot-item]';
 
 /** The ranked rows, in DOM order, with the attributes the contract requires. */

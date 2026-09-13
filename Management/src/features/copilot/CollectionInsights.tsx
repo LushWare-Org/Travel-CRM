@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardList, Loader2, PanelRightClose } from "lucide-react";
+import { Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import InsightList from "./InsightList";
 import { ProducerLine, SuggestedQuestions, sectionBuckets } from "./insightShared";
@@ -167,35 +167,32 @@ export default function CollectionInsights({
   }, [session.noAccess, session.context?.partial, session.error, session.modelPartial, announce, session.context]);
 
   return (
-    <section aria-labelledby="copilot-insights-heading" data-copilot-panel="collection" className="space-y-4">
+    <div data-copilot-panel="collection" className="space-y-4">
       <header className="space-y-1">
-        <div className="flex items-start justify-between gap-2">
-          <h2 id="copilot-insights-heading" tabIndex={-1} className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
-            <ClipboardList className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            Insights
-          </h2>
+        {/*
+          The marker never truncates and the scope label truncates first: the
+          timestamp is the freshness signal the panel's trust rests on, and a
+          clipped one makes a stale briefing look current. `min-w` on the scope
+          keeps it legible by wrapping the marker to its own line rather than
+          squeezing the label to nothing at 360px.
+
+          The panel's own name is the tab above it, so this row starts at the
+          scope. `ml-auto` keeps the collapse control out of that wrap argument.
+        */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="min-w-[4rem] truncate text-sm text-foreground">{scopeLabel}</p>
+          <ProducerLine producer={source.producer} context={session.context} />
           {onCollapse && (
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={onCollapse}
               aria-label="Collapse copilot"
-              className="shrink-0 min-h-[44px] min-w-[44px]"
+              className="ml-auto shrink-0 min-h-[44px] min-w-[44px]"
             >
               <PanelRightClose className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
-        </div>
-        {/*
-          Line two of two. The marker never truncates and the scope label
-          truncates first: the timestamp is the freshness signal the panel's
-          trust rests on, and a clipped one makes a stale briefing look current.
-          `min-w` on the scope keeps it legible by wrapping the marker to its own
-          line rather than squeezing the label to nothing at 360px.
-        */}
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <p className="min-w-[4rem] truncate text-sm text-foreground">{scopeLabel}</p>
-          <ProducerLine producer={source.producer} context={session.context} />
         </div>
       </header>
 
@@ -285,6 +282,6 @@ export default function CollectionInsights({
           <SuggestedQuestions session={session} onAsk={onShowConversation} />
         </>
       )}
-    </section>
+    </div>
   );
 }

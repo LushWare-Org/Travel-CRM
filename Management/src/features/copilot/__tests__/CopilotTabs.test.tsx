@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import CopilotTabs from '../CopilotTabs';
+import CopilotTabs, { COPILOT_TAB_IDS } from '../CopilotTabs';
 
 const renderTabs = (overrides: Partial<Parameters<typeof CopilotTabs>[0]> = {}) =>
   render(
@@ -26,6 +26,21 @@ describe('CopilotTabs', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: /copilot/i }));
     expect(onActiveChange).toHaveBeenCalledWith('conversation');
+  });
+
+  it('makes the tab the panel title, spanning the track', () => {
+    renderTabs();
+
+    // `default` is the variant whose active state is the primary fill; `line`
+    // would render an underline instead.
+    const list = document.querySelector('[data-slot="tabs-list"]');
+    expect(list).toHaveAttribute('data-variant', 'default');
+    expect(list?.className).toContain('w-full');
+
+    // The shell focuses this id when the panel opens, so it must be the tab that
+    // names the visible panel rather than a heading inside it.
+    expect(screen.getByRole('tab', { name: /insights/i })).toHaveAttribute('id', COPILOT_TAB_IDS.insights);
+    expect(screen.getByRole('tab', { name: /copilot/i })).toHaveAttribute('id', COPILOT_TAB_IDS.conversation);
   });
 
   it('keeps both panels mounted, so each tab keeps its own scroll position', () => {

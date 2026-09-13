@@ -3,7 +3,7 @@ import { render } from '@testing-library/react';
 import CopilotSurface from '../CopilotSurface';
 import CopilotDock from '../CopilotDock';
 import CopilotDrawer from '../CopilotDrawer';
-import CopilotTabs from '../CopilotTabs';
+import CopilotTabs, { COPILOT_TAB_IDS } from '../CopilotTabs';
 
 const SURFACE_SELECTOR = '[data-copilot-surface="surface"]';
 
@@ -73,7 +73,14 @@ describe('the panel scrollers', () => {
     expect(scrollersIn(dock.container)).toHaveLength(0);
 
     const drawer = render(
-      <CopilotDrawer open onOpenChange={vi.fn()} hasAttention={false} showCue={false} onDismissCue={vi.fn()}>
+      <CopilotDrawer
+        open
+        onOpenChange={vi.fn()}
+        initialFocusId={COPILOT_TAB_IDS.insights}
+        hasAttention={false}
+        showCue={false}
+        onDismissCue={vi.fn()}
+      >
         body
       </CopilotDrawer>
     );

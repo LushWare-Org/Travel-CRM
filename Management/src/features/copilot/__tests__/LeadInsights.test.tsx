@@ -39,7 +39,6 @@ describe('LeadInsights — hierarchy', () => {
 
     render(<LeadInsights session={session} scopeLabel="Alice Traveller" leadId="a" />);
 
-    expect(screen.getByRole('heading', { name: /insights/i })).toBeInTheDocument();
     expect(screen.getByText('Since you were here')).toBeInTheDocument();
     expect(screen.getByText('Budget was updated yesterday.')).toBeInTheDocument();
     expect(screen.getByText('Current state')).toBeInTheDocument();
@@ -76,18 +75,6 @@ describe('LeadInsights — hierarchy', () => {
       />
     );
     expect(screen.getByText('You do not have access to this record.')).toBeInTheDocument();
-  });
-});
-
-describe('LeadInsights — heading focus target', () => {
-  it('marks the real heading as the programmatic focus target', () => {
-    render(<LeadInsights session={makeSession({})} scopeLabel="Alice Traveller" leadId="a" />);
-
-    // ManagementContextCopilot moves focus to `#copilot-insights-heading` when
-    // the panel opens. That move silently no-ops if the real heading loses its
-    // tabIndex; the shell test renders its own heading stub, so only an
-    // assertion against the real insights can catch the regression.
-    expect(screen.getByRole('heading', { name: /insights/i })).toHaveAttribute('tabindex', '-1');
   });
 });
 
