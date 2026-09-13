@@ -104,14 +104,9 @@ export default function ManagementContextCopilot({
     setActiveTab("insights");
   }, [activeScopeKey]);
 
-  // Discovery: the first valid lead opens the dock once, only at `xl` and wider.
-  // No-lead visits do not count, and a stored choice is never overridden.
-  useEffect(() => {
-    if (!isDesktop || !ready || visibility !== null) return;
-    if (!session.hasScope) return;
-    setVisibility("open");
-  }, [isDesktop, ready, visibility, session.hasScope, setVisibility]);
-
+  // Closed until the operator opens it. There is no first-visit auto-open: the
+  // rail and the floating trigger are the only things that expand the dock, and
+  // a stored preference is the only thing that keeps it open across visits.
   const collapse = useCallback(() => setVisibility("collapsed"), [setVisibility]);
 
   // Opening the panel from either desktop control lands focus on the element

@@ -81,6 +81,10 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
     });
 
     await test.step('the dock opens without covering the record', async () => {
+      // The panel is closed by default; the operator opens it from the floating
+      // trigger. (There is no first-visit auto-open any more.)
+      await page.getByRole('button', { name: /open copilot/i }).click();
+
       const dock = page.locator(DOCK);
       await expect(dock).toBeVisible({ timeout: 15_000 });
       await expect(page.locator(COPILOT_TABS).getByRole('tab', { name: 'Insights' })).toBeVisible();
