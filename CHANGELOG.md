@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - The marketing Landing page now deploys to Firebase Hosting as its own site (`lush-ware-landing-dev`). It ships both by hand (`scripts/deploy-landing.sh`) and automatically from CI's `deploy-hosting` job on every push to `microservices`. Its links to the Client and Management portals are set per environment at build time, so a dev deploy no longer points visitors at production.
 
+### Fixed
+- A destination that groups several countries, such as "Europe (UK, France, Netherlands, Italy)", is no longer cut in half by the comma inside its own parentheses. The Destinations menu showed it as "Europe (UK", an opening bracket with nothing closing it; it now reads "Europe", the destination pages read "Europe, UK, France, Netherlands, Italy", and the link still resolves to that package.
+- A destination named on its own with no country no longer repeats itself on the destination cards and the package pages — "Japan, Japan" now reads "Japan, Asia".
+
 ## [0.6.0.0] - 2026-09-11
 
 ### Added

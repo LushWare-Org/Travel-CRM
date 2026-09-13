@@ -26,8 +26,51 @@ const ACTIVITY_RULES = [
   { label: 'Family', pattern: /(family|kids|children|child|friendly)/i },
 ];
 
-const inferRegion = (countryOrLocation = ''): string =>
-  COUNTRY_REGION_MAP[countryOrLocation.toLowerCase()] || 'Global';
+/**
+ * Splits on a separator that sits outside parentheses, so a grouped
+ * destination like "Europe (UK, France, Netherlands, Italy)" stays one
+ * segment. A plain `split(',')` cut it into "Europe (UK" and "Italy)" — the
+ * truncated, unbalanced label that reached the nav dropdown.
+ */
+const splitTopLevel = (value: string, separator: string): string[] => {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+
+  for (const char of value) {
+    if (char === '(') depth += 1;
+    if (char === separator && depth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    if (char === ')') depth = Math.max(0, depth - 1);
+    current += char;
+  }
+  parts.push(current);
+
+  return parts.map((part) => part.trim()).filter(Boolean);
+};
+
+/**
+ * "Europe (UK, France)" → { name: 'Europe', country: 'UK, France' }. A segment
+ * with no parenthetical keeps its whole text as the name and reports no
+ * country of its own.
+ */
+const splitGroupedName = (segment: string): { name: string; country: string } => {
+  const grouped = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(segment);
+  if (!grouped) return { name: segment, country: '' };
+  return { name: grouped[1].trim() || segment, country: grouped[2].trim() };
+};
+
+/** First candidate the region lookup knows wins; unknown → Global. */
+const inferRegion = (...candidates: string[]): string => {
+  for (const candidate of candidates) {
+    const region = COUNTRY_REGION_MAP[candidate.trim().toLowerCase()];
+    if (region) return region;
+  }
+  return 'Global';
+};
 
 export interface DestinationMeta {
   raw: string;
@@ -57,18 +100,23 @@ export const normalizeDestination = (destinationValue = ''): DestinationMeta => 
     };
   }
 
-  const parts = raw
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const name = parts[0] || raw;
-  const lastSegment = parts.length > 1 ? parts[parts.length - 1] : '';
+  const segments = splitTopLevel(raw, ',');
+  const primary = segments[0] || raw;
+  const grouped = splitGroupedName(primary);
+  const name = grouped.name;
+  // "Place, Country" takes its country from the last top-level segment;
+  // "Place (Country, ...)" from the parenthetical. A bare name has neither, and
+  // leaving `country` empty lets callers fall back to the region instead of
+  // repeating the name ("Japan, Japan").
+  const country = segments.length > 1 ? segments[segments.length - 1] : grouped.country;
+  const countryParts = splitTopLevel(country, ',');
   const type = 'international';
-  const country = lastSegment || raw;
-  const region = inferRegion(country);
+  const region = inferRegion(country, ...countryParts, name);
   const nameSlug = slugify(name);
   const countrySlug = slugify(country);
-  const slug = countrySlug || nameSlug;
+  // A multi-country group is identified by its name ("Europe"), not by the
+  // concatenated country list, so the URL slug stays readable.
+  const slug = (countryParts.length > 1 ? nameSlug : countrySlug) || nameSlug || countrySlug;
   const key = slug || slugify(raw);
 
   return { raw, name, country, type, region, slug, key, nameSlug, countrySlug };

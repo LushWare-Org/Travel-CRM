@@ -43,7 +43,7 @@ const corpusPath = resolve(flagValue('--corpus', 'evaluation/assistant-conversat
 // here as a fixture rather than fetched so the audit does not silently change
 // shape when the client does, and so a mismatch shows up as a failing row
 // rather than as an audit that quietly tested something else.
-const DESTINATION_VALUES = ['uae', 'italy', 'japan', 'indonesia', 'maldives', 'sri-lanka', 'thailand'];
+const DESTINATION_VALUES = ['uae', 'europe', 'japan', 'indonesia', 'maldives', 'sri-lanka', 'thailand'];
 
 const AVAILABLE_ROUTES = [
   { name: 'home', path: '/', params: [] },
@@ -54,7 +54,7 @@ const AVAILABLE_ROUTES = [
     paramValues: {
       destination: [
         { value: 'uae', label: 'Dubai' },
-        { value: 'italy', label: 'Europe (UK' },
+        { value: 'europe', label: 'Europe' },
         { value: 'japan', label: 'Japan' },
         { value: 'indonesia', label: 'Bali' },
         { value: 'maldives', label: 'Maldives' },
