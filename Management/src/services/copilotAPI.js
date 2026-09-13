@@ -9,9 +9,9 @@ import { API_BASE_URL } from "./api.js";
 // a timeout are distinct: an abort is silent (the caller moved on), a timeout is
 // a recoverable failure with Retry.
 
-// Above the server's MANAGEMENT_GENERATION_DEADLINE_MS (17s) so a legitimate
+// Above the server's MANAGEMENT_GENERATION_DEADLINE_MS (30s) so a legitimate
 // generation is never cut off before the server gives up on it.
-export const COPILOT_CLIENT_TIMEOUT_MS = 20_000;
+export const COPILOT_CLIENT_TIMEOUT_MS = 35_000;
 
 export const COPILOT_ABORT_CODE = "COPILOT_ABORTED";
 export const COPILOT_TIMEOUT_CODE = "COPILOT_TIMEOUT";
