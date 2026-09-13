@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "eval:router": "node scripts/evaluate-assistant-router.js",
+    "eval:conversations": "node scripts/evaluate-assistant-conversations.js",
     "lint": "eslint ."
   },
   "dependencies": {
