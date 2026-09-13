@@ -342,4 +342,40 @@ describe('one overall loop budget (T2)', () => {
     expect(result.answerBlocks).toEqual([]);
     expect(result.toolEvidence).toHaveLength(1);
   });
+
+  it('derives its calls from the budget it is handed, not the constant', async () => {
+    let clock = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    globalThis.fetch = stubFetch(LEAD_ROWS);
+
+    const timeouts = [];
+    let step = 0;
+    const generateStructured = vi.fn(async (args) => {
+      timeouts.push(args.timeoutMs);
+      clock += 1_000; // each generation consumes 1s of the one budget
+      return step++ < 1
+        ? { tool: 'listLeads', args: { limit: 1 } }
+        : { tool: 'final_answer', args: { claims: [] } };
+    });
+
+    const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured, budgetMs: 8_000 });
+
+    // 8s of turn, not 17s: the tool rounds draw on 8s MINUS the 6s answer reserve,
+    // so the first call gets 2s and the one after it the remaining second. A loop
+    // that ignored `budgetMs` would bill 11s and 6s here.
+    expect(timeouts).toEqual([2_000, 1_000]);
+    expect(timeouts.every((ms) => ms > 0 && ms <= 2_000)).toBe(true);
+    expect(result.answerBlocks).toEqual([]);
+  });
+
+  it('does not call the model when it arrives with less than the minimum budget', async () => {
+    const generateStructured = vi.fn(async () => ({ tool: 'final_answer', args: { claims: [] } }));
+
+    const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured, budgetMs: 400 });
+
+    // A call handed less than the floor cannot answer before the client gives up,
+    // so the turn says so instead of spending a provider request on it.
+    expect(generateStructured).not.toHaveBeenCalled();
+    expect(result).toEqual({ answerBlocks: [], toolEvidence: [], reason: 'budget-exhausted' });
+  });
 });
