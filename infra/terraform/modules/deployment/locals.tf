@@ -47,6 +47,10 @@ locals {
       secrets = ["${var.env}-database-url", "${var.env}-direct-url", "${var.env}-internal-service-key", "${var.env}-cloudinary-api-key", "${var.env}-cloudinary-api-secret", "${var.env}-gemini-api-key", "${var.env}-liteapi-api-key"]
       plain_env = {
         NODE_ENV                 = "production"
+        # The code default is a thinking model, and the customer Client aborts
+        # these AI routes at 15s, so the lite tier is what can actually finish
+        # inside that window.
+        GEMINI_MODEL             = "gemini-3.5-flash-lite"
         CLOUDINARY_CLOUD_NAME    = var.cloudinary_cloud_name
         COMPANY_NAME             = var.company_name
         COMPANY_TAGLINE          = var.company_tagline
