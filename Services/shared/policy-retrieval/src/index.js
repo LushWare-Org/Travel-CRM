@@ -76,9 +76,22 @@ function tokenize(text) {
   return (text || '').toLowerCase().match(/[a-z0-9]+/g) || [];
 }
 
+// One trailing plural "s" is folded, and the SAME function runs on the question
+// and on the section, so the comparison stays exact rather than becoming a
+// prefix match. That is the whole point: a section that only ever says
+// "cancellations" could not answer a question about the "cancellation policy",
+// which is one of the examples the assistant itself advertises — it fell back to
+// "I don't have a confirmed answer" every time. A prefix or substring match
+// would re-open the false positive this matcher was already fixed for (a
+// baggage clause containing the word "package" answering a question about a
+// package), so the folding stops at the plural.
+const foldPlural = (token) => (token.length >= 5 && token.endsWith('s') ? token.slice(0, -1) : token);
+
 /** Words meaningful enough to score on — short/common words are noise. */
 function meaningfulTokens(text) {
-  return tokenize(text).filter((t) => t.length >= 4 && !STOPWORDS.has(t));
+  return tokenize(text)
+    .filter((t) => t.length >= 4 && !STOPWORDS.has(t))
+    .map(foldPlural);
 }
 
 /** Blank-line-separated sections — the smallest citable unit within a document. */
@@ -103,7 +116,11 @@ export function retrieveSnippets(documents, question, { maxSnippets = 2, minScor
   const candidates = [];
   for (const doc of documents || []) {
     for (const section of splitSections(doc.body)) {
-      const score = meaningfulTokens(section).filter((t) => queryTokens.has(t)).length;
+      // Distinct matched words, not occurrences. A section that repeats one
+      // generic word outscored a section that genuinely answers the question —
+      // the raw count let "package" appearing five times in a baggage clause
+      // outrank a refund clause — so the same word can only count once.
+      const score = new Set(meaningfulTokens(section).filter((t) => queryTokens.has(t))).size;
       if (score >= minScore) {
         candidates.push({ id: `snippet-${candidates.length}`, docId: doc.id, title: doc.title, quote: section, score });
       }
