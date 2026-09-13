@@ -99,6 +99,18 @@
 **Priority:** P3
 **Depends on:** None
 
+### The conversation cannot tell that the visitor changed pages
+
+**What:** Nothing tells the assistant that the visitor navigated outside the chat. History, the package under discussion and the names a browse answer lists are all snapshots taken from the turns themselves; if the visitor clicks a package card, the header navigation or a destination link mid-conversation, the next turn is answered as if the page had not changed. Listing package names in the browse reply makes this sharper, because the assistant will discuss a package the visitor has already left.
+
+**Why:** A visitor who follows the site's own navigation instead of the chat's chip is invisible to the conversation, so a follow-up can be answered against a page they are no longer on — a stale-context bug with no visible cause.
+
+**Context:** The channel is designed and unbuilt. `docs/designs/client-assistant-action-infrastructure.md` specifies `currentView` (`{ path, params, filteredCount, renderedCount, catalogueTotal }`) sent by the client every turn and consumed by a planned `answer_current_view` outcome, with the manifest treated as untrusted input (that document's untrusted-input premise). No code sends it today — `currentView` matches only that design doc. When built: `Client/src/features/assistant/hooks/useAssistantChat.ts` reports the view, `Services/assistant-service/src/validators/assistant.schema.js` declares it (zod strips what is not declared), `assistantTurn.v1.js` gets the union member plus canonicalizer and prompt changes, `assistant.controller.js` gets the dispatch case and its server-composed copy, and the client and server tool enums both learn the new outcome.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
 ## Granular AI Itinerary Generation
 
 ### Give generate-days-preview its own rate limiter
