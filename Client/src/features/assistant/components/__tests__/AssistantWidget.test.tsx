@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import AssistantWidget from '../AssistantWidget';
@@ -79,17 +79,6 @@ const openPanel = () => {
   });
 };
 
-// jsdom's window.scrollY is a fixed 0; the launcher's reveal-on-scroll reads
-// it, so integration tests override the property and dispatch a scroll event.
-const setWindowScrollY = (y: number) => {
-  Object.defineProperty(window, 'scrollY', { value: y, configurable: true, writable: true });
-  fireEvent.scroll(window);
-};
-
-const resetWindowScrollY = () => {
-  Reflect.deleteProperty(window, 'scrollY');
-};
-
 const renderLauncherAndWidget = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -126,7 +115,6 @@ beforeEach(() => {
 
 afterEach(() => {
   setAssistantLauncherOpen(false);
-  resetWindowScrollY();
 });
 
 describe('AssistantWidget', () => {
@@ -179,9 +167,9 @@ describe('AssistantWidget', () => {
     const wrapper = dialog()?.parentElement as HTMLElement;
     expect(wrapper).toHaveClass('right-3');
     expect(wrapper).not.toHaveClass('left-3');
-    // Anchor bottom edge is 16px, anchor is 56px tall, 12px gap — the panel
-    // clears the anchor at 84px instead of covering it.
-    expect(wrapper).toHaveStyle({ bottom: '84px' });
+    // Anchor bottom edge is 16px, anchor is 64px tall, 12px gap — the panel
+    // clears the anchor at 92px instead of covering it.
+    expect(wrapper).toHaveStyle({ bottom: '92px' });
   });
 
   it('a booking handoff renders a chip that opens the booking form for that package', async () => {
@@ -424,7 +412,6 @@ describe('AssistantWidget', () => {
   });
 
   it('opens through the launcher: Contact options → Travel assistant', async () => {
-    setWindowScrollY(600);
     renderLauncherAndWidget('/');
     const user = userEvent.setup();
 
@@ -435,20 +422,5 @@ describe('AssistantWidget', () => {
 
     expect(dialog()).toBeInTheDocument();
     expect(eventsOf('opened')).toHaveLength(1);
-  });
-
-  it('closes the assistant panel when the launcher scrolls out of view on a marketing route', async () => {
-    setWindowScrollY(600);
-    renderLauncherAndWidget('/');
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole('button', { name: 'Contact options' }));
-    await user.click(screen.getByRole('button', { name: 'Travel assistant' }));
-    expect(dialog()).toBeInTheDocument();
-
-    setWindowScrollY(0);
-
-    expect(dialog()).not.toBeInTheDocument();
-    expect(getAssistantLauncherOpen()).toBe(false);
   });
 });

@@ -4,9 +4,10 @@ import { Bot, MessageCircle, Phone, X } from 'lucide-react';
 import {
   FLOATING_ACTIONS_CONFIG,
   FLOATING_ACTION_BASE_OFFSET_PX,
-  FLOATING_ACTION_SCROLL_THRESHOLD_PX,
+  FLOATING_ACTION_RIGHT_OFFSET_PX,
+  FLOATING_ACTION_SCROLL_TOP_RIGHT_OFFSET_PX,
 } from '../../../config/floatingActions';
-import { isAssistantExcludedPath, isLauncherAlwaysVisiblePath } from '../../../config/assistantRoutes';
+import { isAssistantExcludedPath } from '../../../config/assistantRoutes';
 import BRANDING, { getWhatsAppUrl } from '../../../config/branding';
 import { setAssistantLauncherOpen } from './assistantLauncherState';
 import WhatsAppIcon from './WhatsAppIcon';
@@ -40,53 +41,29 @@ const scrollTopEnabled = FLOATING_ACTIONS_CONFIG.scrollTop.enabled;
  * page-scroll utility, not a contact channel) — it never joins the menu and
  * keeps its own scroll threshold.
  *
- * Visibility scope (added by /plan-design-review): on app pages
- * (/planner, /package/:id/customize, /login, /my-account) the launcher is
- * always visible; on marketing pages it stays out of the hero's first
- * viewport and fades in only after the shared scroll threshold — and closes
- * any open menu/assistant panel again if the user scrolls back above it.
+ * Visibility scope: the launcher renders on every route except the four
+ * assistant-excluded ones (/planner, /package/:id/customize, /login,
+ * /my-account — see isAssistantExcludedPath), and it is visible immediately
+ * wherever it renders. ScrollTop stays a separate affordance and keeps its
+ * own scroll threshold.
  */
 const FloatingActionStack = () => {
   const location = useLocation();
   const { pathname } = location;
 
-  // The assistant panel never mounts on excluded routes, so its menu item
-  // (and the widget behind it) only exists when the route is eligible.
-  const assistantAvailable = !isAssistantExcludedPath(pathname);
-  const alwaysVisible = isLauncherAlwaysVisiblePath(pathname);
+  // The launcher is the assistant's only opener, so it renders on exactly the
+  // routes where the assistant mounts. Always immediately: no scroll gate, no
+  // fade-in — a contact channel the visitor has to scroll to discover is not
+  // a contact channel. The four excluded routes render nothing at all.
+  const launcherRoutable = !isAssistantExcludedPath(pathname);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [hasScrolledPastThreshold, setHasScrolledPastThreshold] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-
-  const isRevealed = alwaysVisible || hasScrolledPastThreshold;
-  const launcherAvailable = callEnabled || whatsappEnabled || assistantAvailable;
-
-  // App pages: always visible. Marketing pages: reveal once the window has
-  // scrolled past the hero threshold. The initial handleScroll() call keeps
-  // the state honest on route changes (e.g. a marketing page reached from a
-  // previously-scrolled app page) without waiting for the next scroll event.
-  useEffect(() => {
-    if (alwaysVisible) return;
-    const handleScroll = () => setHasScrolledPastThreshold(window.scrollY > FLOATING_ACTION_SCROLL_THRESHOLD_PX);
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [alwaysVisible]);
 
   // Close the menu on navigation so it never carries over onto another page.
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
-
-  // Hidden launcher (marketing page, scrolled back above the hero) must not
-  // leave an open menu or a floating assistant panel with no anchor beneath
-  // it — collapse both the moment the launcher stops being revealed.
-  useEffect(() => {
-    if (isRevealed) return;
-    setMenuOpen(false);
-    setAssistantLauncherOpen(false);
-  }, [isRevealed]);
 
   // Outside click / Escape closes the expanded menu.
   useEffect(() => {
@@ -120,18 +97,19 @@ const FloatingActionStack = () => {
   return (
     <>
       {scrollTopEnabled && (
-        <div className="fixed z-floating-action right-20" style={{ bottom: FLOATING_ACTION_BASE_OFFSET_PX }}>
+        <div
+          className="fixed z-floating-action"
+          style={{ bottom: FLOATING_ACTION_BASE_OFFSET_PX, right: FLOATING_ACTION_SCROLL_TOP_RIGHT_OFFSET_PX }}
+        >
           <ScrollTopButton />
         </div>
       )}
 
-      {launcherAvailable && (
+      {launcherRoutable && (
         <div
           ref={rootRef}
-          className={`fixed right-3 z-floating-action flex flex-col items-end transition-all duration-300 ease-out ${
-            isRevealed ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0 pointer-events-none'
-          }`}
-          style={{ bottom: FLOATING_ACTION_BASE_OFFSET_PX }}
+          className="fixed z-floating-action flex flex-col items-end"
+          style={{ bottom: FLOATING_ACTION_BASE_OFFSET_PX, right: FLOATING_ACTION_RIGHT_OFFSET_PX }}
         >
           {menuOpen && (
             <div
@@ -167,14 +145,12 @@ const FloatingActionStack = () => {
                   WhatsApp
                 </a>
               )}
-              {assistantAvailable && (
-                <button type="button" onClick={handleAssistantSelect} aria-label="Travel assistant" className={ROW_CLASS}>
-                  <span className={ROW_ICON_CLASS}>
-                    <Bot className="h-[18px] w-[18px]" />
-                  </span>
-                  Travel assistant
-                </button>
-              )}
+              <button type="button" onClick={handleAssistantSelect} aria-label="Travel assistant" className={ROW_CLASS}>
+                <span className={ROW_ICON_CLASS}>
+                  <Bot className="h-[18px] w-[18px]" />
+                </span>
+                Travel assistant
+              </button>
             </div>
           )}
 
@@ -184,9 +160,9 @@ const FloatingActionStack = () => {
             aria-expanded={menuOpen}
             aria-controls={CONTACT_MENU_ID}
             onClick={handleToggleMenu}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-floating transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-600 text-white shadow-floating transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
-            {menuOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+            {menuOpen ? <X className="h-7 w-7" /> : <MessageCircle className="h-7 w-7" />}
           </button>
         </div>
       )}
