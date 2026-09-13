@@ -216,23 +216,34 @@ describe('useCopilotSession — scope lifecycle', () => {
     expect(screen.getByTestId('claims').textContent).not.toContain('Insights a');
   });
 
-  it('surfaces an interrupted insights run instead of leaving the model phase pending forever', async () => {
+  it('restarts an interrupted insights run rather than reporting a failure nobody caused', async () => {
     // The effect's own cleanup aborts an in-flight insights run whenever its
-    // dependencies change — a benign re-render, not a scope change. The abort
-    // used to return silently, leaving status "pending" permanently: the start
-    // effect refuses to restart a run it already began (`insightsStartedRef`),
-    // and the regenerate effect skips "pending" because that status means a
-    // request is legitimately in flight. Nothing retried and nothing errored, so
-    // the panel read "AI insights in progress — showing what is already verified"
-    // indefinitely, with no error and no Retry.
+    // dependencies change, and on a lead record that is the FIRST run of every
+    // record scope: the scope settles as the page resolves, the request is torn
+    // down, and the server's answer — which it did produce — is never presented.
+    // Reporting that as a failure made the panel read "Partial insights" (plus a
+    // Retry that succeeded) for a briefing that had already worked. The run is
+    // restarted instead, which is exactly what that Retry did.
     const interrupted = Object.assign(new Error('cancelled'), { name: 'AbortError' });
     api.copilotInsights.mockImplementationOnce(() => Promise.reject(interrupted));
 
     render(<Harness scope={{ leadId: 'a' }} />);
-    await waitFor(() => expect(api.copilotInsights).toHaveBeenCalled());
+    await waitFor(() => expect(api.copilotInsights).toHaveBeenCalledTimes(2));
 
-    // Recoverable, not stuck: `modelPartial` is what renders the verified summary
-    // plus the Retry control, and it is what the reopen path regenerates from.
+    // The restart is the beforeEach mock, which resolves: the answer lands and
+    // nothing is reported as partial.
+    await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('Insights a'));
+    expect(screen.getByTestId('model')).toHaveTextContent('settled');
+  });
+
+  it('still reports a failure when an interrupted run is interrupted twice', async () => {
+    // The protection the restart must not remove: an interrupted run can never
+    // sit on "pending" forever, with no error and no Retry. One restart is the
+    // benign case; a second interruption is not, so it reports.
+    const interrupted = Object.assign(new Error('cancelled'), { name: 'AbortError' });
+    api.copilotInsights.mockImplementation(() => Promise.reject(interrupted));
+
+    render(<Harness scope={{ leadId: 'a' }} />);
     await waitFor(() => expect(screen.getByTestId('model')).toHaveTextContent('partial'));
   });
 

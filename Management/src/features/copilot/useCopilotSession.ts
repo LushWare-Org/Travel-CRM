@@ -306,6 +306,12 @@ export function useCopilotSession(
   // The (key, run) generation this session body already requested, so an
   // arming re-render cannot start the same generation twice.
   const insightsStartedRef = useRef<{ key: string | null; run: number } | null>(null);
+  /**
+   * The key whose interrupted run has already been restarted once. A run that is
+   * interrupted twice is not the benign case this recovery is for, so the second
+   * interruption still reports a failure.
+   */
+  const insightsRestartRef = useRef<string | null>(null);
   const runIdRef = useRef(0);
   const [deterministicRun, setDeterministicRun] = useState(0);
   const [insightsRun, setInsightsRun] = useState(0);
@@ -509,6 +515,30 @@ export function useCopilotSession(
           // already is. Guarded on `runId` so a superseding run that has already
           // committed its own "pending" is never trampled — a superseding run
           // commits a new runId, so this one no longer matches.
+          // Restart rather than report. The effect's own cleanup aborts this run
+          // whenever its dependencies change, and on a lead record that happens
+          // on the first run of every record scope: the scope settles as the page
+          // resolves, the in-flight request is torn down, and the panel showed
+          // "Partial insights" for a briefing the server had answered correctly.
+          // A manual Retry then succeeded, because Retry bumps the run — so do
+          // exactly that, and the panel recovers without the operator discovering
+          // a failure they never caused.
+          //
+          // Bounded to one restart per key. The protection this branch was
+          // written for still has to hold — an interrupted run must never sit on
+          // "pending" forever — so a second interruption falls through to the
+          // error commit below, and the status stays "pending" across the first
+          // so the restart is invisible.
+          if (insightsRestartRef.current !== capturedKey) {
+            insightsRestartRef.current = capturedKey;
+            // Clear the in-flight guard BEFORE bumping the run: the effect's
+            // re-run refuses to start while a run is registered as in flight, and
+            // it would return early with nothing left to wake it.
+            settle();
+            setInsightsRun((run) => run + 1);
+            return;
+          }
+
           commit((current) =>
             current.insights.runId === runId && current.insights.status === "pending"
               ? {
