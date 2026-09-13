@@ -571,15 +571,34 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     const res = await postTurn({ mode: 'briefing', page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' } });
 
     expect(res.status).toBe(200);
-    // The retry is only safe because `deadlineMs` caps the WHOLE call: the
-    // second attempt cannot outlive the single-attempt budget the client's 20s
-    // abort wraps (see geminiClient.js and constants/managementCopilot.js).
-    expect(mockGenerateStructured).toHaveBeenCalledWith(
-      expect.objectContaining({
-        maxAttempts: 2,
-        timeoutMs: MANAGEMENT_GENERATION_DEADLINE_MS,
-        deadlineMs: MANAGEMENT_GENERATION_DEADLINE_MS,
-      }),
-    );
+    const [{ maxAttempts, timeoutMs, deadlineMs }] = mockGenerateStructured.mock.calls[0];
+    expect(maxAttempts).toBe(2);
+    // The retry is only safe because `deadlineMs` caps the WHOLE call: the second
+    // attempt cannot outlive the turn budget the client's 20s abort wraps (see
+    // geminiClient.js and constants/managementCopilot.js). It is the turn's
+    // REMAINDER, not a fresh copy of the constant, because the evidence load
+    // above already spent part of it.
+    expect(deadlineMs).toBe(timeoutMs);
+    expect(deadlineMs).toBeGreaterThan(0);
+    expect(deadlineMs).toBeLessThanOrEqual(MANAGEMENT_GENERATION_DEADLINE_MS);
+  });
+
+  it('charges the evidence load to the generation budget', async () => {
+    enableCopilot();
+    // A 300ms evidence load: unambiguous against the 2.5s per-source ceiling, and
+    // far from slow enough to make the assertion flaky.
+    globalThis.fetch = vi.fn().mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return { ok: true, status: 200, json: async () => ({ success: true, data: lead }) };
+    });
+
+    const res = await postTurn({ mode: 'briefing', page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' } });
+
+    expect(res.status).toBe(200);
+    const [{ deadlineMs }] = mockGenerateStructured.mock.calls[0];
+    // The load is not free: generation is handed what is LEFT, which is what keeps
+    // the whole response inside the client's 20s abort.
+    expect(deadlineMs).toBeGreaterThan(0);
+    expect(deadlineMs).toBeLessThanOrEqual(MANAGEMENT_GENERATION_DEADLINE_MS - 200);
   });
 });

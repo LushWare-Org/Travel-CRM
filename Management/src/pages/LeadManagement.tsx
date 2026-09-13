@@ -523,7 +523,7 @@ const LeadManagement = () => {
             />
 
             {/* Persistent record surface: the Evidence Lens reveals into these anchors. */}
-            <LeadDetailPane lead={detailLead} onClose={() => setDetailLead(null)} />
+            <LeadDetailPane lead={detailLead} salesReps={salesReps} onClose={() => setDetailLead(null)} />
 
             {/* Lead Cards Grid */}
             {!loading && !error && leads.length > 0 && (

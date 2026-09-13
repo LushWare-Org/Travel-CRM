@@ -15,23 +15,25 @@ import { buildRankedInsights, withIdentity } from '../insights/pipeline.js';
 import { buildDecisionRows, loadPriorState, markSurfaced, recordDecisions } from '../insights/state.js';
 import { aggregateFromRecords, detectAggregateIntent } from '../insights/aggregate.js';
 import { capabilitySummary, toolsForActor } from '../insights/catalogue.js';
-import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../constants/managementCopilot.js';
+import { MANAGEMENT_GENERATION_DEADLINE_MS, MANAGEMENT_MIN_CALL_TIMEOUT_MS } from '../constants/managementCopilot.js';
 import prisma from '../db/client.js';
 
-// The briefing generation runs inside one 17s server deadline. The Management
-// client holds a 20s endpoint timeout WITH AbortSignal support: a scope change
-// aborts the in-flight request, and a timeout surfaces as a recoverable failure
-// with Retry rather than an endless loading state (see design §1). The deadline
-// is defined once in constants/managementCopilot.js and shared with the agent
-// loop, so the loop budget and this phase cannot drift.
+// The whole turn runs inside one 17s server deadline. The Management client holds
+// a 20s endpoint timeout WITH AbortSignal support: a scope change aborts the
+// in-flight request, and a timeout surfaces as a recoverable failure with Retry
+// rather than an endless loading state (see design §1). The deadline is defined
+// once in constants/managementCopilot.js and is the turn's budget — the
+// evidence-bundle load and the ask's aggregate precompute are charged to it, so
+// every generation is handed only what is left (`remainingTurnBudgetMs`) instead
+// of a fresh 17s stacked on top of the load.
 //
-// The phase is allowed a SECOND attempt, but strictly inside that same 17s
-// budget (`deadlineMs`), so worst-case latency does not grow: a transient 503
-// that comes back fast still leaves room and is retried, while an attempt slow
-// enough to leave less than a meaningful retry is not retried at all and falls
-// back as before. That is the difference between a hard `maxAttempts: 1` —
-// which threw away every fast 503 — and a retry that can never outlive the old
-// single attempt's ceiling.
+// The briefing is allowed a SECOND attempt, but strictly inside that same
+// remaining budget (`deadlineMs`), so worst-case latency does not grow: a
+// transient 503 that comes back fast still leaves room and is retried, while an
+// attempt slow enough to leave less than a meaningful retry is not retried at
+// all and falls back as before. That is the difference between a hard
+// `maxAttempts: 1` — which threw away every fast 503 — and a retry that can
+// never outlive the old single attempt's ceiling.
 
 // Server-side feature gates. MANAGEMENT_COPILOT_ENABLED defaults off; when on,
 // MANAGEMENT_COPILOT_PAGE_KEYS (comma-separated) allowlists specific pages for
@@ -128,10 +130,17 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   const scope = adapter.parseScope(page.scope);
   const ctx = { user: req.user, headers: forwardActorHeaders(req) };
 
+  // The one budget for the whole turn. Everything that spends time — the evidence
+  // load below, the ask's aggregate precompute, and every generation — draws on
+  // what is left of it, so a response cannot outlive the client's 20s abort the
+  // way a bundle load plus a fresh 17s generation could.
+  const turnStartedAt = Date.now();
+  const remainingTurnBudgetMs = () => MANAGEMENT_GENERATION_DEADLINE_MS - (Date.now() - turnStartedAt);
+
   // The phase is passed through so the engine can apply the right per-source
-  // budget: the deterministic phase exists to be instant and gets a short leash,
-  // the briefing phase can wait longer for completeness. Adapters that ignore
-  // the third argument are unaffected.
+  // budget: the deterministic phase is the one that starts here, so it takes the
+  // short leash and renders whatever arrived. Adapters that ignore the third
+  // argument are unaffected.
   const bundle = await adapter.loadEvidence(ctx, scope, { mode });
   const noAccess = isNoAccess(bundle);
 
@@ -276,11 +285,21 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   // not-grounded state — instead of a claims body the ask client silently
   // drops.
   if (mode === 'ask') {
-    return handleAsk(res, req, page, bundle, adapter, ctx, scope);
+    return handleAsk(res, req, page, bundle, adapter, ctx, scope, remainingTurnBudgetMs);
   }
 
   // Provider unavailable → deterministic fallback (same single claims contract).
   if (!isAIConfigured()) {
+    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
+  }
+
+  // What is LEFT of the turn, not a fresh copy of the constant: the evidence load
+  // above already spent part of it. With too little left, generation cannot
+  // produce anything the operator is still waiting for, so the deterministic
+  // fallback answers instead of a provider call that is certain to be cut off.
+  const budgetMs = remainingTurnBudgetMs();
+  if (budgetMs < MANAGEMENT_MIN_CALL_TIMEOUT_MS) {
+    logger.warn({ pageKey: page.key, budgetMs }, 'briefing arrived with no time left to generate — falling back');
     return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
   }
 
@@ -299,9 +318,9 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
       schema: managementBriefingResponseJsonSchema,
       temperature: 0.2,
       maxOutputTokens: 8192,
-      timeoutMs: MANAGEMENT_GENERATION_DEADLINE_MS,
+      timeoutMs: budgetMs,
       maxAttempts: 2,
-      deadlineMs: MANAGEMENT_GENERATION_DEADLINE_MS,
+      deadlineMs: budgetMs,
     });
   } catch (err) {
     logger.warn({ err: err.message, pageKey: page.key }, 'management briefing generation failed — falling back to deterministic insights');
@@ -398,7 +417,7 @@ function respondWithFallback(res, page, bundle, adapter, sinceBoundary) {
 // claim set, no reachable tool (the single-shot path inside the runner) and an
 // unconfigured provider all return `answerBlocks` — possibly empty — and never
 // the insights' `claims`.
-async function handleAsk(res, req, page, bundle, adapter, ctx, scope) {
+async function handleAsk(res, req, page, bundle, adapter, ctx, scope, remainingTurnBudgetMs) {
   const question = latestUserQuestion(req.body.messages);
   const priorClaims = req.body.priorClaims ?? [];
   const conversation = priorConversation(req.body.messages);
@@ -420,6 +439,9 @@ async function handleAsk(res, req, page, bundle, adapter, ctx, scope) {
   // THE VOCABULARY COMES FROM THE ACTOR, NOT THE PAGE. Same operator, same
   // question, same capability on every screen — which is the whole point of this
   // change. The page still decides what is volunteered unprompted.
+  // The aggregate above belongs to this turn and was charged to it, so the loop
+  // gets what is LEFT of the budget rather than a fresh 17s of its own.
+  const budgetMs = remainingTurnBudgetMs();
   const { answerBlocks: rawBlocks, toolEvidence, reason } = await runAgentLoop({
     ctx,
     scopeLabel: bundle.context.scopeLabel,
@@ -429,6 +451,7 @@ async function handleAsk(res, req, page, bundle, adapter, ctx, scope) {
     generateStructured,
     priorClaims,
     conversation,
+    budgetMs,
   });
 
   if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) {
