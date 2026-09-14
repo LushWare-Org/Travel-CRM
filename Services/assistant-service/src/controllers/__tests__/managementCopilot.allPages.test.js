@@ -278,7 +278,7 @@ describe('an ask by an actor with no tools (S8)', () => {
     // rather than naming capabilities that do not exist for this role.
     expect(res.body.answerBlocks).toHaveLength(1);
     expect(res.body.answerBlocks[0].id).toBe('limitation:ungrounded');
-    expect(res.body.answerBlocks[0].text).toMatch(/readable with your role/);
+    expect(res.body.answerBlocks[0].text).toMatch(/no readable business data/);
     expect(res.body.claims).toEqual([]);
 
     // The branch itself, not merely the envelope: exactly one generation, the

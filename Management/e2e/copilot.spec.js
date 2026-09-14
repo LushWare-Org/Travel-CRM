@@ -116,7 +116,7 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
       // DOM. Assert on the visible one, never on the count.
       const surface = page.locator(`${SURFACE_SELECTOR}:visible`);
       await expect(surface).toHaveCount(1);
-      await surface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
+      await surface.getByRole('textbox', { name: 'Ask the copilot' }).fill(UNBREAKABLE_TOKEN);
       await surface.getByRole('button', { name: 'Ask' }).click();
       await expect(surface.getByText(UNBREAKABLE_TOKEN, { exact: true }).first()).toBeVisible();
 
@@ -201,7 +201,7 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
       // must wrap there too — asserted on the scroller, never on the dialog.
       const drawerSurface = page.locator(`[role="dialog"] ${SURFACE_SELECTOR}:visible`);
       await expect(drawerSurface).toHaveCount(1);
-      await drawerSurface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
+      await drawerSurface.getByRole('textbox', { name: 'Ask the copilot' }).fill(UNBREAKABLE_TOKEN);
       await drawerSurface.getByRole('button', { name: 'Ask' }).click();
       await expect(drawerSurface.getByText(UNBREAKABLE_TOKEN, { exact: true }).first()).toBeVisible();
 

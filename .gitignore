@@ -162,3 +162,25 @@ env_backup.zip
 
 # Local Deployment Skill
 .claude/skills/deploy-travelcrm/
+
+# Machine-local agent tooling config — deliberately NOT committed, but copied into
+# every worktree by `wt step copy-ignored` via .worktreeinclude so parallel omp
+# sessions have the same MCP servers, editors and deploy runbook. See
+# .claude/skills/parallel-worktrees/SKILL.md.
+#
+# Anchored to the repository root: unanchored, `config/` also matched
+# `Client/src/config/` and silently ignored every new file added there, and a
+# nested `.vscode/` in any package would have gone the same way.
+/.mcp.json
+/opencode.json
+/config/
+/.codex/
+/.cursor/
+/.gemini/
+/.goose/
+/.vscode/
+/.zed/
+
+# Parallel-worktree / multi-session safety playbook — TRACKED on purpose so every
+# worktrunk (wt) worktree inherits it (worktrees only contain tracked files).
+!.claude/skills/parallel-worktrees/

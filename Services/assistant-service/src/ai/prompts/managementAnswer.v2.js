@@ -22,13 +22,13 @@ export {
 // validator was satisfied, and the operator was told something false about what
 // the page had measured. The prompt has to forbid the substitution itself.
 const ENTITY_RULE =
-  'The scope above names what this page volunteers without being asked; it does not bound what you may read. Use the tools to read any domain the question needs, even when that domain is not this page, and say which sources you read so the answer is never mistaken for a statement about the page alone. Never answer about a different entity under the name you were asked about: leads are not packages, invoices are not leads, and a list of leads is not a catalogue. If no tool and no evidence carries the subject, say plainly that it is not available here.';
+  'The scope above names what this page volunteers without being asked; it does not bound what you may read. Work out the SUBJECT of the question first — leads, invoices, packages, company performance — and read THAT subject\'s domain with its tool, even when the subject is not this page. Do not narrow a question about a whole domain to a single record this page happens to show: "the overdue invoices" means the whole book, not the invoices of the lead in front of you, and reading it through a record-scoped argument returns nothing and then reads as if the data were unavailable. Use the tools to read any domain the question needs, and say which sources you read so the answer is never mistaken for a statement about the page alone. Never answer about a different entity under the name you were asked about: leads are not packages, invoices are not leads, and a list of leads is not a catalogue. If no tool and no evidence carries the subject, say plainly that it is not available.'
 
 // The validator admits a computed answer without a citation (see isComputedEvidence
 // in groundingValidator.js). Saying so is what stops the model inventing an id: live,
 // it guessed `tool:<name>:<n>`, missed, and had every claim deleted.
 const COMPUTED_CLAIM_RULE =
-  'A claim built from a tool result may leave `evidenceIds` empty — the server records which results you read. Its numbers must still come from that result: state a figure only when it appears in the tool output above. When you are answering from the page evidence instead, cite it as usual.';
+  'A claim built from a tool result may leave `evidenceIds` empty — the server records which results you read. Such a claim must then carry NO `facts` at all: a fact requires an evidenceId and you have none for a tool result, so put its figures in `text` only and leave `facts` as an empty array. Sending a fact with an empty `evidenceId` is rejected, and a rejected claim is discarded whole, so the operator is told the answer could not be grounded when in fact it was written correctly. Its numbers must still come from that result: state a figure only when it appears in the tool output above. When you are answering from the page evidence instead, cite it as usual and emit facts carrying that evidenceId. Write every figure as digits — a number spelled as a word cannot be checked against your sources.';
 
 /**
  * The forced final answer, issued after the tool budget is spent.
@@ -135,7 +135,7 @@ export function buildManagementFinalAnswerPrompt({
     '',
     'Your tool budget is spent — you cannot call any more tools. Answer the question NOW, from the tool results and the evidence below.',
     'Return exactly one { "claims": [...] } object with the same claim shape as the briefing schema.',
-    'State only what the tool results and evidence support. If they do not contain the answer, say so plainly in the claim text — for example that this page does not carry that data — and say what the page could answer instead. Do NOT return an empty claims list, and never invent a number.',
+    'State only what the tool results and evidence support. If they do not contain the answer, say so plainly in the claim text — name the subject you could not read and what you can read instead. Do NOT return an empty claims list, and never invent a number.',
     '',
     ENTITY_RULE,
 
@@ -180,7 +180,7 @@ export function buildManagementAnswerPrompt({
   if (toolDescriptions.length === 0) {
     return [
       ...base,
-      'No tools are available for this scope: answer only from the evidence below.',
+      'No tools are available to your role: answer only from the evidence below, which covers the records this page has loaded.',
       'Return exactly one { "claims": [...] } object with the same claim shape as the briefing schema.',
       'If the evidence does not contain the answer, return { "claims": [] } rather than restating the briefing.',
       '',
@@ -216,8 +216,8 @@ export function buildManagementAnswerPrompt({
     && evidence.some((item) => String(item?.id ?? '').includes(':aggregate:'));
 
   const countingRule = hasPrecomputedGroups
-    ? 'The initial evidence below contains PRE-COMPUTED GROUPS for this question: each group item names a group and carries its count. Answer directly from those items and cite them — they are authoritative and already complete for the rows this scope read. Do NOT call a tool to re-count or re-group those rows, and do not return an empty claim list.'
-    : 'For a question about a COUNT, a RANKING or a GROUPING, use the tool that carries the subject. The analytics tools return figures already computed over the whole company (or over the caller\'s own book), so state those figures rather than counting a capped list yourself. Do not return an empty claim list merely because the evidence block is small.';
+    ? 'The initial evidence below contains PRE-COMPUTED GROUPS: each group item names a group and carries its count, computed over the records THIS PAGE has loaded. Answer from them and cite them when the question is about this page\'s records. If the question is about a different subject — invoices, packages, another domain — call the tool that carries it instead, because these groups do not count it. Do not return an empty claim list.'
+    : 'For a question about a COUNT, a RANKING or a GROUPING, use the tool that carries the subject. The analytics tools return figures already computed over the whole company (or over the caller\'s own book), so state those figures rather than counting a capped list yourself. A list tool reports its counts only when it read the whole set; state a count from a list only when such a field is present, and otherwise say the figure is not available rather than counting the rows you were shown. Do not return an empty claim list merely because the evidence block is small.';
 
   const toolBlock = toolDescriptions.map((t) => `- ${t.name}: ${t.description}`).join('\n');
   const historyBlock = history.length

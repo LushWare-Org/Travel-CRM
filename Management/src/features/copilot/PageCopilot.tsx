@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import ManagementContextCopilot, { type CopilotSectionApi } from "./ManagementContextCopilot";
 import CollectionInsights from "./CollectionInsights";
+import { CopilotControlProvider } from "@/contexts/CopilotControlContext";
 
 /**
  * The one-line mount for a collection-scoped page.
@@ -53,25 +54,29 @@ export default function PageCopilot({
 }: PageCopilotProps) {
   const enabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === "true";
 
-  if (!enabled) return <>{children}</>;
+  // The control provider wraps BOTH branches so a page without a copilot still
+  // resolves `useCopilotControl()` to null instead of throwing.
+  if (!enabled) return <CopilotControlProvider>{children}</CopilotControlProvider>;
 
   return (
-    <div className="grid grid-cols-1 items-start xl:grid-cols-[minmax(0,1fr)_auto]">
-      <div className="min-w-0 xl:pb-[72px]">{children}</div>
-      <ManagementContextCopilot pageKey={pageKey} scope={scope} scopeLabel={scopeLabel}>
-        {(api) =>
-          renderInsights ? (
-            renderInsights(api)
-          ) : (
-            <CollectionInsights
-              session={api.session}
-              scopeLabel={scopeLabel}
-              onCollapse={api.collapse}
-              onShowConversation={api.showConversation}
-            />
-          )
-        }
-      </ManagementContextCopilot>
-    </div>
+    <CopilotControlProvider>
+      <div className="grid grid-cols-1 items-start xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0 xl:pb-[72px]">{children}</div>
+        <ManagementContextCopilot pageKey={pageKey} scope={scope} scopeLabel={scopeLabel}>
+          {(api) =>
+            renderInsights ? (
+              renderInsights(api)
+            ) : (
+              <CollectionInsights
+                session={api.session}
+                scopeLabel={scopeLabel}
+                onCollapse={api.collapse}
+                onShowConversation={api.showConversation}
+              />
+            )
+          }
+        </ManagementContextCopilot>
+      </div>
+    </CopilotControlProvider>
   );
 }

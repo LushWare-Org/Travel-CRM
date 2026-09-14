@@ -41,7 +41,6 @@ describe('chat about this', () => {
             { id: 't1', question: 'who owns it?', status: 'answered', answer: [], context: anchor },
           ],
         })}
-        scopeLabel="Billing"
       />
     );
 
@@ -52,7 +51,7 @@ describe('chat about this', () => {
   });
 
   it('shows the attachment above the composer before the question is sent', () => {
-    render(<CopilotConversation session={makeSession({ pendingContext: anchor })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ pendingContext: anchor })} />);
 
     expect(screen.getByText('Finding referenced')).toBeInTheDocument();
     expect(screen.getByText(anchor.text)).toBeInTheDocument();
@@ -131,7 +130,6 @@ describe('chat about this', () => {
           clearConversation,
           turns: [{ id: 't1', question: 'what changed?', status: 'answered', answer: [] }],
         })}
-        scopeLabel="Billing"
       />
     );
 
@@ -151,7 +149,6 @@ describe('chat about this', () => {
           clearConversation,
           turns: [{ id: 't1', question: 'what changed?', status: 'answered', answer: [] }],
         })}
-        scopeLabel="Billing"
       />
     );
 
@@ -163,7 +160,7 @@ describe('chat about this', () => {
   });
 
   it('offers no clear control when there is nothing to clear', () => {
-    render(<CopilotConversation session={makeSession()} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession()} />);
 
     expect(screen.queryByRole('button', { name: /clear conversation/i })).not.toBeInTheDocument();
   });
@@ -174,7 +171,6 @@ describe('chat about this', () => {
         session={makeSession({
           turns: [{ id: 't1', question: 'what changed?', status: 'answered', answer: [] }],
         })}
-        scopeLabel="Billing"
       />
     );
 

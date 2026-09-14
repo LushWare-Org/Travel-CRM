@@ -19,6 +19,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../..
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
 import { StatCard, type StatCardColor } from '../../components/shared/StatCard';
+import PageHeader from '../../components/PageHeader';
 
 // Shared theming for recharts, which takes literal CSS color strings rather
 // than Tailwind classes — referencing the same CSS custom properties that
@@ -425,27 +426,25 @@ const DashboardContainer = () => {
 
   return (
     <div className="h-full overflow-auto bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-card/80 backdrop-blur-lg border-b border-border">
-        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="pl-10 md:pl-0">
-            <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">Welcome back, <span className="font-semibold text-foreground">{user?.name || 'User'}</span></p>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+      <PageHeader
+        title="Dashboard"
+        subtitle={`Welcome back, ${user?.name || 'User'}`}
+        actions={
+          <>
             <Button
               variant="outline"
               size="icon"
               onClick={() => { setRefreshing(true); fetchData(); }}
               disabled={refreshing}
               className={refreshing ? 'animate-spin' : ''}
+              aria-label="Refresh dashboard"
             >
               <RefreshCw className="w-4 h-4" />
             </Button>
             <TimeSelector selected={timeRange} onChange={setTimeRange} />
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
         {error && (

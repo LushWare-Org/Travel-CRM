@@ -17,12 +17,15 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('CopilotConversation — scope-neutral copy', () => {
-  it('derives the pending copy from the scope and never says "this lead"', () => {
-    render(<CopilotConversation session={makeSession({ turns: [turn()] })} scopeLabel="Billing" />);
+describe('CopilotConversation — scope-free copy', () => {
+  it('names no scope while working', () => {
+    render(<CopilotConversation session={makeSession({ turns: [turn()] })} />);
 
-    expect(screen.getByText('Checking Billing…')).toBeInTheDocument();
-    expect(screen.queryByText('Checking this lead…')).not.toBeInTheDocument();
+    expect(screen.getByText('Looking that up…')).toBeInTheDocument();
+    // The shell must not name a scope at all. Naming one states a limit that does
+    // not exist — the tools belong to the actor, not to the page — and that is
+    // what stopped an operator asking a question the copilot could have answered.
+    expect(screen.queryByText(/Checking|this lead|Billing|Leads/)).not.toBeInTheDocument();
   });
 
   it('renders a collection-scope question with the same paired turn shape', () => {
@@ -31,7 +34,6 @@ describe('CopilotConversation — scope-neutral copy', () => {
         session={makeSession({
           turns: [turn({ status: 'answered', answer: [claim({ text: 'The deposit is paid.' })] })],
         })}
-        scopeLabel="Billing"
       />
     );
 
@@ -47,7 +49,6 @@ describe('CopilotConversation — an empty answer is recoverable', () => {
     render(
       <CopilotConversation
         session={makeSession({ turns: [turn({ status: 'answered', answer: [] })], retryTurn })}
-        scopeLabel="Billing"
       />
     );
 
@@ -65,7 +66,6 @@ describe('CopilotConversation — an empty answer is recoverable', () => {
           canAsk: false,
           turns: [turn({ status: 'answered', answer: [] })],
         })}
-        scopeLabel="Billing"
       />
     );
 
@@ -79,7 +79,6 @@ describe('CopilotConversation — an empty answer is recoverable', () => {
     render(
       <CopilotConversation
         session={makeSession({ turns: [turn({ status: 'error', error: 'assistant offline' })], retryTurn })}
-        scopeLabel="Billing"
       />
     );
 
@@ -98,7 +97,6 @@ describe('CopilotConversation — an empty answer is recoverable', () => {
           })],
           sources: [source()],
         })}
-        scopeLabel="Billing"
       />
     );
 
@@ -116,7 +114,7 @@ describe('CopilotConversation — who said what', () => {
   };
 
   it('makes the operator turn a bubble and leaves the answer unboxed', () => {
-    render(<CopilotConversation session={makeSession({ turns: [paired()] })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ turns: [paired()] })} />);
 
     const user = document.querySelector('[data-copilot-turn="user"]');
     const assistant = document.querySelector('[data-copilot-turn="assistant"]');
@@ -138,7 +136,7 @@ describe('CopilotConversation — who said what', () => {
   });
 
   it('nests the referenced finding in its own inset box inside the bubble', () => {
-    render(<CopilotConversation session={makeSession({ turns: [turn({ context })] })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ turns: [turn({ context })] })} />);
 
     const bubble = document.querySelector<HTMLElement>('[data-copilot-turn="user"] .bg-accent');
     const box = document.querySelector<HTMLElement>('[data-copilot-quote="in-bubble"]');
@@ -160,7 +158,7 @@ describe('CopilotConversation — who said what', () => {
   });
 
   it('insets the pending attachment against the composer surface instead', () => {
-    render(<CopilotConversation session={makeSession({ pendingContext: context })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ pendingContext: context })} />);
 
     const box = document.querySelector<HTMLElement>('[data-copilot-quote="above-composer"]');
 
@@ -176,7 +174,7 @@ describe('CopilotConversation — who said what', () => {
   });
 
   it('gives the answer more room than the gap between turns', () => {
-    render(<CopilotConversation session={makeSession({ turns: [paired()] })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ turns: [paired()] })} />);
 
     const section = document.querySelector('[aria-label="Conversation"]');
     const turnWrapper = document.querySelector('[data-copilot-turn="user"]')?.parentElement;
@@ -188,14 +186,14 @@ describe('CopilotConversation — who said what', () => {
   });
 
   it('keeps both speakers attributable to a screen reader', () => {
-    render(<CopilotConversation session={makeSession({ turns: [turn()] })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ turns: [turn()] })} />);
 
     expect(screen.getByText('You said:')).toBeInTheDocument();
     expect(screen.getByText('Copilot said:')).toBeInTheDocument();
   });
 
   it('drops the visible speaker labels', () => {
-    render(<CopilotConversation session={makeSession({ turns: [paired()] })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ turns: [paired()] })} />);
 
     expect(screen.queryByText('You')).not.toBeInTheDocument();
     expect(screen.queryByText('Copilot')).not.toBeInTheDocument();
@@ -204,9 +202,9 @@ describe('CopilotConversation — who said what', () => {
 
 describe('CopilotConversation — composer', () => {
   it('sticks to the surface scrollport and spans its full width', () => {
-    render(<CopilotConversation session={makeSession({})} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({})} />);
 
-    const form = screen.getByLabelText('Ask about Billing').closest('form');
+    const form = screen.getByLabelText('Ask the copilot').closest('form');
     expect(form).not.toBeNull();
     expect(form?.className).toContain('sticky');
     expect(form?.className).toContain('bottom-0');
@@ -226,9 +224,9 @@ describe('CopilotConversation — composer', () => {
   });
 
   it('is present but disabled until the deterministic phase is ready', () => {
-    render(<CopilotConversation session={makeSession({ canAsk: false, loading: true })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ canAsk: false, loading: true })} />);
 
-    expect(screen.getByLabelText('Ask about Billing')).toBeDisabled();
+    expect(screen.getByLabelText('Ask the copilot')).toBeDisabled();
   });
 
   const blockingStates: [string, Partial<CopilotSession>][] = [
@@ -242,17 +240,16 @@ describe('CopilotConversation — composer', () => {
         // Non-empty input so the Ask button's own `!input.trim()` operand is
         // satisfied: what disables it here must be the session state alone.
         session={makeSession({ ...state, input: 'Is the deposit paid?' })}
-        scopeLabel="Billing"
       />
     );
 
-    expect(screen.getByLabelText('Ask about Billing')).toBeDisabled();
+    expect(screen.getByLabelText('Ask the copilot')).toBeDisabled();
     expect(screen.getByRole('button', { name: /ask/i })).toBeDisabled();
   });
 
   it('renders nothing at all without a scope', () => {
     const { container } = render(
-      <CopilotConversation session={makeSession({ hasScope: false, canAsk: false })} scopeLabel="Leads" />
+      <CopilotConversation session={makeSession({ hasScope: false, canAsk: false })} />
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -266,7 +263,7 @@ describe('CopilotConversation — detaching the attachment', () => {
     const user = userEvent.setup();
     const detachFinding = vi.fn();
     render(
-      <CopilotConversation session={makeSession({ pendingContext: context, detachFinding })} scopeLabel="Billing" />
+      <CopilotConversation session={makeSession({ pendingContext: context, detachFinding })} />
     );
 
     await user.click(screen.getByRole('button', { name: 'Remove attached finding' }));
@@ -277,7 +274,7 @@ describe('CopilotConversation — detaching the attachment', () => {
   });
 
   it('offers no detach when nothing is attached', () => {
-    render(<CopilotConversation session={makeSession({ turns: [turn({ context })] })} scopeLabel="Billing" />);
+    render(<CopilotConversation session={makeSession({ turns: [turn({ context })] })} />);
 
     expect(screen.queryByRole('button', { name: 'Remove attached finding' })).not.toBeInTheDocument();
   });
@@ -289,7 +286,6 @@ describe('CopilotConversation — detaching the attachment', () => {
           pendingContext: context,
           turns: [turn({ context, status: 'answered', answer: [claim({ text: 'The deposit is paid.' })] })],
         })}
-        scopeLabel="Billing"
       />
     );
 
@@ -307,7 +303,6 @@ describe('CopilotConversation — suggested questions', () => {
     render(
       <CopilotConversation
         session={makeSession({ suggestedQuestions: ['Who is the most overdue?'], setInput, submit })}
-        scopeLabel="Billing"
       />
     );
 
@@ -326,21 +321,20 @@ describe('CopilotConversation — suggested questions', () => {
     const { rerender } = render(
       <CopilotConversation
         session={makeSession({ suggestedQuestions: ['One?', 'Two?', 'Three?', 'Four?'] })}
-        scopeLabel="Billing"
       />
     );
 
     expect(screen.getByRole('button', { name: 'One?' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Four?' })).not.toBeInTheDocument();
 
-    rerender(<CopilotConversation session={makeSession({ suggestedQuestions: [] })} scopeLabel="Billing" />);
+    rerender(<CopilotConversation session={makeSession({ suggestedQuestions: [] })} />);
     expect(screen.queryByRole('region', { name: 'Suggested questions' })).not.toBeInTheDocument();
   });
 
   it('offers them only while the transcript is empty, and brings them back when it is cleared', () => {
     const prompts = { suggestedQuestions: ['One?'] };
     const { rerender } = render(
-      <CopilotConversation session={makeSession({ turns: [], ...prompts })} scopeLabel="Billing" />
+      <CopilotConversation session={makeSession({ turns: [], ...prompts })} />
     );
     expect(screen.getByRole('region', { name: 'Suggested questions' })).toBeInTheDocument();
 
@@ -348,13 +342,12 @@ describe('CopilotConversation — suggested questions', () => {
     rerender(
       <CopilotConversation
         session={makeSession({ turns: [turn({ status: 'answered', answer: [] })], ...prompts })}
-        scopeLabel="Billing"
       />
     );
     expect(screen.queryByRole('region', { name: 'Suggested questions' })).not.toBeInTheDocument();
 
     // Cleared: empty again, so they are the way back in.
-    rerender(<CopilotConversation session={makeSession({ turns: [], ...prompts })} scopeLabel="Billing" />);
+    rerender(<CopilotConversation session={makeSession({ turns: [], ...prompts })} />);
     expect(screen.getByRole('region', { name: 'Suggested questions' })).toBeInTheDocument();
   });
 });

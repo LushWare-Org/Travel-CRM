@@ -14,6 +14,11 @@ type InsightRowProps = {
    */
   ranked?: boolean;
   /**
+   * The surface-owned primary action. Copilot panels pass none; the business
+   * notification surface passes its View action.
+   */
+  primaryAction?: { label: string; onClick: () => void };
+  /**
    * Present only when the session can actually ask. Absent hides the affordance
    * entirely rather than offering it and failing.
    */
@@ -56,7 +61,7 @@ function whyThis(claim: CopilotClaim): string | null {
  * the row's own affordances gathered into one footer. `claim-row` itself is the
  * answer transcript's shape (`ClaimItem`), and it stays unboxed.
  */
-export default function InsightRow({ claim, sources, announce, ranked = false, onChatAbout }: InsightRowProps) {
+export default function InsightRow({ claim, sources, announce, ranked = false, primaryAction, onChatAbout }: InsightRowProps) {
   const why = ranked ? whyThis(claim) : null;
   const { spineClass } = severityStyles(claim.severity);
 
@@ -68,8 +73,13 @@ export default function InsightRow({ claim, sources, announce, ranked = false, o
       className={cn("rounded-lg border-l-4 bg-foreground/10 px-3 py-2 min-h-[44px]", spineClass)}
     >
       <ClaimItem claim={claim} sources={sources} announce={announce} />
-      {(why || onChatAbout) && (
+      {(primaryAction || why || onChatAbout) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {primaryAction && (
+            <Button variant="outline" size="xs" onClick={primaryAction.onClick}>
+              {primaryAction.label}
+            </Button>
+          )}
           {why && <p className="text-xs text-muted-foreground">Why now: {why}</p>}
           {onChatAbout && (
             <Button

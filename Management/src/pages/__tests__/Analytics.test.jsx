@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-const { mockUseAuth } = vi.hoisted(() => ({ mockUseAuth: vi.fn() }));
+const { mockUseAuth, router } = vi.hoisted(() => ({
+  mockUseAuth: vi.fn(),
+  router: { params: new URLSearchParams(), setParams: vi.fn() },
+}));
 
 vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: mockUseAuth, useOptionalAuth: mockUseAuth }));
+vi.mock('react-router-dom', () => ({
+  useSearchParams: () => [router.params, router.setParams],
+}));
 
 vi.mock('../../features/analytics/components', () => ({
   LeadAnalytics: () => <div>Lead Analytics Content</div>,
@@ -18,6 +24,8 @@ import Analytics from '../Analytics.jsx';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  router.params = new URLSearchParams();
+  router.setParams.mockReset();
 });
 
 describe('Analytics — tab visibility by role', () => {
@@ -55,5 +63,16 @@ describe('Analytics — tab visibility by role', () => {
     render(<Analytics />);
 
     expect(screen.queryByText('My Performance')).not.toBeInTheDocument();
+  });
+});
+
+describe('Analytics — notification deep links', () => {
+  it('selects the URL-backed analytics tab when the role may view it', () => {
+    mockUseAuth.mockReturnValue({ user: { role: 'admin' } });
+    router.params = new URLSearchParams('tab=billing');
+
+    render(<Analytics />);
+
+    expect(screen.getByText('Billing Analytics Content')).toBeInTheDocument();
   });
 });

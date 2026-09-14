@@ -78,12 +78,20 @@ test.describe('copilot smoke — the counting question', () => {
   test('a counting question gets an answer that carries the number @requires-model', async ({ adminPage: page }) => {
     await page.goto('/leads');
 
-    // The tab panel that is not showing stays mounted, so its surface is in the
-    // DOM too — scope to the visible one rather than matching both.
+    // The panel is closed by default. This test never had the step: it was written
+    // while the dock still auto-opened, and d72e29e added the click to the other
+    // test in this file only — so it has failed on its first assertion since.
+    await page.getByRole('button', { name: /open copilot/i }).click();
+
+    // The composer is on the Copilot tab and the panel opens on Insights, so the
+    // tab has to be selected before the composer exists on screen. The inactive
+    // panel stays mounted, so scope to the VISIBLE surface rather than the count.
+    await page.getByRole('tab', { name: 'Copilot' }).click();
+
     const surface = page.locator(`${SURFACE_SELECTOR}:visible`);
     await expect(surface).toBeVisible({ timeout: 30_000 });
 
-    const composer = surface.getByRole('textbox', { name: /^Ask about / });
+    const composer = surface.getByRole('textbox', { name: 'Ask the copilot' });
     await expect(composer).toBeVisible({ timeout: 30_000 });
     await composer.fill('which destinations have the most leads?');
     await surface.getByRole('button', { name: 'Ask' }).click();
@@ -94,11 +102,13 @@ test.describe('copilot smoke — the counting question', () => {
     // The pending row is the completion signal: it is replaced by either the
     // answer or the refusal, so waiting for it to clear waits for the outcome
     // without polling for a shape.
-    await expect(conversation).not.toContainText('Checking', { timeout: 90_000 });
+    await expect(conversation).not.toContainText('Looking that up', { timeout: 90_000 });
 
-    // THE ACCEPTANCE CRITERION. Before this work, this exact question produced
-    // this exact sentence, on every page, every time.
+    // THE ACCEPTANCE CRITERION. The refusal used to blame the page — "nothing in
+    // its data matched it" — which was never true: reading is the actor's, not the
+    // page's. Neither the sentence it replaced nor the current opening may appear.
     await expect(conversation).not.toContainText('No grounded answer for that question.');
+    await expect(conversation).not.toContainText('I could not ground an answer');
 
     // A count-bearing answer, not merely a non-refusal: the rendered text has to
     // contain a number, which is what the old validator deleted.

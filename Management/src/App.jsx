@@ -17,6 +17,7 @@ import ResetPassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HomeRoute from "./components/HomeRoute";
 import { useAuth } from "./contexts/AuthContext";
+import { NotificationProvider } from "./features/notifications/NotificationProvider";
 
 function AppContent() {
   const { isAuthenticated, loading } = useAuth();
@@ -64,10 +65,10 @@ function AppContent() {
         path="/*"
         element={
           isAuthenticated ? (
+            <NotificationProvider>
             <div className="flex h-screen bg-background">
               <Sidebar />
               <div className="flex-1 overflow-auto min-w-0">
-                <div className="md:hidden h-0" /> {/* Spacer for mobile hamburger */}
                 <Routes>
                   <Route path="/" element={<HomeRoute />} />
                   <Route path="/analytics" element={<Analytics />} />
@@ -107,6 +108,7 @@ function AppContent() {
                 </Routes>
               </div>
             </div>
+            </NotificationProvider>
           ) : (
             <Navigate to="/login" replace />
           )
