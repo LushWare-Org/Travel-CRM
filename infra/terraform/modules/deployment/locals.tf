@@ -173,6 +173,7 @@ locals {
         CLIENT_URL                                = "https://lush-ware-client-${var.env}.web.app"
         MANAGEMENT_COPILOT_ENABLED                = var.management_copilot_enabled
         MANAGEMENT_COPILOT_PAGE_KEYS              = var.management_copilot_page_keys
+        MANAGEMENT_NOTIFICATIONS_ENABLED          = var.management_notifications_enabled
         ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = "true"
         # The briefing and the ask loop both run on this one model. The flash tier
         # thinks: measured at ~1000 thinking tokens and 5.7s on a prompt far
