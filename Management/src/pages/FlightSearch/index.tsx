@@ -11,6 +11,7 @@ import SearchForm from './SearchForm';
 import { TravelerDetailsStep, ReviewStep, ConfirmationStep } from './BookingWizard';
 import BookingsPanel from './BookingsPanel';
 import PageCopilot from '@/features/copilot/PageCopilot';
+import PageHeader from '@/components/PageHeader';
 import { SORT_OPTIONS, STATUS_BUCKETS, OFFERS_PAGE_SIZE, emptyTraveler, statusBucket, todayStr } from './helpers';
 import type { StatusBucket } from './helpers';
 import { journeyStops, splitLegs } from '@/features/shared/utils/flightSegments';
@@ -338,17 +339,8 @@ export default function FlightSearch() {
   return (
     <PageCopilot pageKey="flights" scopeLabel="Flights">
       <FlightErrorBoundary>
+      <PageHeader title="Flights" subtitle="Search, book and manage flight reservations" />
       <div className="min-h-screen bg-background mx-auto max-w-7xl p-4 md:p-6">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="rounded-lg bg-primary p-2.5 text-primary-foreground">
-            <Plane className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Flights</h1>
-            <p className="text-sm text-muted-foreground">Search, book and manage flight reservations</p>
-          </div>
-        </div>
-
         <div className="mb-6">
           <Tabs
             value={activeTab}

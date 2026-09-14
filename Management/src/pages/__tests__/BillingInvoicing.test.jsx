@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 const {
   mockQuotationGetAll, mockQuotationDownloadPDF, mockQuotationSend,
   mockInvoiceGetAll, mockReceiptGetAll, mockVoucherGetAll, mockPaymentHistoryGetAll,
+  router,
 } = vi.hoisted(() => ({
   mockQuotationGetAll: vi.fn(),
   mockQuotationDownloadPDF: vi.fn(),
@@ -13,6 +14,7 @@ const {
   mockReceiptGetAll: vi.fn(),
   mockVoucherGetAll: vi.fn(),
   mockPaymentHistoryGetAll: vi.fn(),
+  router: { params: new URLSearchParams(), setParams: vi.fn() },
 }));
 
 vi.mock('../../services/api.js', () => ({
@@ -25,6 +27,7 @@ vi.mock('../../services/api.js', () => ({
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
+  useSearchParams: () => [router.params, router.setParams],
 }));
 
 vi.mock('@/lib/toast', () => ({
@@ -45,6 +48,8 @@ const quotation = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  router.params = new URLSearchParams();
+  router.setParams.mockReset();
   mockQuotationGetAll.mockResolvedValue({ success: true, data: [quotation] });
   mockInvoiceGetAll.mockResolvedValue({ success: true, data: [] });
   mockReceiptGetAll.mockResolvedValue({ success: true, data: [] });
@@ -102,5 +107,21 @@ describe('BillingInvoicing quotations tab', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to send quotation'));
     expect(screen.getByText('QT-1001')).toBeInTheDocument();
+  });
+});
+
+describe('BillingInvoicing notification deep links', () => {
+  it('activates the requested document tab and forwards its id set', async () => {
+    router.params = new URLSearchParams('tab=invoice&ids=invoice-1%2Cinvoice-2');
+
+    render(<BillingInvoicing />);
+
+    await waitFor(() => expect(mockInvoiceGetAll).toHaveBeenCalledWith(expect.objectContaining({
+      ids: 'invoice-1,invoice-2',
+      limit: 100,
+      page: 1,
+    })));
+    expect(screen.getAllByText('Invoices').length).toBeGreaterThan(0);
+    expect(screen.getByText(/selected documents/)).toBeInTheDocument();
   });
 });

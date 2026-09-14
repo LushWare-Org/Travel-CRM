@@ -95,13 +95,15 @@ function QuotedContext({
 
 type CopilotConversationProps = {
   session: CopilotSession;
-  scopeLabel: string;
 };
 
 /**
- * The shell's conversation — not the record panel's. It renders on every
- * page key, so nothing here may assume a lead is in scope: the pending copy is
- * derived from `scopeLabel`, never the record-specific "this lead".
+ * The shell's conversation — not the record panel's. It renders on every page
+ * key, and it names NO scope at all: reading is not bounded by the page the
+ * operator is standing on (the tools are the actor's, not the page's), so a
+ * composer that said "Ask about Leads" would state a limit that does not exist
+ * and stop the operator asking the question the copilot could have answered.
+ * The page-named scope belongs to the insights panel, which really is scoped.
  *
  * It is its own tab, inside its own `CopilotSurface`:
  *
@@ -168,7 +170,7 @@ type CopilotConversationProps = {
  * The one case with no retry is a scope the operator cannot read, where asking
  * again cannot help.
  */
-export default function CopilotConversation({ session, scopeLabel }: CopilotConversationProps) {
+export default function CopilotConversation({ session }: CopilotConversationProps) {
   const [announcement, announce] = useAnnouncer();
 
   // Attaching a finding moves focus into the composer and says so once. The
@@ -259,7 +261,7 @@ export default function CopilotConversation({ session, scopeLabel }: CopilotConv
                 {turn.status === "pending" && (
                   <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                    Checking {scopeLabel}…
+                    Looking that up…
                   </p>
                 )}
 
@@ -386,8 +388,8 @@ export default function CopilotConversation({ session, scopeLabel }: CopilotConv
               }
             }}
             rows={1}
-            aria-label={`Ask about ${scopeLabel}`}
-            placeholder={`Ask about ${scopeLabel}…`}
+            aria-label="Ask the copilot"
+            placeholder="Ask anything about the business…"
             disabled={composerDisabled}
             className="min-h-0 resize-none py-2 text-sm"
           />

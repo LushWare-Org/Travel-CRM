@@ -4,12 +4,14 @@ import userEvent from '@testing-library/user-event';
 
 const {
   mockGetAllLeads, mockGetLeadStats, mockGetSalesReps, mockGetAssignmentSettings, mockGetStoredUser,
+  router,
 } = vi.hoisted(() => ({
   mockGetAllLeads: vi.fn(),
   mockGetLeadStats: vi.fn(),
   mockGetSalesReps: vi.fn(),
   mockGetAssignmentSettings: vi.fn(),
   mockGetStoredUser: vi.fn(),
+  router: { params: new URLSearchParams(), setParams: vi.fn() },
 }));
 
 vi.mock('../../services/api', () => ({
@@ -19,7 +21,7 @@ vi.mock('../../services/api', () => ({
 }));
 
 vi.mock('react-router-dom', () => ({
-  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  useSearchParams: () => [router.params, router.setParams],
   useNavigate: () => vi.fn(),
 }));
 
@@ -39,6 +41,9 @@ vi.mock('../../features/lead-management/components/FilterDialog', () => ({ defau
 vi.mock('../../features/lead-management/components/SettingsDialog', () => ({ default: () => null }));
 vi.mock('../../features/lead-management/components/StatusChangeDialog', () => ({ default: () => null }));
 vi.mock('../../features/lead-management/components/ActiveSalesRepsDialog', () => ({ default: () => null }));
+vi.mock('../../features/lead-management/components/LeadDetailPane', () => ({
+  default: ({ lead }) => <div data-testid="lead-detail">{lead?.id || lead?._id || 'empty'}</div>,
+}));
 vi.mock('../../features/lead-management/components/LeadSectionView', () => ({ default: () => null }));
 vi.mock('../../features/lead-management/components/quotation/QuotationModal', () => ({ default: () => null }));
 vi.mock('../../features/lead-management/components/InvoiceDialog', () => ({ default: () => null }));
@@ -49,6 +54,8 @@ import LeadManagement from '../LeadManagement';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  router.params = new URLSearchParams();
+  router.setParams.mockReset();
   mockGetAllLeads.mockResolvedValue({ success: true, data: [], pagination: { pages: 1, total: 0 } });
   mockGetLeadStats.mockResolvedValue({ success: true, summary: { total: 0 }, data: [] });
   mockGetSalesReps.mockResolvedValue({ success: true, data: [] });
@@ -88,5 +95,39 @@ describe('LeadManagement — PENDING_VERIFICATION filter wiring', () => {
       expect(params).toMatchObject({ status: 'DRAFTING' });
       expect(params).not.toHaveProperty('lifecycleStatus');
     });
+  });
+});
+
+describe('LeadManagement — notification deep links', () => {
+  it('requests and labels only the lead ids named by the URL', async () => {
+    router.params = new URLSearchParams('ids=lead-1%2Clead-2');
+    mockGetAllLeads.mockResolvedValue({
+      success: true,
+      data: [{ id: 'lead-1' }, { id: 'lead-2' }],
+      pagination: { pages: 1, total: 2 },
+    });
+
+    render(<LeadManagement />);
+
+    await waitFor(() => expect(lastParams()).toMatchObject({
+      ids: 'lead-1,lead-2',
+      limit: 200,
+      page: 1,
+    }));
+    expect(await screen.findByText(/Showing/)).toBeInTheDocument();
+    expect(screen.getByText(/selected leads/)).toBeInTheDocument();
+  });
+
+  it('opens the requested lead detail when open=1 accompanies leadId', async () => {
+    router.params = new URLSearchParams('leadId=lead-1&open=1');
+    mockGetAllLeads.mockResolvedValue({
+      success: true,
+      data: [{ id: 'lead-1', name: 'Alice' }],
+      pagination: { pages: 1, total: 1 },
+    });
+
+    render(<LeadManagement />);
+
+    await waitFor(() => expect(screen.getByTestId('lead-detail')).toHaveTextContent('lead-1'));
   });
 });

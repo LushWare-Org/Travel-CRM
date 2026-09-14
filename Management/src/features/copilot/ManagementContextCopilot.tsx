@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useOptionalAuth } from "@/contexts/AuthContext";
+import { useRegisterCopilotControl } from "@/contexts/CopilotControlContext";
 import { deriveScopeKey, useCopilotSession } from "./useCopilotSession";
 import { useCopilotVisibility } from "./useCopilotVisibility";
 import { useIsDesktopDock } from "./useMediaQuery";
@@ -143,6 +144,22 @@ export default function ManagementContextCopilot({
 
   const showCue = !isDesktop && ready && !cueDismissed && session.ready;
 
+  // The one seam the site-wide notification surface uses. Order matters:
+  // attach, switch tab, then open — `expand` lands focus through the effect
+  // above, which only runs once `dockOpen` commits.
+  const { chatAbout } = session;
+  const askAbout = useCallback(
+    (claim: Parameters<CopilotSession["chatAbout"]>[0]) => {
+      chatAbout(claim);
+      showConversation();
+      if (isDesktop) expand();
+      else handleDrawerOpenChange(true);
+    },
+    [chatAbout, showConversation, isDesktop, expand, handleDrawerOpenChange]
+  );
+  const control = useMemo(() => ({ askAbout }), [askAbout]);
+  useRegisterCopilotControl(control);
+
   const content = children({
     session,
     open: surfaceOpen,
@@ -157,7 +174,7 @@ export default function ManagementContextCopilot({
   const body = (
     <CopilotTabs
       insights={content}
-      conversation={<CopilotConversation session={session} scopeLabel={scopeLabel} />}
+      conversation={<CopilotConversation session={session} />}
       active={activeTab}
       onActiveChange={setActiveTab}
       pending={session.asking}
