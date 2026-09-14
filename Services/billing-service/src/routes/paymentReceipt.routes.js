@@ -16,5 +16,13 @@ router.put('/:id/cancel', requireAuth, authorize('admin'), paymentReceiptControl
 router.put('/:id/verify', requireAuth, authorize('admin'), paymentReceiptController.verifyPaymentReceipt);
 router.put('/:id/reconcile', requireAuth, authorize('admin'), paymentReceiptController.reconcilePaymentReceipt);
 router.post('/:id/send', requireAuth, authorize('admin', 'salesRep'), paymentReceiptController.sendPaymentReceipt);
+const internalTokenAuth = (req, res, next) => {
+  const token = req.headers['x-internal-token'];
+  if (!token || token !== process.env.INTERNAL_EVENTS_TOKEN) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  next();
+};
+router.post('/:id/resend-voice', internalTokenAuth, paymentReceiptController.resendPaymentReceiptForVoice);
 
 export default router;

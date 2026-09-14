@@ -19,12 +19,28 @@ export const LeadPackageSelectionRaw = z
   })
   .passthrough();
 
+export const PendingAiChange = z.object({
+  before: z.object({
+    nights: z.number(),
+    hotel: z.string().nullable(),
+    destination: z.string().nullable(),
+  }),
+  after: z.object({
+    nights: z.number(),
+    hotel: z.string().nullable(),
+    destination: z.string().nullable(),
+  }),
+  summary: z.string(),
+  changedAt: z.string(),
+});
+
 export const LeadPackageSelectionSummary = LeadPackageSelectionRaw.extend({
   itineraryDays: z.array(z.any()),
   costLines: z.array(z.any()),
   pricing: z.any().nullable(),
   isMaterialized: z.boolean(),
   derivationError: z.boolean().optional(),
+  pendingAiChange: PendingAiChange.nullable().optional(),
 });
 
 // The `data` payload of POST /leads/:id/packages/:selectionId/quote — the

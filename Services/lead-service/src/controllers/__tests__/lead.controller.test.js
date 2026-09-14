@@ -556,12 +556,35 @@ describe('logCommunication — WhatsApp/billing timeline ingestion', () => {
     await logCommunication(req, res, vi.fn());
 
     expect(mockLeadFindFirst).toHaveBeenCalledWith({
-      where: { OR: [{ phone: '15551234567' }, { whatsapp: '15551234567' }] },
+      where: { OR: [{ phoneNormalized: '15551234567' }, { whatsappNormalized: '15551234567' }] },
     });
     expect(mockLeadCommunicationLogCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ leadId: 'lead-2' }),
     }));
     expect(res.json).toHaveBeenCalledWith({ success: true, data: { matched: true, leadId: 'lead-2' } });
+  });
+
+  it('queries the normalized columns so an E.164 lead stored with a leading plus still matches', async () => {
+    mockLeadFindFirst.mockResolvedValue({ id: 'lead-rep-created' });
+    mockLeadCommunicationLogCreate.mockResolvedValue({ id: 'log-3' });
+
+    const req = { body: { phone: '94771234567', type: 'whatsapp', notes: 'WhatsApp (customer): hi' } };
+    const res = { json: vi.fn() };
+    await logCommunication(req, res, vi.fn());
+
+    expect(mockLeadFindFirst).toHaveBeenCalledWith({
+      where: { OR: [{ phoneNormalized: '94771234567' }, { whatsappNormalized: '94771234567' }] },
+    });
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { matched: true, leadId: 'lead-rep-created' } });
+  });
+
+  it('skips the lookup and responds matched:false when the phone holds no digits', async () => {
+    const req = { body: { phone: 'n/a', type: 'whatsapp', notes: 'WhatsApp (customer): hi' } };
+    const res = { json: vi.fn() };
+    await logCommunication(req, res, vi.fn());
+
+    expect(mockLeadFindFirst).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { matched: false } });
   });
 
   it('responds matched:false without erroring when no lead matches the phone number', async () => {

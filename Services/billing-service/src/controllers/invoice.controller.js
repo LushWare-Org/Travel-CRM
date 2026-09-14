@@ -188,6 +188,53 @@ export const sendInvoice = asyncHandler(async (req, res) => {
   }
 });
 
+// ─── POST /:id/resend-voice ─────────────────────────────────────
+export const resendInvoiceForVoice = asyncHandler(async (req, res) => {
+  const invoice = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: invoiceInclude });
+  if (!invoice) throw new AppError('Invoice not found', 404);
+  if (!invoice.sentAt) throw new AppError('This invoice has not been sent yet — a specialist needs to send it the first time', 409);
+
+  const results = { email: null, whatsapp: null };
+  const pdf = await generateInvoicePDF(invoice);
+  const now = new Date();
+
+  if (invoice.customerEmail) {
+    try {
+      await sendInvoiceEmail({ invoice, recipientEmail: invoice.customerEmail, pdfBuffer: pdf });
+      await prisma.invoice.update({ where: { id: invoice.id }, data: { emailSent: true } });
+      results.email = 'sent';
+    } catch (err) {
+      req.log.error({ err, invoiceId: invoice.id }, 'Voice resend: email failed');
+      results.email = 'failed';
+    }
+  }
+
+  if (invoice.customerPhone) {
+    try {
+      const mediaUrl = await uploadPdfBuffer(pdf, `invoice-${invoice.invoiceNumber}`);
+      await sendInvoiceWhatsapp({ invoice, phone: invoice.customerPhone, mediaUrl });
+      await prisma.invoice.update({ where: { id: invoice.id }, data: { whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl } });
+      results.whatsapp = 'sent';
+    } catch (err) {
+      req.log.error({ err, invoiceId: invoice.id }, 'Voice resend: WhatsApp failed');
+      results.whatsapp = 'failed';
+    }
+  }
+
+  if (results.email === 'sent' || results.whatsapp === 'sent') {
+    try {
+      await logLeadCommunication({
+        leadId: invoice.leadId, type: 'message',
+        notes: `Invoice ${invoice.invoiceNumber} resent by voice agent (email: ${results.email ?? 'n/a'}, WhatsApp: ${results.whatsapp ?? 'n/a'})`,
+      });
+    } catch (err) {
+      req.log.error({ err, leadId: invoice.leadId }, 'Failed to log voice resend on lead timeline');
+    }
+  }
+
+  res.json({ success: true, data: results });
+});
+
 export const markInvoiceViewed = asyncHandler(async (req, res) => {
   const invoice = await prisma.invoice.update({
     where: { id: req.params.id },

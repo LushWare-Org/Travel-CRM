@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import AiLeadBadges from './AiLeadBadges';
 import { Button } from '@/components/ui/button';
 import { repLabelFor, repOptionId, type SalesRepOption } from '../utils/salesRepLabel';
 
@@ -289,10 +290,11 @@ const LeadTable = ({
                 <div className="p-5 pb-4">
                   <div className="flex items-start justify-between gap-3 mb-4">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <h3 className="font-semibold text-foreground text-lg truncate group-hover:text-primary transition-colors">
                           {lead.name}
                         </h3>
+                        <AiLeadBadges lead={lead} />
                       </div>
                       <p className="text-xs text-muted-foreground font-mono">
                         ID: {leadId?.slice(-8)}
@@ -325,7 +327,7 @@ const LeadTable = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
-                              onDeleteClick?.(lead);
+                              onDeleteClick?.(lead.id || lead._id);
                             }
                           }}
                           className="p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-md transition-colors"

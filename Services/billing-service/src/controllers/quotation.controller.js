@@ -188,6 +188,53 @@ export const sendQuotation = asyncHandler(async (req, res) => {
   }
 });
 
+// ─── POST /:id/resend-voice ─────────────────────────────────────
+export const resendQuotationForVoice = asyncHandler(async (req, res) => {
+  const quotation = await prisma.quotation.findUnique({ where: { id: req.params.id }, include: quotationInclude });
+  if (!quotation) throw new AppError('Quotation not found', 404);
+  if (!quotation.sentAt) throw new AppError('This quotation has not been sent yet — a specialist needs to send it the first time', 409);
+
+  const results = { email: null, whatsapp: null };
+  const pdf = await generateQuotationPDF(quotation);
+  const now = new Date();
+
+  if (quotation.customerEmail) {
+    try {
+      await sendQuotationEmail({ quotation, recipientEmail: quotation.customerEmail, pdfBuffer: pdf });
+      await prisma.quotation.update({ where: { id: quotation.id }, data: { emailSent: true } });
+      results.email = 'sent';
+    } catch (err) {
+      req.log.error({ err, quotationId: quotation.id }, 'Voice resend: email failed');
+      results.email = 'failed';
+    }
+  }
+
+  if (quotation.customerPhone) {
+    try {
+      const mediaUrl = await uploadPdfBuffer(pdf, `quotation-${quotation.quotationNumber}`);
+      await sendQuotationWhatsapp({ quotation, phone: quotation.customerPhone, mediaUrl });
+      await prisma.quotation.update({ where: { id: quotation.id }, data: { whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl } });
+      results.whatsapp = 'sent';
+    } catch (err) {
+      req.log.error({ err, quotationId: quotation.id }, 'Voice resend: WhatsApp failed');
+      results.whatsapp = 'failed';
+    }
+  }
+
+  if (results.email === 'sent' || results.whatsapp === 'sent') {
+    try {
+      await logLeadCommunication({
+        leadId: quotation.leadId, type: 'message',
+        notes: `Quotation ${quotation.quotationNumber} resent by voice agent (email: ${results.email ?? 'n/a'}, WhatsApp: ${results.whatsapp ?? 'n/a'})`,
+      });
+    } catch (err) {
+      req.log.error({ err, leadId: quotation.leadId }, 'Failed to log voice resend on lead timeline');
+    }
+  }
+
+  res.json({ success: true, data: results });
+});
+
 export const markQuotationViewed = asyncHandler(async (req, res) => {
   const quotation = await prisma.quotation.update({
     where: { id: req.params.id },

@@ -10,13 +10,15 @@ router.get('/lead/:leadId', requireAuth, quotationController.getQuotationsByLead
 router.get('/:id/pdf', requireAuth, quotationController.downloadQuotationPDF);
 router.get('/:id', requireAuth, quotationController.getQuotationById);
 router.post('/', requireAuth, authorize('admin', 'salesRep'), quotationController.createQuotation);
-router.post('/from-lead', (req, res, next) => {
+const internalTokenAuth = (req, res, next) => {
   const token = req.headers['x-internal-token'];
   if (!token || token !== process.env.INTERNAL_EVENTS_TOKEN) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   next();
-}, quotationController.createQuotationFromLead);
+};
+router.post('/from-lead', internalTokenAuth, quotationController.createQuotationFromLead);
+router.post('/:id/resend-voice', internalTokenAuth, quotationController.resendQuotationForVoice);
 router.put('/:id', requireAuth, authorize('admin', 'salesRep'), quotationController.updateQuotation);
 router.delete('/:id', requireAuth, authorize('admin'), quotationController.deleteQuotation);
 router.post('/:id/send', requireAuth, authorize('admin', 'salesRep'), quotationController.sendQuotation);

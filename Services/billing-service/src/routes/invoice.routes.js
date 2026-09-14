@@ -14,6 +14,14 @@ router.post('/', requireAuth, authorize('admin', 'salesRep'), invoiceController.
 router.put('/:id', requireAuth, authorize('admin', 'salesRep'), invoiceController.updateInvoice);
 router.put('/:id/cancel', requireAuth, authorize('admin'), invoiceController.cancelInvoice);
 router.post('/:id/send', requireAuth, authorize('admin', 'salesRep'), invoiceController.sendInvoice);
+const internalTokenAuth = (req, res, next) => {
+  const token = req.headers['x-internal-token'];
+  if (!token || token !== process.env.INTERNAL_EVENTS_TOKEN) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  next();
+};
+router.post('/:id/resend-voice', internalTokenAuth, invoiceController.resendInvoiceForVoice);
 router.post('/:id/viewed', invoiceController.markInvoiceViewed);
 router.post('/:id/remind', requireAuth, authorize('admin', 'salesRep'), invoiceController.sendPaymentReminder);
 

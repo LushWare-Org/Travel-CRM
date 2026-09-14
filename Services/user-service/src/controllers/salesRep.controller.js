@@ -116,6 +116,16 @@ export const updateSalesRepCommission = asyncHandler(async (req, res) => {
   res.json({ status: 'success', message: 'Commission rate updated', data: {} });
 });
 
+export const getInternalNotifyTargets = asyncHandler(async (req, res) => {
+  const reps = await prisma.user.findMany({
+    where: { role: 'salesRep', isActive: true },
+    select: { id: true, name: true, email: true },
+    orderBy: { name: 'asc' },
+    take: 50,
+  });
+  res.json({ status: 'success', data: { reps } });
+});
+
 export const getOnlineSalesReps = asyncHandler(async (req, res) => {
   const cutoff = new Date(Date.now() - 5 * 60 * 1000); // online = active in last 5 min
   const reps = await prisma.user.findMany({

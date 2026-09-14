@@ -147,6 +147,55 @@ export const sendVoucher = asyncHandler(async (req, res) => {
   }
 });
 
+// ─── POST /:id/resend-voice ─────────────────────────────────────
+export const resendVoucherForVoice = asyncHandler(async (req, res) => {
+  const voucher = await prisma.voucher.findUnique({ where: { id: req.params.id }, include: voucherInclude });
+  if (!voucher) throw new AppError('Voucher not found', 404);
+  if (!voucher.emailSent && !voucher.whatsappSent) {
+    throw new AppError('This voucher has not been sent yet — a specialist needs to send it the first time', 409);
+  }
+
+  const results = { email: null, whatsapp: null };
+  const pdf = await generateVoucherPDF(voucher);
+  const now = new Date();
+
+  if (voucher.customerEmail) {
+    try {
+      await sendVoucherEmail({ voucher, recipientEmail: voucher.customerEmail, pdfBuffer: pdf });
+      await prisma.voucher.update({ where: { id: voucher.id }, data: { emailSent: true, emailSentAt: now } });
+      results.email = 'sent';
+    } catch (err) {
+      req.log.error({ err, voucherId: voucher.id }, 'Voice resend: email failed');
+      results.email = 'failed';
+    }
+  }
+
+  if (voucher.customerPhone) {
+    try {
+      const mediaUrl = await uploadPdfBuffer(pdf, `voucher-${voucher.voucherNumber}`);
+      await sendVoucherWhatsapp({ voucher, phone: voucher.customerPhone, mediaUrl });
+      await prisma.voucher.update({ where: { id: voucher.id }, data: { whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl } });
+      results.whatsapp = 'sent';
+    } catch (err) {
+      req.log.error({ err, voucherId: voucher.id }, 'Voice resend: WhatsApp failed');
+      results.whatsapp = 'failed';
+    }
+  }
+
+  if (results.email === 'sent' || results.whatsapp === 'sent') {
+    try {
+      await logLeadCommunication({
+        leadId: voucher.leadId, type: 'message',
+        notes: `Voucher ${voucher.voucherNumber} resent by voice agent (email: ${results.email ?? 'n/a'}, WhatsApp: ${results.whatsapp ?? 'n/a'})`,
+      });
+    } catch (err) {
+      req.log.error({ err, leadId: voucher.leadId }, 'Failed to log voice resend on lead timeline');
+    }
+  }
+
+  res.json({ success: true, data: results });
+});
+
 export const markVoucherViewed = asyncHandler(async (req, res) => {
   const voucher = await prisma.voucher.update({ where: { id: req.params.id }, data: { status: 'viewed', viewedAt: new Date() } });
   res.json({ success: true, data: voucher });
