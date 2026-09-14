@@ -89,13 +89,29 @@ describe('ask mode is told to answer a counting question', () => {
     expect(withTool).toMatch(/rather than counting a capped list/);
     expect(withTool).toMatch(/do not return an empty claim list/i);
   });
+  it('says where a count from a list may come from', () => {
+    const withTool = answerPrompt({ toolDescriptions: [{ name: 'listLeads', description: 'list leads' }] });
+
+    // A capped list contains no count. Naming the field is what stops the model
+    // counting the rows it happens to have been shown.
+    expect(withTool).toMatch(/reports its counts only when it read the whole set/);
+    expect(withTool).toMatch(/say the figure is not available rather than counting the rows you were shown/);
+  });
+
+  it('requires every figure to be written as digits, so the numeric rule can see it', () => {
+    expect(answerPrompt()).toMatch(/Write every figure as digits/);
+  });
 
   it('tells the model the scope does not bound what it may read', () => {
     const prompt = answerPrompt({ toolDescriptions: [{ name: 'getPackagePerformance', description: 'd' }] });
 
     // The reach change: the page decides what is volunteered, not what is askable.
     expect(prompt).toMatch(/it does not bound what you may read/);
-    expect(prompt).toMatch(/even when that domain is not this page/);
+    expect(prompt).toMatch(/even when the subject is not this page/);
+    // Reach alone was not enough. Live, asked from /leads which invoices are
+    // overdue, the model read the invoice domain but scoped it to the lead on
+    // screen (`?lead/…`), got nothing, and reported invoices as unavailable.
+    expect(prompt).toMatch(/Do not narrow a question about a whole domain to a single record/);
     // Still forbidden to relabel one entity as another — that failure is about
     // naming, not about reach, and survives the widening.
     expect(prompt).toMatch(/never answer about a different entity/i);
@@ -110,7 +126,12 @@ describe('ask mode is told to answer a counting question', () => {
     });
 
     expect(prompt).toMatch(/PRE-COMPUTED GROUPS/);
-    expect(prompt).toMatch(/Do NOT call a tool to re-count or re-group/);
+    // The groups are the PAGE's rows, and the prompt says so: on /leads a
+    // question about invoices by destination used to be handed lead groups it was
+    // told were authoritative for "this question", which is the substitution the
+    // ENTITY_RULE exists to prevent.
+    expect(prompt).toMatch(/computed over the records THIS PAGE has loaded/);
+    expect(prompt).toMatch(/call the tool that carries it instead/);
     // This is the line that broke it live: the server had the answer in the
     // evidence, and the prompt told the model not to use it — so it re-gathered
     // by hand, failed four times, and returned nothing.
@@ -148,7 +169,9 @@ describe('ask mode is told to answer a counting question', () => {
   });
 
   it('keeps the no-tools path honest about its limits', () => {
-    expect(answerPrompt()).toMatch(/No tools are available for this scope/);
+    // The limit is the ACTOR's, not the page's: the missing thing is a tool for
+    // this role, and the evidence still covers what the page loaded.
+    expect(answerPrompt()).toMatch(/No tools are available to your role/);
   });
 
   it('tells the model a tool-derived claim may cite nothing, on every answer path', () => {
@@ -163,6 +186,13 @@ describe('ask mode is told to answer a counting question', () => {
 
     for (const prompt of [toolPrompt, singleShot, forced]) {
       expect(prompt).toMatch(/may leave `evidenceIds` empty/);
+      // The half that was missing, and that made the exception useless: a fact
+      // REQUIRES an evidenceId (`BriefingFactSchema`), so a model told only that
+      // it may cite nothing emitted `facts` with `evidenceId: ""`, the whole claim
+      // failed the contract, and the operator got a limitation block for a
+      // correctly written answer. Live, that is how "which invoices are overdue?"
+      // came back as "that could not be grounded".
+      expect(prompt).toMatch(/must then carry NO `facts`/);
     }
     // The briefing has no computed results to reason about — every one of its
     // claims cites a rendered field — so the exception must not reach it.

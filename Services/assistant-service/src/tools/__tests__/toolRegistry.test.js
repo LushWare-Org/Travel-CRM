@@ -449,6 +449,67 @@ describe('listInvoices filters, orders and derives overdue (S5)', () => {
     expect(result.data.map((row) => row.id)).toEqual(['inv-dated', 'inv-nodate']);
     expect(result.data[1].overdue).toBe(false);
   });
+  it('reports a count only when the read was the whole set', async () => {
+    captureFetch({
+      success: true,
+      total: 5,
+      data: [
+        invoice({ id: 'inv-paid', paymentStatus: 'paid' }),
+        invoice({ id: 'inv-refunded', paymentStatus: 'refunded' }),
+        invoice({ id: 'inv-a' }),
+        invoice({ id: 'inv-b', paymentStatus: 'partial' }),
+        invoice({ id: 'inv-c', dueDate: future(5) }),
+      ],
+    });
+
+    const result = await executeTool('listInvoices', {}, ctx, ['listInvoices']);
+
+    // These are the numbers an answer may cite, and they count the rows the tool
+    // RETURNS: the question is about this filter's view, not the whole invoice table.
+    expect(result.total).toBe(3);
+    // One of the three is not yet due, so the derived overdue count differs from the
+    // row count — and no single row carries "2", which is why the tool has to state it.
+    expect(result.overdueTotal).toBe(2);
+    expect(result.data).toHaveLength(3);
+    expect(result.truncated).toBeUndefined();
+  });
+
+  it('withholds a count when the page was short of the envelope total', async () => {
+    captureFetch({
+      success: true,
+      total: 40,
+      data: [invoice({ id: 'inv-a' }), invoice({ id: 'inv-b' })],
+    });
+
+    const result = await executeTool('listInvoices', {}, ctx, ['listInvoices']);
+
+    // Two rows out of forty. A count read off this page would be a wrong number
+    // stated as fact, so no count is offered at all and the drop is declared.
+    expect(result.total).toBeUndefined();
+    expect(result.overdueTotal).toBeUndefined();
+    expect(result.truncated).toBe(true);
+  });
+
+  it('declares a caller limit as a truncation rather than passing it off as the list', async () => {
+    captureFetch({
+      success: true,
+      total: 4,
+      data: [
+        invoice({ id: 'inv-a', dueDate: past(40) }),
+        invoice({ id: 'inv-b', dueDate: past(30) }),
+        invoice({ id: 'inv-c', dueDate: past(20) }),
+        invoice({ id: 'inv-d', dueDate: past(10) }),
+      ],
+    });
+
+    const result = await executeTool('listInvoices', { limit: 2 }, ctx, ['listInvoices']);
+
+    // The slice runs before boundResult, so before this change nothing recorded it.
+    expect(result.data.map((row) => row.id)).toEqual(['inv-a', 'inv-b']);
+    expect(result.truncated).toBe(true);
+    expect(result.total).toBeUndefined();
+    expect(result.overdueTotal).toBeUndefined();
+  });
 });
 
 describe('the public catalogue tools', () => {
