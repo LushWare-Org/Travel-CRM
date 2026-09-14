@@ -1,0 +1,35 @@
+# Worktrunk project config — tracked so every worktree inherits it.
+# Read from the worktree the command runs in. First run of a project command
+# asks for approval once (saved in ~/.config/worktrunk/approvals.toml).
+#
+# Purpose: a fresh `wt switch -c` worktree contains only tracked files — no
+# `.env`, no `node_modules`. This hook copies the gitignored files named in
+# `.worktreeinclude` (the 16 package `.env` files) so services can boot without
+# a confusing "missing credential" crash. See skill://parallel-worktrees.
+
+# Runs once in the background when a worktree is created (`wt switch -c ...`).
+# Background is right: worktree creation should not block on the copy.
+[post-start]
+copy = "wt step copy-ignored"
+
+# ── Optional: install dependencies per worktree ──────────────────────────────
+# There is no root workspace; each package installs independently. Uncomment and
+# narrow to the packages a session will actually run. This is a pipeline so the
+# gitignored copy above completes first.
+#
+# [[post-start]]
+# deps = "cd Client && npm install && cd ../Management && npm install"
+#
+# ── Optional: isolated frontend port per worktree ────────────────────────────
+# The backend stack is fixed-port and must stay single (see the skill). The two
+# frontends can safely get their own port per worktree via worktrunk's hash_port:
+#
+# [aliases]
+# client = "cd Client && npm run dev -- --port {{ branch | hash_port }}"
+
+# ── Optional: tear down a dev server with the worktree ───────────────────────
+# `wt step tether` kills the whole process tree on `wt remove`, so no orphaned
+# server is left behind:
+#
+# [post-start]
+# server = "wt step tether -- cd Client && npm run dev -- --port {{ branch | hash_port }}"

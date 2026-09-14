@@ -130,6 +130,19 @@ Each service has its own `package.json` — there is no root workspace. Commands
 
 When testing API endpoints, use `curl http://localhost:3000/api/v1/<path>` to hit the gateway. Do not call microservices directly on their ports unless debugging routing issues within the gateway. If you find yourself running the same curl patterns repeatedly, create a script at `Services/test-<scenario>.sh` instead of re-running raw curl commands each time.
 
+## Parallel sessions & git worktrees (Worktrunk)
+
+[Worktrunk](https://worktrunk.dev) (`wt`) manages one git worktree + branch per parallel session (`wt switch -c -x omp feat`). File edits are isolated — but *nothing else is*. Ports, the one shared Supabase Postgres instance, the running stack, the Gateway's auth rate limiter, and all gitignored machine-local state (`.env` files, `node_modules/`, `env_backup/`, `.claude/skills/deploy-travelcrm/`) are shared.
+
+**Before running anything in a worktree, read `skill://parallel-worktrees`.** Non-negotiables it expands:
+
+- A fresh worktree has **no `.env` files and no `node_modules`** (worktrees contain tracked files only). `.config/wt.toml` hooks `wt step copy-ignored` on `post-start` + `.worktreeinclude` to copy the 16 `.env` files; run it manually with `wt step copy-ignored` if the hook hasn't. Install deps per package (`node_modules` is deliberately not copied).
+- **One backend stack.** Do not start a second `cd Services && npm run dev` — ports are fixed (3000, 3001–3011, 5173, 5174, 5000) and collide. The stack runs the **primary worktree's** code, so a worktree edit is *not* live on it. Frontends are the exception: worktrunk's `hash_port` gives each worktree its own (`--port {{ branch | hash_port }}`).
+- **The database is shared and live.** Never `prisma migrate dev` / `db:push` / seed scripts from a parallel session; never apply two services' migrations concurrently. `migrate deploy` only when the migrations are yours.
+- **E2E is exclusive.** `Services/e2e-tests` and `Management` Playwright both need the shared stack + DB and the Gateway's 10-req/15-min login limiter — never run them concurrently from two sessions.
+- **Stage explicitly** (`wt step commit --stage=tracked`, or `git add <paths>`) so untracked local artifacts don't get committed, and install the packages you touch before committing so the `pre-commit` lint-staged hook finds its per-package eslint.
+- **Tear down long servers** with `wt step tether`, or stop them before `wt remove`, so `wt remove` doesn't leave an orphaned process.
+
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
@@ -148,3 +161,4 @@ Key routing rules:
 - Save progress → invoke /context-save
 - Resume context → invoke /context-restore
 - Author a backlog-ready spec/issue → invoke /spec
+- Parallel sessions / Worktrunk / git worktrees / multiple agents at once → invoke /parallel-worktrees
