@@ -67,6 +67,26 @@ Each service has its own `package.json` — there is no root workspace. Commands
 - `cd Services && node seed-extended.mjs` — extended seed
 - `cd Services && node update-passwords.mjs` — password migration
 - `cd Server && npm run seed` — seed MongoDB
+- `cd Services && node clean-test-data.mjs` / `node seed-demo.mjs` — remove test residue and populate the demo dataset (see below)
+
+### Demo seed & test-data cleanup
+
+Both scripts need `DATABASE_URL` and refuse to guess one (see `Services/database-url.mjs`):
+
+```bash
+cd Services
+export DATABASE_URL="$(grep -m1 '^DATABASE_URL=' lead-service/.env | cut -d= -f2- | tr -d '"')"
+
+node clean-test-data.mjs            # report test residue (dry run)
+node clean-test-data.mjs --commit   # delete it
+node seed-demo.mjs                  # populate the demo dataset
+node seed-demo.mjs --reset          # delete the demo rows, then reseed
+node seed-demo.mjs --audit          # row counts only, writes nothing
+```
+
+- **`clean-test-data.mjs`** removes what the test suites leave in the shared Postgres: `[E2E-…]`/`e2e-…@travelcrm.test` rows from `Services/e2e-tests`, `SYNTH-…` rows from `e2e-tests/synthetic`, `E2E Test Lead <ts>` rows from `Management/e2e`, throwaway accounts (`planprobe@test.com`, `smoketest_…@example.com`, …), plus billing documents whose lead no longer exists. Assistant telemetry and OTPs carry no marker string, so they are matched by *absence* of the demo seed's id prefixes — `seed-demo.mjs`'s own transcripts survive the sweep. Dry run by default; all deletes run in one transaction.
+- **`seed-demo.mjs`** builds a full book of business — 18 new packages with day-by-day itineraries (plus itineraries for the 7 original packages), ~150 leads across every lifecycle status with pricing, cost lines and copied itineraries, quotations, bookings, hotel and flight bookings, invoices with payments and vouchers, careers, and assistant transcripts. Existing users, packages and anything created through the UI are left alone; only rows carrying the script's own deterministic id prefixes are ever deleted, and `--reset` is scoped to those. The one exception is `Career`/`Vacancy`, which have no unique key: the older seeds left their own postings for the same roles, and those are superseded by natural key so no job is advertised twice.
+- Adding a demo login: staff, customers and vendors created by this script share one password per role — `SuperAdmin@123`, `Admin@123`, `Sales@123`, `Vendor@123`, `Customer@123`.
 
 ## Code Conventions
 
