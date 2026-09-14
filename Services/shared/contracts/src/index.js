@@ -9,6 +9,7 @@ export { VoucherForPdf } from './voucherPdf.js';
 export {
   LeadPackageSelectionRaw,
   LeadPackageSelectionSummary,
+  PendingAiChange,
   QuotePackageSelectionResult,
 } from './packageSelection.js';
 export { QuotationSummary } from './quotationSummary.js';

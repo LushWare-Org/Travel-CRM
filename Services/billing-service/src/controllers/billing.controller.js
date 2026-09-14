@@ -2,6 +2,35 @@ import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 
+// ─── GET /internal/leads/:leadId/latest-document ────────────────
+const DOCUMENT_TYPES = [
+  { type: 'quotation', model: 'quotation', numberField: 'quotationNumber' },
+  { type: 'invoice', model: 'invoice', numberField: 'invoiceNumber' },
+  { type: 'receipt', model: 'paymentReceipt', numberField: 'receiptNumber' },
+  { type: 'voucher', model: 'voucher', numberField: 'voucherNumber' },
+];
+
+export const getLatestSentDocumentForVoice = asyncHandler(async (req, res) => {
+  const { leadId } = req.params;
+
+  const results = await Promise.all(DOCUMENT_TYPES.map(async ({ type, model, numberField }) => {
+    const isVoucher = type === 'voucher';
+    const where = isVoucher
+      ? { leadId, OR: [{ emailSent: true }, { whatsappSent: true }] }
+      : { leadId, sentAt: { not: null } };
+    const orderBy = isVoucher ? { updatedAt: 'desc' } : { sentAt: 'desc' };
+    const recencyField = isVoucher ? 'updatedAt' : 'sentAt';
+    const doc = await prisma[model].findFirst({ where, orderBy, select: { id: true, [numberField]: true, [recencyField]: true } });
+    return doc ? { type, id: doc.id, number: doc[numberField], sentAt: doc[recencyField] } : null;
+  }));
+
+  const found = results.filter(Boolean);
+  // Most recently sent across all types, not just the first type that has one.
+  found.sort((a, b) => new Date(b.sentAt || 0) - new Date(a.sentAt || 0));
+
+  res.json({ success: true, data: { latest: found[0] || null } });
+});
+
 export const getDashboardStats = asyncHandler(async (req, res) => {
   const [
     totalQuotations, pendingQuotations,

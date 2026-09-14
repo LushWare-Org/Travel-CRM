@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, MessageCircle, Plus,
   User, MapPin, Plane, Users, Globe, Package, ChevronDown, ChevronUp,
-  Trash2, Check, Lock, RefreshCw, XCircle, Wallet,
+  Trash2, Check, Lock, RefreshCw, XCircle, Wallet, Sparkles, FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import toast from '@/lib/toast';
@@ -26,6 +26,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FormDialogHeader, FormDialogBody, FormDialogSection, FormDialogFooter } from '@/components/shared/FormDialogSections';
+import LeadAiCallsTab from './LeadAiCallsTab';
+import { isAiHandled } from './AiLeadBadges';
 
 // A lead can hold many packages at once, plus at most one manual
 // (from-scratch) itinerary slot — this sentinel is the "add" picker's third
@@ -140,10 +142,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
   });
   const [formData, setFormData] = useState(emptyFormData);
   const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(true);
-
-  // Snapshot of everything the dialog loaded, so Cancel can revert in place
-  // (the dialog stays mounted across open/close cycles, so React alone won't
-  // reset it if the `lead` prop reference happens not to change).
+  const [activeView, setActiveView] = useState<'overview' | 'ai'>('overview');
   const snapshotRef = useRef<any>(null);
 
   const isLocked = isLeadFieldLocked(lead?.lifecycleStatus);
@@ -166,8 +165,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
   useEffect(() => {
     if (isOpen) {
       fetchPackages();
+      setActiveView(lead?.needsRepFollowup ? 'ai' : 'overview');
     }
-  }, [isOpen]);
+  }, [isOpen, lead?.needsRepFollowup]);
 
   const fetchPackages = async () => {
     try {
@@ -403,14 +403,39 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
 
   if (!isOpen || !lead) return null;
 
+  const showAiTab = isAiHandled(lead);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
       <DialogContent
         className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col"
         closeClassName="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground dark:hover:bg-primary-foreground/20 dark:hover:text-primary-foreground"
       >
-        <FormDialogHeader icon={Edit} title="Edit Lead" subtitle={formData.name || 'Lead Details'} />
+        <FormDialogHeader
+          icon={Edit}
+          title="Edit Lead"
+          subtitle={formData.name || 'Lead Details'}
+          tabs={showAiTab ? [
+            { key: 'overview', label: 'Overview', icon: FileText },
+            { key: 'ai', label: 'AI', icon: Sparkles },
+          ] : undefined}
+          activeTab={activeView}
+          onTabChange={(key) => setActiveView(key as 'overview' | 'ai')}
+        />
 
+        {activeView === 'ai' ? (
+          <>
+            <FormDialogBody>
+              <LeadAiCallsTab lead={lead} onVerified={onSuccess} />
+            </FormDialogBody>
+            <FormDialogFooter>
+              <Button type="button" variant="outline" onClick={handleCancel} className="flex-1">
+                Close
+              </Button>
+            </FormDialogFooter>
+          </>
+        ) : (
+        <>
         <FormDialogBody>
           <FormDialogSection
             id="personal"
@@ -1054,6 +1079,8 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
             )}
           </Button>
         </FormDialogFooter>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

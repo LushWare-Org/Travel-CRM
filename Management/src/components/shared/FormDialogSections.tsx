@@ -12,13 +12,25 @@ import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/di
  * FormDialogBody is the only scrolling region.
  */
 
+export interface FormDialogHeaderTab {
+  key: string;
+  label: string;
+  icon?: LucideIcon;
+  count?: number;
+}
+
 interface FormDialogHeaderProps {
   icon: LucideIcon;
   title: string;
   subtitle?: ReactNode;
+  tabs?: FormDialogHeaderTab[];
+  activeTab?: string;
+  onTabChange?: (key: string) => void;
 }
 
-export function FormDialogHeader({ icon: Icon, title, subtitle }: FormDialogHeaderProps) {
+export function FormDialogHeader({
+  icon: Icon, title, subtitle, tabs, activeTab, onTabChange,
+}: FormDialogHeaderProps) {
   return (
     <DialogHeader className="bg-primary text-primary-foreground p-4 sm:p-6 shrink-0 space-y-0">
       <div className="flex items-center gap-4">
@@ -32,6 +44,43 @@ export function FormDialogHeader({ icon: Icon, title, subtitle }: FormDialogHead
           )}
         </div>
       </div>
+
+      {tabs && tabs.length > 1 && (
+        <div className="flex gap-1 pt-4 -mb-4 sm:-mb-6" role="tablist">
+          {tabs.map((tab) => {
+            const TabIcon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => onTabChange?.(tab.key)}
+                className={cn(
+                  'flex items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors',
+                  isActive
+                    ? 'bg-background text-foreground'
+                    : 'text-primary-foreground/75 hover:bg-primary-foreground/10 hover:text-primary-foreground'
+                )}
+              >
+                {TabIcon && <TabIcon className="w-4 h-4" />}
+                <span>{tab.label}</span>
+                {tab.count != null && tab.count > 0 && (
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[11px] font-bold',
+                      isActive ? 'bg-muted text-muted-foreground' : 'bg-primary-foreground/20'
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </DialogHeader>
   );
 }

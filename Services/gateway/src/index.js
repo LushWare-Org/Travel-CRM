@@ -70,6 +70,7 @@ const SERVICES = {
   notification: process.env.NOTIFICATION_SERVICE_URL  || 'http://localhost:3008',
   analytics:    process.env.ANALYTICS_SERVICE_URL     || 'http://localhost:3009',
   assistant:    process.env.ASSISTANT_SERVICE_URL     || 'http://localhost:3011',
+  voice:        process.env.VOICE_SERVICE_URL         || 'http://localhost:3012',
 };
 
 // ─── Public routes (no JWT required) ──────────────────────────────────────────
@@ -262,6 +263,9 @@ app.use(`${V1}/payments`,  proxy(SERVICES.billing));
 app.use(`${V1}/careers`,   proxy(SERVICES.career));
 app.use(`${V1}/vacancies`, proxy(SERVICES.career));
 
+//Retell AI Voice call
+app.use(`${V1}/webhooks/voice`, proxy(SERVICES.voice));
+
 // Webhooks & notifications → notification-service
 app.use(`${V1}/webhooks`,      proxy(SERVICES.notification));
 app.use(`${V1}/notifications`, proxy(SERVICES.notification));
@@ -277,6 +281,7 @@ app.use(`${V1}/dashboard`, proxy(SERVICES.analytics));
 app.use(`${V1}/assistant/turn`, itineraryChatLimiter, proxy(SERVICES.assistant));
 app.use(`${V1}/assistant`, proxy(SERVICES.assistant));
 
+app.use(`${V1}/voice`, proxy(SERVICES.voice));
 // ─── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) =>
   res.status(404).json({ success: false, message: `Route ${req.method} ${req.path} not found` })

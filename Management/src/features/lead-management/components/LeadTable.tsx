@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import AiLeadBadges from './AiLeadBadges';
 import { Button } from '@/components/ui/button';
 
 interface LeadTableProps {
@@ -215,10 +216,11 @@ const LeadTable = ({
                 <div className="p-5 pb-4">
                   <div className="flex items-start justify-between gap-3 mb-4">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <h3 className="font-semibold text-foreground text-lg truncate group-hover:text-primary transition-colors">
                           {lead.name}
                         </h3>
+                        <AiLeadBadges lead={lead} />
                       </div>
                       <p className="text-xs text-muted-foreground font-mono">
                         ID: {leadId?.slice(-8)}
@@ -251,7 +253,7 @@ const LeadTable = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
-                              onDeleteClick?.(lead);
+                              onDeleteClick?.(lead.id || lead._id);
                             }
                           }}
                           className="p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-md transition-colors"
@@ -518,7 +520,12 @@ const LeadTable = ({
                   <TableCell className="px-4 py-3 text-sm font-bold border-r border-border sticky left-0 bg-card group-hover:bg-muted z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)]">
                     {(lead._id || lead.id).toString().substring(0, 8)}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-sm font-semibold text-foreground border-r border-border">{lead.name || 'N/A'}</TableCell>
+                  <TableCell className="px-4 py-3 text-sm font-semibold text-foreground border-r border-border">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span>{lead.name || 'N/A'}</span>
+                      <AiLeadBadges lead={lead} />
+                    </div>
+                  </TableCell>
                   <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.phone || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.city || 'N/A'}</TableCell>
                   <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.email || 'N/A'}</TableCell>
@@ -626,7 +633,7 @@ const LeadTable = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
-                              onDeleteClick?.(lead);
+                              onDeleteClick?.(lead.id || lead._id);
                             }
                           }}
                           className="p-2 transition-colors bg-muted rounded-lg hover:bg-destructive/10"

@@ -9,6 +9,7 @@ import {
   validateTravelDatesUpdate,
 } from '../services/state-machine.service.js';
 import { gatekeeperInputs, loadPrimarySelection } from '../services/gatekeeper.service.js';
+import { normalizePhone, phoneMatchWhere } from '../utils/phone.js';
 import { handleLeadEvent } from '../services/lead-events.service.js';
 import { serializeLeadDays } from '../services/lead-itinerary.service.js';
 
@@ -87,6 +88,8 @@ export const createLead = asyncHandler(async (req, res) => {
         email: body.email,
         phone: body.phone,
         whatsapp: body.whatsapp,
+        phoneNormalized: normalizePhone(body.phone),
+        whatsappNormalized: normalizePhone(body.whatsapp),
         city: body.city,
         source: body.source,
         platform: body.platform,
@@ -137,7 +140,11 @@ export const createLead = asyncHandler(async (req, res) => {
 
 export const getLeads = asyncHandler(async (req, res) => {
   const { user } = req;
-  const { page = 1, limit = 10, search, status, lifecycleStatus, source, platform, sortBy = 'createdAt', order = 'desc' } = req.query;
+  const {
+    page = 1, limit = 10, search, status, lifecycleStatus, source, platform,
+    aiHandled, needsRepFollowup, aiVerified,
+    sortBy = 'createdAt', order = 'desc',
+  } = req.query;
 
   const where = { AND: [] };
   // The PENDING_VERIFICATION queue is visible to any salesRep regardless of
@@ -154,6 +161,14 @@ export const getLeads = asyncHandler(async (req, res) => {
   // are sent from Management's LeadFilters chips.
   if (source) where.AND.push({ source: { in: source.split(',') } });
   if (platform) where.AND.push({ platform: { in: platform.split(',') } });
+
+  // Voice-agent filters. Applied server-side rather than client-side over
+  // already-loaded rows (as the platform chips do) because AI-touched leads
+  // become the majority once the agent is live.
+  if (aiHandled === 'true') where.AND.push({ aiHandled: true });
+  if (needsRepFollowup === 'true') where.AND.push({ needsRepFollowup: true });
+  if (aiVerified === 'true') where.AND.push({ aiVerifiedAt: { not: null } });
+  if (aiVerified === 'false') where.AND.push({ aiHandled: true, aiVerifiedAt: null });
 
   if (search) {
     where.AND.push({
@@ -312,6 +327,8 @@ export const updateLead = asyncHandler(async (req, res) => {
       updateData[field] = validatedBody[field];
     }
   }
+  if (validatedBody.phone !== undefined) updateData.phoneNormalized = normalizePhone(validatedBody.phone);
+  if (validatedBody.whatsapp !== undefined) updateData.whatsappNormalized = normalizePhone(validatedBody.whatsapp);
   if (validatedBody.travelDate !== undefined) {
     updateData.travelDate = validatedBody.travelDate ? new Date(validatedBody.travelDate) : null;
   }
@@ -533,6 +550,7 @@ export const createWebsiteContactLead = asyncHandler(async (req, res) => {
         name: name.trim(),
         email: sanitizedEmail,
         phone: phone ? String(phone).replace(/\D/g, '') : null,
+        phoneNormalized: normalizePhone(phone),
         source: 'website',
         platform: 'Website_Form',
         destination: destination?.trim() || null,
@@ -599,6 +617,7 @@ export const handleFacebookLeadEvent = asyncHandler(async (req, res) => {
         name: name?.trim() || 'Facebook Lead',
         email: sanitizedEmail,
         phone: sanitizedPhone,
+        phoneNormalized: normalizePhone(sanitizedPhone),
         source: 'social_media',
         platform: 'Social_Media',
         message: message?.trim() || null,
@@ -625,10 +644,11 @@ export const logCommunication = asyncHandler(async (req, res) => {
 
   let resolvedLeadId = leadId || null;
   if (!resolvedLeadId && phone) {
-    const sanitizedPhone = String(phone).replace(/\D/g, '');
-    const lead = await prisma.lead.findFirst({
-      where: { OR: [{ phone: sanitizedPhone }, { whatsapp: sanitizedPhone }] },
-    });
+    // Matches on the digits-only mirrors, not the raw columns: a rep-created
+    // lead stores "+94771234567" while this webhook supplies "94771234567",
+    // so the old raw-column comparison never matched those rows.
+    const where = phoneMatchWhere(phone);
+    const lead = where ? await prisma.lead.findFirst({ where }) : null;
     resolvedLeadId = lead?.id || null;
   }
 

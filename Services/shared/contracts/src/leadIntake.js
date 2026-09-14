@@ -4,7 +4,7 @@ import { z } from 'zod';
 // The chat wizard (package-service) is the first caller; a future WhatsApp bot
 // or contact-form widget would call the same endpoint with a different `channel`.
 
-export const LeadIntakeChannel = z.enum(['chatbot']);
+export const LeadIntakeChannel = z.enum(['chatbot', 'voice']);
 
 export const LeadIntakeContact = z.object({
   name: z.string().min(1).max(255).optional(),

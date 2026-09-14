@@ -204,6 +204,7 @@ export async function applyLeadSelectionItinerary({
   days = [],
   pricingSettings = {},
   actorId = null,
+  actor = 'USER',
   fetchImpl = fetch,
   prismaClient = prisma,
 }) {
@@ -307,9 +308,9 @@ export async function applyLeadSelectionItinerary({
         statusHistory: {
           create: [{
             status: nextStatus,
-            actor: 'USER',
+            actor,
             changedById: actorId,
-            notes: 'Itinerary edited — moved to drafting',
+            notes: actor === 'SYSTEM' ? 'Itinerary edited by voice agent — moved to drafting' : 'Itinerary edited — moved to drafting',
           }],
         },
       },

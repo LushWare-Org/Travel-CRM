@@ -40,6 +40,7 @@ enum LeadSource {
   walk_in      @map("walk-in")
   other
   chatbot
+  voice_agent  @map("voice-agent")
 
   @@schema("crm_leads")
 }
@@ -54,6 +55,7 @@ enum LeadPlatform {
   Referral     @map("Referral")
   Walk_in      @map("Walk-in")
   Chatbot_Wizard @map("Chatbot Wizard")
+  Voice_Agent    @map("Voice Agent")
 
   @@schema("crm_leads")
 }
@@ -177,6 +179,10 @@ model Lead {
   email              String?
   phone              String?
   whatsapp           String?
+  // Digits-only mirrors of phone/whatsapp. Lookups use these — the source
+  // columns hold mixed formats (rep-created leads keep a leading `+`).
+  phoneNormalized    String?
+  whatsappNormalized String?
   city               String?
   source             LeadSource   @default(manual)
   platform           LeadPlatform @default(Manual_Entry)
@@ -222,6 +228,13 @@ model Lead {
   lostReason   String?
   tags         String[]
 
+  // Voice-agent provenance. Orthogonal to lifecycleStatus: a lead can be
+  // REVISION and AI-touched and awaiting rep review at the same time.
+  aiHandled        Boolean   @default(false)
+  needsRepFollowup Boolean   @default(false)
+  aiVerifiedAt     DateTime?
+  aiVerifiedById   String? // → users.User.id
+
   remarks           LeadRemark[]
   statusHistory     LeadStatusHistory[]
   communicationLogs LeadCommunicationLog[]
@@ -246,6 +259,10 @@ model Lead {
   @@index([email])
   @@index([phone])
   @@index([whatsapp])
+  @@index([phoneNormalized])
+  @@index([whatsappNormalized])
+  @@index([aiHandled])
+  @@index([needsRepFollowup])
   @@schema("crm_leads")
 }
 
@@ -339,6 +356,14 @@ model LeadPackageSelection {
   // Quotation handoff (billing-service), now per selection.
   currentQuoteId  String? // → billing.Quotation.id
   quoteAcceptedAt DateTime?
+
+  // Set when the voice agent edits this selection's itinerary, so a rep can
+  // see what changed before accepting it: { beforeNights, afterNights,
+  // beforeHotel, afterHotel, beforeDestination, afterDestination, summary,
+  // changedAt }. Only the MOST RECENT pending edit is kept — the full
+  // per-call history lives in crm_voice.VoiceCallEvent. Cleared when a rep
+  // approves it, or by refreshSelection() (the "Discard" path).
+  pendingAiChange Json?
 
   pricing         LeadPricing?
   costLines       LeadCostLine[]

@@ -20,6 +20,37 @@ export async function isSelectionMaterialized(selectionId, prismaClient = prisma
   return dayCount > 0 || Boolean(pricingRow);
 }
 
+/**
+ * Creates a LeadPackageSelection for leadId/packageId if one doesn't already
+ * exist, and sets it as the lead's primary selection when none is set yet.
+ * Shared by the live voice attach_package tool and lead intake (auto-selecting
+ * a package a new caller already named) — same "attach, don't overwrite"
+ * contract either way.
+ */
+export async function attachPackageToLead(leadId, packageId, { primarySelectionId = null, prismaClient = prisma } = {}) {
+  const existing = await prismaClient.leadPackageSelection.findFirst({ where: { leadId, packageId } });
+  if (existing) {
+    return { selectionId: existing.id, packageName: existing.packageName, alreadyAttached: true };
+  }
+
+  let packageName = null;
+  try {
+    const pkg = await fetchPackage(packageId);
+    packageName = pkg.title || null;
+  } catch {
+    // package-service unreachable — attach anyway; name refreshes on materialize.
+  }
+
+  const selection = await prismaClient.leadPackageSelection.create({
+    data: { leadId, packageId, isManual: false, packageName },
+  });
+  if (!primarySelectionId) {
+    await prismaClient.lead.update({ where: { id: leadId }, data: { primarySelectionId: selection.id } });
+  }
+
+  return { selectionId: selection.id, packageName, alreadyAttached: false };
+}
+
 function createDefaultManualDay() {
   return {
     dayNumber: 1,
@@ -153,7 +184,7 @@ export async function refreshSelection({ selectionId, force = false, prismaClien
 
   return prismaClient.leadPackageSelection.update({
     where: { id: selectionId },
-    data: { sourcePackageId: null },
+    data: { sourcePackageId: null, pendingAiChange: null },
   });
 }
 

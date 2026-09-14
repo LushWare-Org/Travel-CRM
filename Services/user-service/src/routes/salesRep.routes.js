@@ -4,9 +4,18 @@ import {
   getAllSalesReps, getSalesRepById, createSalesRep, updateSalesRep, deleteSalesRep,
   getSalesRepStats, toggleSalesRepStatus, resetSalesRepPassword,
   getSalesRepPerformance, updateSalesRepCommission, getOnlineSalesReps,
+  getInternalNotifyTargets,
 } from '../controllers/salesRep.controller.js';
 
 const router = express.Router();
+router.get('/internal/notify-targets', (req, res, next) => {
+  const token = req.headers['x-internal-token'];
+  if (!token || token !== process.env.INTERNAL_SERVICE_KEY) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  next();
+}, getInternalNotifyTargets);
+
 router.use(requireAuth, authorize('admin'));
 
 router.get('/', getAllSalesReps);

@@ -1,0 +1,116 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_voice"]
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+
+  @@schema("crm_voice")
+}
+
+enum CallerMatchOutcome {
+  NONE
+  MATCHED
+  AMBIGUOUS
+  // Known customer, but every trip on their number has already finished —
+  // greeted by name, bound to no lead, raised as a fresh enquiry after the call.
+  RETURNING
+
+  @@schema("crm_voice")
+}
+
+enum CallDisposition {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  FAILED
+
+  @@schema("crm_voice")
+}
+
+model VoiceNumber {
+  id             String  @id @default(uuid())
+  e164           String  @unique
+  label          String?
+  retellAgentId  String
+  isActive       Boolean @default(true)
+  language       String  @default("en")
+  disclosureText String?
+  businessHours  Json?
+
+  calls VoiceCall[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@schema("crm_voice")
+}
+
+model VoiceCall {
+  id           String       @id @default(uuid())
+  retellCallId String       @unique
+  numberId     String?
+  number       VoiceNumber? @relation(fields: [numberId], references: [id])
+
+  direction  CallDirection @default(INBOUND)
+  fromNumber String?
+  toNumber   String?
+
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  durationSec Int?
+
+  disposition  CallDisposition    @default(IN_PROGRESS)
+  matchOutcome CallerMatchOutcome @default(NONE)
+
+  // → leads.Lead.id. Set at inbound time for a recognised caller, or after
+  // post-call intake for a new one.
+  leadId           String?
+  needsRepFollowup Boolean @default(false)
+
+  transcript   Json?
+  recordingUrl String?
+  summary      String?
+  sentiment    String?
+  costCents    Int?
+
+  events VoiceCallEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([fromNumber])
+  @@index([startedAt])
+  @@index([disposition])
+  @@schema("crm_voice")
+}
+
+model VoiceCallEvent {
+  id          String    @id @default(uuid())
+  voiceCallId String
+  voiceCall   VoiceCall @relation(fields: [voiceCallId], references: [id], onDelete: Cascade)
+
+  sequence     Int
+  functionName String
+  args         Json?
+  result       Json?
+  latencyMs    Int?
+  succeeded    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@unique([voiceCallId, sequence])
+  @@index([voiceCallId])
+  @@schema("crm_voice")
+}

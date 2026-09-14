@@ -72,6 +72,7 @@ const LeadManagement = () => {
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
   const [filterSources, setFilterSources] = useState<string[]>([]);
+  const [filterAi, setFilterAi] = useState<string[]>([]);
 
   const [statsSummary, setStatsSummary] = useState<any>(null);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ all: 0 });
@@ -171,7 +172,7 @@ const LeadManagement = () => {
   useEffect(() => {
     fetchLeads();
     fetchLeadStats();
-  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, filterSources, currentPage]);
+  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, filterSources, filterAi, currentPage]);
 
   useEffect(() => {
     fetchSalesReps();
@@ -219,6 +220,9 @@ const LeadManagement = () => {
       if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
       if (filterSources.length > 0) params.source = filterSources.join(',');
       if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
+      if (filterAi.includes('aiHandled')) params.aiHandled = 'true';
+      if (filterAi.includes('needsRepFollowup')) params.needsRepFollowup = 'true';
+      if (filterAi.includes('aiVerified')) params.aiVerified = 'true';
 
       // Note: backend search uses leadAPI.searchLeads for query, but standard filters for standard endpoint.
       // If there is a search term, use the search endpoint, else standard endpoint.
@@ -447,6 +451,8 @@ const LeadManagement = () => {
           setFilterSources={setFilterSources}
           filterPlatforms={filterPlatforms}
           setFilterPlatforms={setFilterPlatforms}
+          filterAi={filterAi}
+          setFilterAi={setFilterAi}
           onAdvancedFilterClick={() => setShowFilterDialog(true)}
         />
 
