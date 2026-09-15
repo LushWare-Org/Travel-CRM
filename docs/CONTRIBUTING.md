@@ -42,11 +42,11 @@ We are committed to providing a welcoming and inclusive environment for all cont
 ### **1. Fork & Clone Repository**
 ```bash
 # Fork on GitHub, then clone your fork
-git clone https://github.com/<YOUR-USERNAME>/Trip-Sky-Way.git
-cd Trip-Sky-Way
+git clone https://github.com/<YOUR-USERNAME>/Travel-CRM.git
+cd Travel-CRM
 
 # Add upstream remote
-git remote add upstream https://github.com/LushWare-Org/Trip-Sky-Way.git
+git remote add upstream https://github.com/LushWare-Org/Travel-CRM.git
 ```
 
 ### **2. Create Development Branch**
@@ -136,21 +136,23 @@ git push origin feature/user-authentication
 
 ### **Branch Selection**
 
-| Branch | Purpose | Deploy To |
+`main` is the only long-lived branch — it is the repository's default branch, and
+CI (`.github/workflows/deploy.yml`) deploys the `dev` environment on every push to
+it. Everything else is a short-lived branch cut from `main` that PRs back into
+`main`.
+
+| Branch | Purpose | PR Target |
 |--------|---------|-----------|
-| `main` | Production release | Production |
-| `develop` | Development integration | Staging |
-| `feature/*` | New features | N/A (PR only) |
-| `bugfix/*` | Bug fixes | PR → develop |
-| `docs/*` | Documentation | PR → develop |
+| `main` | Integration + release branch | — (deploys `dev` on push) |
+| `feature/*` | New features | `main` |
+| `bugfix/*` | Bug fixes | `main` |
+| `docs/*` | Documentation | `main` |
+| `chore/*` | Maintenance | `main` |
+| `refactor/*` | Refactoring | `main` |
 
-### **Always Create PRs to `develop`**
+### **Always Create PRs to `main`**
 ```bash
-# ✅ CORRECT: PR to develop
-- base: develop
-- compare: feature/my-feature
-
-# ❌ INCORRECT: PR directly to main
+# ✅ CORRECT: cut from main, PR back to main
 - base: main
 - compare: feature/my-feature
 ```
@@ -452,7 +454,7 @@ Before submitting a PR, verify:
 - [ ] No hardcoded secrets
 - [ ] No debug console.logs
 - [ ] PR description is complete
-- [ ] Branched from `develop`, not `main`
+- [ ] Branched from `main`
 
 ---
 

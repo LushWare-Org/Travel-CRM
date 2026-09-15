@@ -4,14 +4,12 @@ on:
   push:
     branches:
       - main
-      - develop
     paths:
       - 'Server/**'
       - '.github/workflows/server-ci.yml'
   pull_request:
     branches:
       - main
-      - develop
     paths:
       - 'Server/**'
 

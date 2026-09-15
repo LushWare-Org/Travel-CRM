@@ -22,7 +22,7 @@ This folder contains all CI/CD-related documentation, organized by topic and aud
 **Audience**: Maintainers, Project Leads, DevOps Engineers
 **Purpose**: Setup and configuration of GitHub branch protection rules
 **Content**:
-- Main and develop branch protection setup
+- Main branch protection setup
 - Status check configuration
 - Pull request requirements
 - Troubleshooting common issues
@@ -84,7 +84,7 @@ The CI/CD pipeline consists of **6 automated jobs** that run on every push and p
 6. **⚙️ Environment Check** - Configuration validation
 
 **Execution Time**: ~3-5 minutes  
-**Triggers**: Push/PR to `main` and `develop` branches  
+**Triggers**: Push/PR to `main`  
 **Status Checks**: Required for merging
 
 ---

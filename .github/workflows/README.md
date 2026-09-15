@@ -13,8 +13,8 @@ Comprehensive Continuous Integration pipeline for the Trip Sky Way backend serve
 **Purpose**: Automate testing, linting, security scanning, and code quality checks
 
 **Triggers**:
-- Push to `main` or `develop` branches
-- Pull requests to `main` or `develop` branches
+- Push to `main`
+- Pull requests to `main`
 - File changes in `Server/` directory
 
 **Jobs**:
@@ -51,14 +51,12 @@ on:
   push:
     branches:
       - main
-      - develop
     paths:
       - 'Server/**'
       - '.github/workflows/**'
   pull_request:
     branches:
       - main
-      - develop
 ```
 
 ---
@@ -90,7 +88,7 @@ Workflows run automatically on:
 
 ```bash
 # Run workflow by name
-gh workflow run "🚀 Server CI Pipeline" -f ref=develop
+gh workflow run "🚀 Server CI Pipeline" -f ref=main
 
 # List available workflows
 gh workflow list

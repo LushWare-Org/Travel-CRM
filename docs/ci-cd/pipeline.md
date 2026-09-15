@@ -2,7 +2,7 @@
 
 ## 📋 Overview
 
-This document describes the Continuous Integration (CI) pipeline for the Trip Sky Way backend server. The pipeline is triggered on every push and pull request to the `main` and `develop` branches.
+This document describes the Continuous Integration (CI) pipeline for the Trip Sky Way backend server. The pipeline is triggered on every push and pull request to the `main` branch.
 
 **Current Status**: ✅ **CI Only** (CD will be configured during deployment phase)
 
@@ -17,8 +17,8 @@ The CI pipeline follows industry best practices and runs **6 parallel and sequen
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      EVENT TRIGGER                              │
-│  • Push to main/develop                                         │
-│  • Pull Request to main/develop                                 │
+│  • Push to main                                                 │
+│  • Pull Request to main                                         │
 │  • Changes in Server/ directory                                 │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
@@ -254,7 +254,6 @@ on:
   push:
     branches:
       - main
-      - develop
     paths:
       - 'Server/**'           # Only if Server files change
       - '.github/workflows/*' # Or if workflow files change
@@ -266,7 +265,6 @@ on:
   pull_request:
     branches:
       - main
-      - develop
     paths:
       - 'Server/**'
 ```
@@ -282,10 +280,6 @@ For 'main' branch:
 ✅ Require conversation resolution
 ✅ Dismiss stale PR approvals
 ✅ Require commits to be signed (optional)
-
-For 'develop' branch:
-✅ Require status checks to pass
-✅ Require branches to be up to date
 ```
 
 ---
@@ -431,10 +425,10 @@ name: 🚀 Server CI Pipeline
 # Trigger conditions
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths: [Server/**, .github/workflows/server-ci.yml]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 # Global environment variables
 env:
@@ -455,7 +449,7 @@ jobs:
 
 ### **Option 1: Using GitHub CLI**
 ```bash
-gh workflow run server-ci.yml -f ref=develop
+gh workflow run server-ci.yml -f ref=main
 ```
 
 ### **Option 2: Using act (Local)**
@@ -473,7 +467,7 @@ act -j test
 ```bash
 git add .
 git commit -m "Trigger CI pipeline"
-git push origin develop
+git push origin main
 ```
 
 ---

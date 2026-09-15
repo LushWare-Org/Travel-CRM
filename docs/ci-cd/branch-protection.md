@@ -6,7 +6,7 @@ This guide helps you set up branch protection rules to enforce CI/CD checks and 
 
 ## 📋 Quick Setup
 
-### **For Main Branch** (Production)
+### **For Main Branch** (the only long-lived branch)
 
 1. Go to **Repository Settings** → **Branches**
 2. Click **Add rule**
@@ -37,32 +37,6 @@ This guide helps you set up branch protection rules to enforce CI/CD checks and 
 
 #### **✅ Dismiss Stale Reviews**
 - [x] When new commits are pushed
-
----
-
-### **For Develop Branch** (Development)
-
-1. Go to **Repository Settings** → **Branches**
-2. Click **Add rule**
-3. Fill in branch name pattern: `develop`
-4. Enable the following:
-
-#### **✅ Status Checks Required**
-- [x] Require status checks to pass before merging
-- [x] Require branches to be up to date before merging
-- [x] Select required status checks:
-  - 🔍 Lint & Code Quality
-  - 🧪 Unit Tests & Coverage
-  - 🏗️ Build Check
-
-#### **✅ Pull Request Requirements**
-- [x] Require pull request reviews before merging
-- [x] Required number of reviewers: **1** (flexible for development)
-- [x] Dismiss stale pull request approvals when new commits are pushed
-
-#### **✅ Additional Protection**
-- [x] Require conversation resolution before merging
-- [x] Include administrators
 
 ---
 
@@ -125,46 +99,22 @@ Select status checks:
 [x] Restrict who can push
 ```
 
-### **Step 3: Configure Develop Branch**
-
-```
-Branch name pattern: develop
-
-✅ STATUS CHECKS
-[x] Require status checks to pass before merging
-[x] Require branches to be up to date before merging
-
-Select status checks:
-[x] Lint & Code Quality
-[x] Unit Tests & Coverage
-[x] Build Check
-
-✅ PULL REQUESTS
-[x] Require pull request reviews before merging
-    Approval count: 1
-[x] Dismiss stale pull request approvals
-
-✅ ADDITIONAL
-[x] Require conversation resolution
-[x] Include administrators
-```
-
-### **Step 4: Save Rules**
+### **Step 3: Save Rules**
 - Click **Create** or **Save changes**
 - Rules are now active!
 
 ---
 
-## 📊 Configuration Comparison
+## 📊 Recommended Rules for `main`
 
-| Feature | Main | Develop |
-|---------|------|---------|
-| Require status checks | ✅ Yes | ✅ Yes |
-| Required reviews | 2 | 1 |
-| Require signed commits | ✅ Optional | ❌ No |
-| Include administrators | ✅ Yes | ✅ Yes |
-| Dismiss stale reviews | ✅ Yes | ✅ Yes |
-| Require conversation resolution | ✅ Yes | ✅ Yes |
+| Feature | Main |
+|---------|------|
+| Require status checks | ✅ Yes |
+| Required reviews | 2 |
+| Require signed commits | ✅ Optional |
+| Include administrators | ✅ Yes |
+| Dismiss stale reviews | ✅ Yes |
+| Require conversation resolution | ✅ Yes |
 
 ---
 
@@ -308,7 +258,7 @@ git push origin feature/my-feature
 
 ## 📝 Recommended Rules Summary
 
-### **Production (Main Branch)**
+### **`main` — the only protected branch**
 ```
 Strictness: 🔴 HIGH
 - 2 code reviews required
@@ -318,20 +268,11 @@ Strictness: 🔴 HIGH
 - Stale reviews dismissed
 ```
 
-### **Development (Develop Branch)**
-```
-Strictness: 🟡 MEDIUM
-- 1 code review required
-- All status checks required
-- Admins included
-- Stale reviews dismissed
-```
-
-### **Feature Branches**
+### **Short-lived branches** (`feature/*`, `bugfix/*`, `docs/*`, `chore/*`, `refactor/*`)
 ```
 Strictness: 🟢 LOW
 - No branch protection
-- Standard PR review (via develop)
+- Standard PR review, into `main`
 - Deleted after merge
 ```
 
@@ -341,8 +282,7 @@ Strictness: 🟢 LOW
 
 After setting up branch protection:
 
-- [ ] Main branch protection active
-- [ ] Develop branch protection active
+- [ ] `main` branch protection active
 - [ ] Status checks configured
 - [ ] Required reviews configured
 - [ ] PR template appears on new PRs
