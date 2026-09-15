@@ -5,8 +5,8 @@ of `Client` (customer-facing app, vite+React+Tailwind, no component library) run
 against the real backend (all 12 services + Supabase), 8 routes, desktop (1440x900)
 and mobile (375x667/812).
 
-Base branch for every phase: `microservices` (current branch). Each phase is its own
-branch, its own session, its own PR back into `microservices`. Do not skip ahead —
+Base branch for every phase: `main` (the default branch). Each phase is its own
+branch, its own session, its own PR back into `main`. Do not skip ahead —
 Phase 0 changes the primitives every later phase builds on.
 
 ---
@@ -458,7 +458,7 @@ on the new component set; final design score + AI-slop score recorded per the
 - Run `/design-review` for real this time (all pages, both outside-voice reviewers,
   regression scoring) against the completed rewamp as the final gate before this
   branch is the one that gets merged last.
-- Confirm every prior phase branch has already been merged into `microservices` —
+- Confirm every prior phase branch has already been merged into `main` —
   this phase is integration QA on the accumulated result, not another feature phase.
 - Full regression pass on the booking flow (Phase 4) with the real backend, not
   just visual QA.
@@ -533,9 +533,9 @@ remains genuinely open:
 
 ## Branch/merge mechanics
 
-- Every phase branches from `microservices` at the start of its session (`git checkout
-  microservices && git pull && git checkout -b client-rewamp/0N-name`).
-- Rebase (not merge) onto `microservices` before opening each PR, since phases are
+- Every phase branches from `main` at the start of its session (`git checkout
+  main && git pull && git checkout -b client-rewamp/0N-name`).
+- Rebase (not merge) onto `main` before opening each PR, since phases are
   sequential and each depends on the prior phase's primitives already landing.
 - One phase = one PR = one session. Don't start Phase N+1's branch until Phase N is
   merged — Phase 0's tokens and Phase 1's chrome are load-bearing for everything after.

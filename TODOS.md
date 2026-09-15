@@ -509,7 +509,7 @@
 
 ### Run the Playwright suite in CI
 
-**What:** Add a GitHub Actions job that boots the stack and runs `cd Management && npm run test:e2e` on PRs targeting `microservices`.
+**What:** Add a GitHub Actions job that boots the stack and runs `cd Management && npm run test:e2e` on PRs targeting `main`.
 
 **Why:** `Management/e2e/` never runs in CI — `.github/workflows/` has no Playwright step. Three tests were red from the commits that wrote them: `auth/login.spec.js` still expected a salesRep to land on `/` after `ce651b2` deliberately sent agents to `/leads`; `copilot.spec.js` expected an evidence chip to read "not captured" at a moment when the briefing does supply a field value; and `lead-lifecycle.spec.js` still clicked Invoice as a direct row child after `01043f6` moved it into a "More actions" popover. All three were only found when the panel-hardening branch repaired them, and the horizontal-scroll regression that branch fixes had no X-axis assertion for the same reason.
 

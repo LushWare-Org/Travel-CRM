@@ -28,7 +28,7 @@ Ships to the Firebase Hosting site `lush-ware-landing-dev`
 
 - `scripts/deploy-landing.sh [dev|staging|prod]` — builds and deploys by hand.
 - CI's `deploy-hosting` job in `.github/workflows/deploy.yml` — builds and
-  deploys `hosting:landing-$TARGET_ENV` on every push to `microservices`
+  deploys `hosting:landing-$TARGET_ENV` on every push to `main`
   (`dev`), or on a manual `workflow_dispatch` to another environment.
 
 The build's only inputs are the portal URLs in `src/config/portals.js`, which

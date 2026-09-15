@@ -2,7 +2,7 @@ name: Microservices CI
 
 on:
   pull_request:
-    branches: [main, microservices]
+    branches: [main]
     paths: &ci-paths
       - 'Services/shared/contracts/**'
       - 'Services/analytics-service/**'
@@ -19,7 +19,7 @@ on:
       - 'Management/**'
       - '.github/workflows/microservices-ci.yml'
   push:
-    branches: [main, microservices]
+    branches: [main]
     paths: *ci-paths
 
 env:
@@ -170,7 +170,7 @@ jobs:
         run: npm run test:ci
 
   # NOT COVERED: flight-service. Its integration suite (test/integration/
-  # flights.api.test.js) currently has 7 failing tests on `microservices` —
+  # flights.api.test.js) currently has 7 failing tests on `main` —
   # pre-existing, and untouched by this workflow. They appear to be drift from
   # the `feat(flight-service): add Zod validation layer` commit: the search/book
   # payloads now fail validation (422) and two endpoints answer 404, so the

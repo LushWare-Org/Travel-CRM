@@ -21,12 +21,12 @@ name: Terraform
 
 on:
   pull_request:
-    branches: [microservices]
+    branches: [main]
     paths:
       - 'infra/terraform/**'
       - '.github/workflows/terraform.yml'
   push:
-    branches: [microservices]
+    branches: [main]
     paths:
       - 'infra/terraform/**'
       - '.github/workflows/terraform.yml'

@@ -2,7 +2,7 @@
 
 Tracks execution of the plan approved 2026-08-22. Full plan (context, decisions, rationale) lives at the top of this session's plan file; this doc is the checklist + resumption point for future sessions.
 
-**Branch:** `feat/management-ui-design-system-rewrite` (base: `microservices`)
+**Branch:** `feat/management-ui-design-system-rewrite` (base: `main`)
 **Execution mode:** autonomous, step by step, one commit per completed unit. Read this file first at the start of every session before doing anything else.
 
 ## Decisions locked in (do not re-litigate)

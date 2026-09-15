@@ -291,7 +291,7 @@ gh secret set TF_VARS_DEV --repo LushWare-Org/Travel-CRM < infra/terraform/deplo
 
 ### 5.5 The pipeline itself (`.github/workflows/terraform.yml`)
 
-- **`plan`** — runs on every PR and push to `microservices` touching `infra/terraform/**`.
+- **`plan`** — runs on every PR and push to `main` touching `infra/terraform/**`.
   Read-only: `terraform plan`, posted as a PR comment. Hardcoded to `dev` (the only
   environment with state and a `TF_VARS_*` secret today).
 - **`apply`** — `workflow_dispatch` only. A human picks an environment in the Actions UI

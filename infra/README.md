@@ -43,7 +43,7 @@ Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`. Cl
 
 `.firebaserc` maps the `client-dev`/`management-dev`/`landing-dev` targets in `firebase.json` to the real Firebase Hosting site IDs `lush-ware-client-dev`/`lush-ware-management-dev`/`lush-ware-landing-dev`. Backend `CLIENT_URL`/`MANAGEMENT_URL` env vars now point at these real domains (previously `https://client-dev.web.app` / `https://management-dev.web.app`, which were never-created placeholders).
 
-Landing is a standalone marketing page with no backend. `scripts/deploy-landing.sh [dev|staging|prod]` builds it and deploys it; CI's `deploy-hosting` job does the same for the target environment on every push to `microservices`. Its only build-time inputs are the two portal URLs it links out to (`VITE_MANAGEMENT_URL`/`VITE_CLIENT_URL`) — both the script and CI set them explicitly, because a non-prod build that leaves them unset would point visitors at the production custom domains.
+Landing is a standalone marketing page with no backend. `scripts/deploy-landing.sh [dev|staging|prod]` builds it and deploys it; CI's `deploy-hosting` job does the same for the target environment on every push to `main`. Its only build-time inputs are the two portal URLs it links out to (`VITE_MANAGEMENT_URL`/`VITE_CLIENT_URL`) — both the script and CI set them explicitly, because a non-prod build that leaves them unset would point visitors at the production custom domains.
 
 ### Gateway ID-token race fix
 

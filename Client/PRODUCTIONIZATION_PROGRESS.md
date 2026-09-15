@@ -2,7 +2,7 @@
 
 Tracks execution of the plan approved 2026-08-27. Full plan (context, decisions, rationale) lives at `local://client-productionization-plan.md`; this doc is the checklist + resumption point for future sessions.
 
-**Branch:** `refactor/client-productionization` (base: `microservices`)
+**Branch:** `refactor/client-productionization` (base: `main`)
 **Execution mode:** autonomous, step by step, one commit per completed unit. Read this file first at the start of every session before doing anything else.
 
 ## Decisions locked in (do not re-litigate)

@@ -12,12 +12,12 @@ on:
           - staging
           - prod
   push:
-    branches: [microservices]
+    branches: [main]
 
 env:
   NODE_VERSION: '20.x'
   # workflow_dispatch carries the chosen environment; a push to
-  # microservices auto-deploys the lowest-stakes environment only.
+  # main auto-deploys the lowest-stakes environment only.
   TARGET_ENV: ${{ github.event.inputs.environment || 'dev' }}
 
 jobs:
