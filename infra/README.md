@@ -8,7 +8,7 @@ Terraform-managed GCP infrastructure for Travel-CRM's microservices backend, plu
 
 **GCP project:** `travelcrm-506818` (region `asia-south1`)
 
-**Backend API:** all 12 microservices are deployed to Cloud Run and healthy.
+**Backend API:** all 13 microservices are deployed to Cloud Run and healthy.
 
 | Service | URL |
 |---|---|
@@ -23,13 +23,13 @@ Terraform-managed GCP infrastructure for Travel-CRM's microservices backend, plu
 | flight-service | https://dev-flight-service-fbystisnzq-el.a.run.app |
 | analytics-service | https://dev-analytics-service-fbystisnzq-el.a.run.app |
 | notification-service | https://dev-notification-service-fbystisnzq-el.a.run.app |
-| assistant-service | https://dev-assistant-service-fbystisnzq-el.a.run.app |
+| voice-service | https://dev-voice-service-fbystisnzq-el.a.run.app |
 
 Only the gateway is publicly invocable (`allUsers` on `run.invoker`). Every other service accepts requests only from the `dev-gateway` service account's identity token — calling any backend URL directly returns `403`, by design.
 
 Verified: `GET /health` on the gateway returns `200 {"status":"ok","service":"api-gateway"}`, and `GET /api/v1/packages` returns real proxied data (see "Gateway ID-token race fix" below).
 
-**Image tag currently deployed:** `dev-a1c28de` (all 12 services built from `Services/` at commit `a1c28de`, pushed via CI's `build-and-push` job), pushed to the shared Artifact Registry repo.
+**Image tag currently deployed:** the newest push to `main` — CI's `build-and-push` job re-tags all 13 services on every push. `voice-service` was created by the Terraform apply that provisioned it (`dev-545aac0`), after which CI owns its image like every other service's.
 
 **Frontend (Client, Management, Landing):** all three apps are built and deployed to Firebase Hosting.
 
@@ -63,31 +63,6 @@ Landing is a standalone marketing page with no backend. `scripts/deploy-landing.
 
 ## Not deployed
 
-- **`voice-service`.** Wired as far as it can be without an apply: Dockerfile,
-  `Services/package.json`'s dev/start scripts, its `microservices-ci.yml` matrix
-  slot (its tests run green on every push to `main`), the `build-and-push` half of
-  `deploy.yml`, and a Terraform `voice_service` module with its gateway URL, six
-  `run.invoker` grants and the two Retell secrets. `terraform plan` for `dev`
-  reports exactly that footprint: **18 to add, 1 to change, 0 to destroy** — the
-  one change being `dev-gateway` gaining `VOICE_SERVICE_URL`.
-  Two deliberate holds, both because CI must not create what Terraform owns:
-  - **`deploy.yml`'s `deploy` matrix omits `voice-service`** (its build matrix does
-    not). `gcloud run deploy` creates a service that does not exist — with no env
-    vars and no secrets, so the revision crash-loops without `DATABASE_URL` — and
-    the apply that owns those would then collide with it and need an import. The
-    first CI run without the image proved the build half was missing: the deploy
-    job failed with `Image .../voice-service:dev-f848628 not found`. Add
-    `voice-service` back to the deploy matrix in the same change that lands the
-    first apply.
-  - **`TF_VARS_DEV` needs two things before an apply can succeed.** The Retell
-    secrets (`retell_webhook_secret`, `retell_tool_secret` — both default to `""`,
-    which leaves the service fail-closed rather than unarmed), and an `image_tag`
-    that names a tag that actually exists, because Terraform sets the image when it
-    *creates* the service and `ignore_changes` only protects it afterwards. CI's
-    build job already pushes `voice-service:<env>-<sha>`, so point it at that tag.
-  Until the apply lands, the gateway's `/api/v1/webhooks/voice/*` route answers 502
-  in `dev`.
-
 - **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates). No Firebase Hosting sites exist for `client-staging`/`client-prod`/`management-staging`/`management-prod` either. `infra/CI-CD-SETUP.md`'s WIF setup would need repeating per-environment (new pool/provider or per-env SAs) before CI could target them.
 
 ## Known placeholder / inactive config in `dev`
@@ -98,6 +73,18 @@ These are deliberate, not bugs — real values can be dropped in later without a
 - **Facebook** (`facebook_app_secret`, `facebook_page_access_token`): both `"unset"`. Only read when an actual Meta webhook call arrives (`Services/notification-service/src/controllers/webhook.controller.js`) — nothing calls this in `dev`.
 - **Branding/invoice/bank/admin-email config** (35 variables — company name, bank details, WhatsApp templates, etc.): all empty strings. Every consumer reads them as `process.env.X || <generic default>`, so this is behavior-identical to unset.
 - **WhatsApp, email, Duffel, Cloudinary, Gemini, LiteAPI**: real values, live and working.
+- **The voice agent's phone number.** `dev-voice-service` is live and healthy, its
+  two Retell secrets are in Secret Manager, and the gateway proxies
+  `/api/v1/webhooks/voice/*` to it — but **no number is registered yet**, so a call
+  to an unconfigured number gets `404` and the caller hears nothing. Registering is
+  a deliberate one-off from a machine that has `RETELL_AGENT_ID`,
+  `RETELL_PHONE_NUMBER` and `RETELL_WEBHOOK_SECRET` in `Services/voice-service/.env`:
+  `cd Services && node setup-voice-number.mjs` (it writes immediately, and
+  deactivates whichever number was active before). The sibling command
+  `node setup-voice-agent.mjs --apply` pushes the prompt and the seven CustomTool
+  definitions, and reads `RETELL_PUBLIC_BASE_URL` — which must be the gateway host
+  (`https://api.lushtravelcloud.com`), not the Management portal host, whose
+  Firebase rewrites answer every path with the SPA.
 
 ## Repo layout
 

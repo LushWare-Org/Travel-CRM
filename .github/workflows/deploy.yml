@@ -129,13 +129,7 @@ jobs:
           - analytics-service
           - notification-service
           - assistant-service
-          # voice-service is deliberately absent here until Terraform has created
-          # it. `gcloud run deploy` creates a service that does not exist — with
-          # no env vars and no secrets, so it crash-loops without DATABASE_URL —
-          # and the Terraform apply that owns those would then collide with it and
-          # need an import. Its image is still built and pushed by build-and-push
-          # above; add it to this matrix in the same change that lands the first
-          # apply (see infra/README.md, "Not deployed").
+          - voice-service
           - gateway
     steps:
       - uses: actions/checkout@v4
