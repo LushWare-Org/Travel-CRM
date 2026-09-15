@@ -63,17 +63,30 @@ Landing is a standalone marketing page with no backend. `scripts/deploy-landing.
 
 ## Not deployed
 
-- **`voice-service`.** Wired end-to-end in this repo — Dockerfile, both `deploy.yml`
-  matrices (build + deploy), `Services/package.json`'s dev/start scripts, its
-  `microservices-ci.yml` matrix slot, and a Terraform `voice_service` module with
-  its gateway URL, `run.invoker` grants in both directions, and the two Retell
-  secrets — but nothing has been applied or deployed yet. Bringing it live is
-  **apply first, then push**: `TF_VARS_DEV` needs `retell_webhook_secret` and
-  `retell_tool_secret` added, then a Terraform apply creates `dev-voice-service`
-  (the service the gateway's new `/api/v1/webhooks/voice/*` route proxies to).
-  Deploy CI before that apply and `gcloud run deploy` creates the service
-  unmanaged, which makes the next apply collide and need an import. Until both
-  happen, the voice routes answer 502 in `dev`.
+- **`voice-service`.** Wired as far as it can be without an apply: Dockerfile,
+  `Services/package.json`'s dev/start scripts, its `microservices-ci.yml` matrix
+  slot (its tests run green on every push to `main`), the `build-and-push` half of
+  `deploy.yml`, and a Terraform `voice_service` module with its gateway URL, six
+  `run.invoker` grants and the two Retell secrets. `terraform plan` for `dev`
+  reports exactly that footprint: **18 to add, 1 to change, 0 to destroy** — the
+  one change being `dev-gateway` gaining `VOICE_SERVICE_URL`.
+  Two deliberate holds, both because CI must not create what Terraform owns:
+  - **`deploy.yml`'s `deploy` matrix omits `voice-service`** (its build matrix does
+    not). `gcloud run deploy` creates a service that does not exist — with no env
+    vars and no secrets, so the revision crash-loops without `DATABASE_URL` — and
+    the apply that owns those would then collide with it and need an import. The
+    first CI run without the image proved the build half was missing: the deploy
+    job failed with `Image .../voice-service:dev-f848628 not found`. Add
+    `voice-service` back to the deploy matrix in the same change that lands the
+    first apply.
+  - **`TF_VARS_DEV` needs two things before an apply can succeed.** The Retell
+    secrets (`retell_webhook_secret`, `retell_tool_secret` — both default to `""`,
+    which leaves the service fail-closed rather than unarmed), and an `image_tag`
+    that names a tag that actually exists, because Terraform sets the image when it
+    *creates* the service and `ignore_changes` only protects it afterwards. CI's
+    build job already pushes `voice-service:<env>-<sha>`, so point it at that tag.
+  Until the apply lands, the gateway's `/api/v1/webhooks/voice/*` route answers 502
+  in `dev`.
 
 - **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates). No Firebase Hosting sites exist for `client-staging`/`client-prod`/`management-staging`/`management-prod` either. `infra/CI-CD-SETUP.md`'s WIF setup would need repeating per-environment (new pool/provider or per-env SAs) before CI could target them.
 
