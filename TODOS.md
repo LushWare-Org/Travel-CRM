@@ -621,6 +621,18 @@ Deferred during `/plan-eng-review` on `docs/designs/actionable-insight-ranking-a
 
 ## Voice Agent (Retell AI)
 
+### A voice lead is always flagged `needsRepFollowup`, whatever the agent concluded
+
+**What:** `Services/lead-service/src/controllers/leadIntake.controller.js:76` sets `needsRepFollowup: channel === 'voice'` unconditionally, so every voice-originated lead lands in the needs-follow-up queue even when the agent's own analysis says `needs_rep_followup: false`. The agent's answer does drive the other two places the flag matters — the `VoiceCall` row and whether the sales team is emailed (`webhook.controller.js` notifies only on the false → true transition) — so the lead row and the call row disagree about the same call.
+
+**Why:** CLAUDE.md's voice section describes the lead flag as following the analysis field ("absence defaults to `true`", i.e. an explicit `false` clears it), and a rep filtering `?needsRepFollowup=true` will see calls that needed nothing. The direction is fail-safe — an extra check costs nothing, an unkept promise costs a customer — but the filter stops meaning what it says.
+
+**Context:** Observed live on the deployed stack: a post-call carrying `needs_rep_followup: false` created a lead with `aiHandled=true, needsRepFollowup=true` (no rep email was sent, correctly). Fix is either a new optional field on `LeadIntakeRequest` that intake honours, or having voice-service clear the flag through the existing lead-update route after a successful intake.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None.
+
 ### Playback route for a call recording
 
 **What:** `VoiceCall.recordingUrl` is persisted from Retell's post-call payload, and Management's AI tab already renders an `<audio>` player gated on `call.hasRecording` — but no route serves the audio. `voiceAPI.recordingUrl()` builds `/api/v1/voice/calls/:id/recording`, which voice-service does not implement, and `listCallsForLead` never returns `hasRecording`.
