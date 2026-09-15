@@ -619,6 +619,18 @@ Deferred during `/plan-eng-review` on `docs/designs/actionable-insight-ranking-a
 **Priority:** P2
 **Depends on:** None.
 
+### Some invoice questions still end in "could not ground an answer"
+
+**What:** With `listInvoices` fixed and both overdue definitions aligned, count questions ground correctly ("There are 15 invoices that are past due."), but other phrasings — "how much is still outstanding on unpaid invoices?", "which invoices should I chase first?" — come back as `limitation:ungrounded`. That is the safe refusal rather than a wrong figure, so it is a quality gap, not a correctness one.
+
+**Why:** An operator asking the obvious follow-up reads "I could not ground an answer" as the copilot being broken. The model appears to state a number it did not read that turn (typically one it expected from a tool it never called) and the validator, correctly, refuses it — so the fix belongs in how the ask path is steered, not in loosening the gate.
+
+**Context:** Verified live against dev on `POST /api/v1/assistant/management/turn` (mode `ask`, page `billing`) after `ad4988a`. `billing:aggregate:outstanding-total:value` is listed in `sources` **without** a `capturedValue`, unlike `billing:source:invoices:recordCount` — worth checking whether that is what the validator needs to accept an amount, or whether the tool description (which already tells the model the counts come from the tool) should push harder toward actually calling it.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None.
+
 ## Voice Agent (Retell AI)
 
 ### A voice lead is always flagged `needsRepFollowup`, whatever the agent concluded
