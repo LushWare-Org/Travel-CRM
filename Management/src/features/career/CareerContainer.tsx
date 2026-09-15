@@ -12,6 +12,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { DataTable, type DataTableColumn } from '../../components/shared/DataTable';
 import { StatCard } from '../../components/shared/StatCard';
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
+import PageHeader from '../../components/PageHeader';
 
 interface Application {
   id: string;
@@ -306,10 +307,7 @@ const CareerContainer = () => {
 
   return (
     <div className="h-full overflow-auto bg-background">
-      <div className="bg-card border-b border-border px-4 sm:px-8 py-4 shadow-card sticky top-0 z-10">
-        <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground pl-10 md:pl-0">Career Management</h1>
-        <p className="text-sm text-muted-foreground mt-1 pl-10 md:pl-0">Manage job applications and candidates</p>
-      </div>
+      <PageHeader title="Career Management" subtitle="Manage job applications and candidates" />
 
       <div className="p-4 sm:p-6">
         {/* Stats Cards */}

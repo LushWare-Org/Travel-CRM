@@ -489,6 +489,31 @@ async function handleAsk(res, req, page, bundle, adapter, ctx, scope, remainingT
   const validationBundle = { ...bundle, evidence: [...promptEvidence, ...toolEvidence] };
   const guidanceEnabled = process.env.MANAGEMENT_COPILOT_GUIDANCE_ENABLED === 'true';
   const canonical = canonicalizeBriefingResponse({ claims: rawBlocks }, BriefingClaimSchema);
+  // A claim the response CONTRACT rejects never reaches the validator, so it is
+  // in neither `claims` nor `rejected` — and when every claim fails the shape,
+  // `handleAsk` returned a limitation with nothing logged anywhere. That is the
+  // same undiagnosable dead end the rejection warning below exists to remove, one
+  // layer earlier: the operator is told the answer could not be grounded when the
+  // truth is that the model's JSON did not match the schema.
+  if (canonical.length < rawBlocks.length) {
+    // WHICH field failed is the actionable half: "the model's JSON did not match
+    // the schema" is as undiagnosable as the empty answer this replaces.
+    const firstIssue = rawBlocks
+      .map((rawBlock) => BriefingClaimSchema.safeParse(rawBlock))
+      .find((parsed) => !parsed.success);
+    logger.warn(
+      {
+        pageKey: page.key,
+        question,
+        produced: rawBlocks.length,
+        kept: canonical.length,
+        issues: firstIssue?.error?.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`) ?? [],
+        // Bounded: this is model output pasted into a log.
+        firstDropped: JSON.stringify(rawBlocks[0] ?? null).slice(0, 500),
+      },
+      'ask claims dropped by the response contract',
+    );
+  }
   const { claims, rejected } = validateClaims({
     claims: canonical,
     bundle: validationBundle,
@@ -536,11 +561,17 @@ async function handleAsk(res, req, page, bundle, adapter, ctx, scope, remainingT
  */
 // The opening depends on WHY nothing came back, because the causes are not
 // interchangeable: a transient provider fault must never be reported as a limit of
-// the page. Getting that wrong is its own kind of dishonesty — the operator would
-// stop asking questions this scope can actually answer.
+// what can be read. Getting that wrong is its own kind of dishonesty — the operator
+// would stop asking questions the copilot can actually answer.
+//
+// None of these may blame the page. Reading is not bounded by the page the operator
+// is standing on (see the ENTITY_RULE in managementAnswer.v2 and the actor-derived
+// tool catalogue), so "this page does not carry that" is a claim the server cannot
+// make and that is usually false: the identical question about invoices is
+// answerable from /leads through a tool.
 const LIMITATION_OPENINGS = {
-  rejected: 'I could not ground an answer to that question on this page — nothing in its data matched it. ',
-  'no-final-answer': 'I could not answer that from this page. ',
+  rejected: 'I could not ground an answer to that question — the figures I would have had to cite were not in what I read. ',
+  'no-final-answer': 'I could not settle on an answer to that question. ',
   'budget-exhausted': 'I ran out of time working that out. ',
 };
 
@@ -549,7 +580,7 @@ function limitationBlock({ actor, reason }) {
     return {
       id: 'limitation:generation-failed',
       section: 'current_state',
-      text: 'I could not generate an answer just now — that is a temporary fault on my side, not a limit of this page. Try again in a moment.',
+      text: 'I could not generate an answer just now — that is a temporary fault on my side, not a limit of what I can read. Try again in a moment.',
       facts: [],
       evidenceIds: [],
       evidenceType: 'computed',
@@ -560,8 +591,8 @@ function limitationBlock({ actor, reason }) {
   const readable = capabilitySummary(actor);
   const opening = LIMITATION_OPENINGS[reason] ?? LIMITATION_OPENINGS['no-final-answer'];
   const capability = readable
-    ? `Here I can read ${readable}, and a question about those will get a grounded answer.`
-    : 'No data on this page is readable with your role, so I cannot answer questions about it.';
+    ? `I can read ${readable} from any page — ask me about any of those.`
+    : 'Your role has no readable business data, so I cannot answer questions about it.';
 
   return {
     id: 'limitation:ungrounded',

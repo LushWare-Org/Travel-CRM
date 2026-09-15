@@ -189,7 +189,7 @@ const listLeadsTool = {
 const listInvoicesTool = {
   name: 'listInvoices',
   description:
-    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Pass `leadId` to read one lead\'s invoices instead of the whole page. Use `limit` to bound how many are returned.',
+    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Reads the WHOLE book by default and needs no page context. When it read the whole book the result also carries `total` and `overdueTotal` — the invoice counts an answer may state. Pass `leadId` ONLY when the question names one specific lead — never to narrow an invoice question down to whatever lead happens to be on screen, which returns nothing and reads as "invoices are unavailable". Use `limit` to bound how many are returned.',
   argsSchema: z
     .object({
       limit: z.number().int().min(1).max(MAX_TOOL_ROWS).optional(),
@@ -226,7 +226,34 @@ const listInvoicesTool = {
       });
     rows.sort(byDueDateAscending);
     const limit = args.limit ?? DEFAULT_LIST_LIMIT;
-    return boundResult(listInvoicesTool, rows.slice(0, limit));
+    const selected = rows.slice(0, limit);
+    const bounded = boundResult(listInvoicesTool, selected);
+
+    // A count is citable ONLY when it is the whole count, and `boundResult` cannot
+    // see either drop: the paymentStatus filter above and this caller-limit slice
+    // both run BEFORE it, so `records.length > rowCap` is already false by the time
+    // it looks. That is how a partial list could be presented as complete — the
+    // failure boundResult's own comment says it exists to prevent. Completeness is
+    // therefore decided here, against the envelope's own total.
+    const knownTotal = Number.isFinite(result.total) ? result.total : null;
+    const droppedRows = selected.length < rows.length || (knownTotal !== null && raw.length < knownTotal);
+    const complete = knownTotal !== null && !droppedRows && !bounded.truncated;
+
+    return {
+      ...bounded,
+      ...(droppedRows ? { truncated: true } : {}),
+      // Present exactly when they are true, and absent otherwise: these numbers are
+      // what an answer may cite, so an incomplete read must not offer any. Both are
+      // exact only because `complete` means these rows ARE the whole filtered set:
+      // `total` is its size, and `overdueTotal` counts the rows whose dueDate has
+      // passed. "How many invoices are overdue?" cannot be answered from the rows
+      // themselves — the count is a property of the set, not a value any row carries,
+      // so the model could only ever guess it, and a guess is what the numeric rule
+      // exists to refuse.
+      ...(complete
+        ? { total: rows.length, overdueTotal: rows.reduce((n, row) => n + (row.overdue ? 1 : 0), 0) }
+        : {}),
+    };
   },
 };
 

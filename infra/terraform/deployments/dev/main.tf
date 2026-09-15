@@ -25,6 +25,11 @@ module "deployment" {
   management_copilot_enabled   = var.management_copilot_enabled
   management_copilot_page_keys = var.management_copilot_page_keys
 
+  # Business notification surface (assistant-service) — the same dark-launch
+  # gate. The bell is in the Management bundle already, so without this the
+  # panel it opens has nothing to ask for and the feed route 404s.
+  management_notifications_enabled = var.management_notifications_enabled
+
   # Secret Manager secrets (26 rows of the plan table)
   database_url               = var.database_url
   direct_url                 = var.direct_url

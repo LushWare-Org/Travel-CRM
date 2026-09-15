@@ -9,6 +9,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Card, CardContent } from '../../components/ui/card';
+import PageHeader from '../../components/PageHeader';
 
 interface Vacancy {
   id: string;
@@ -151,13 +152,10 @@ const VacanciesContainer = () => {
 
   return (
     <div className="h-full overflow-auto bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border px-4 sm:px-8 py-4 shadow-card sticky top-0 z-10">
-        <div className="flex justify-between items-center">
-          <div className="pl-10 md:pl-0">
-            <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Vacancies Management</h1>
-            <p className="text-sm text-muted-foreground mt-1">Create and manage job openings</p>
-          </div>
+      <PageHeader
+        title="Vacancies Management"
+        subtitle="Create and manage job openings"
+        actions={
           <Button
             onClick={() => {
               resetForm();
@@ -168,8 +166,8 @@ const VacanciesContainer = () => {
             <span className="hidden sm:inline">Add Vacancy</span>
             <span className="sm:hidden">Add</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="p-4 sm:p-6">
         {/* Filter */}

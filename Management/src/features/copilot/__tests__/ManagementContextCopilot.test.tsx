@@ -427,7 +427,11 @@ describe('ManagementContextCopilot — conversation on every scope', () => {
     // insights one — one scroller per panel, so each tab keeps its own scroll
     // position. Asserting against the first surface in the document would be
     // asserting the insights panel, which is the bug this comment records.
-    const composer = await screen.findByLabelText('Ask about Alice Traveller');
+    //
+    // The composer's name carries no scope on purpose: the copilot reads from any
+    // domain, so a composer labelled "Ask about Alice Traveller" (or "Ask about
+    // Leads") would state a limit the service does not have.
+    const composer = await screen.findByLabelText('Ask the copilot');
     const surface = composer.closest('[data-copilot-surface="surface"]');
     expect(surface).not.toBeNull();
     expect(document.querySelectorAll('[data-copilot-surface="surface"]')).toHaveLength(2);
@@ -443,7 +447,8 @@ describe('ManagementContextCopilot — conversation on every scope', () => {
       </AuthProvider>
     );
 
-    await waitFor(() => expect(screen.queryByLabelText('Ask about Leads')).not.toBeInTheDocument());
+    // The same name at every scope, and gone entirely once there is no scope.
+    await waitFor(() => expect(screen.queryByLabelText('Ask the copilot')).not.toBeInTheDocument());
   });
 });
 

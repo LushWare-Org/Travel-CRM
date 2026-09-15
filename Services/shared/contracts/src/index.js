@@ -85,6 +85,12 @@ export {
   ManagementAssistantTurnResult,
   DeterministicInsightSchema,
   ManagementDeterministicResult,
+  ManagementNotificationCategories,
+  ManagementNotificationTargetSchema,
+  BusinessNotificationSchema,
+  ManagementNotificationsRequest,
+  ManagementNotificationsResult,
+  ManagementNotificationsSeenRequest,
 } from './managementCopilot.js';
 export {
   ASSISTANT_FORM_FIELDS,

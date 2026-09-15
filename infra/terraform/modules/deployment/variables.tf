@@ -409,3 +409,9 @@ variable "management_copilot_page_keys" {
   default     = ""
 }
 
+variable "management_notifications_enabled" {
+  description = "Business notification surface gate (plain env var MANAGEMENT_NOTIFICATIONS_ENABLED on assistant-service). The feed route answers an undisclosed 404 unless this is exactly \"true\" — the same dark-launch convention as MANAGEMENT_COPILOT_ENABLED, so the default stays off and an environment opts in deliberately. Unlike the copilot gate there is no build-time half: the bell is compiled into the Management bundle, so enabling this lights it for whoever can already see the page bar."
+  type        = string
+  default     = "false"
+}
+

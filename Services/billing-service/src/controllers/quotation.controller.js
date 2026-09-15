@@ -20,9 +20,12 @@ const quotationInclude = {
 };
 
 export const getAllQuotations = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, status } = req.query;
+  const { page = 1, limit = 20, ids, status } = req.query;
   const skip = (Number(page) - 1) * Number(limit);
-  const where = { ...(status && { status }) };
+  const where = {
+    ...(status && { status }),
+    ...(ids && { id: { in: ids.split(',').filter(Boolean).slice(0, 200) } }),
+  };
 
   const [data, total] = await Promise.all([
     prisma.quotation.findMany({ where, include: quotationInclude, orderBy: { createdAt: 'desc' }, skip, take: Number(limit) }),

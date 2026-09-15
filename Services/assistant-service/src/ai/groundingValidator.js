@@ -47,7 +47,12 @@ function factGroundedIn(factValue, evidenceValue) {
 // Values that must never appear in operator-facing prose for safety reasons,
 // independent of whether they are grounded. Numbers are deliberately absent.
 const UNSAFE_PROSE_PATTERNS = [
-  /\b[A-Z]{2,}-\d[\w-]*\b/, // record ids (LEAD-8F21…)
+  // Internal record ids. Every id this system mints is a UUID — that is what must
+  // never reach operator prose. The prefix-shaped rule this replaced
+  // (`[A-Z]{2,}-\d[\w-]*`) matched the operator-facing DOCUMENT numbers instead
+  // (`INV-202608-00027`, the number the panel and the billing list both show)
+  // while missing every UUID it was written to catch.
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i,
   /\btool:[a-zA-Z_]+:\d+\b/, // tool-call ids
   /\bevidenceIds?\b|\bfieldPaths?\b|\bpageKey\b/, // evidence plumbing
   /\{[\s\S]{0,200}?"[a-zA-Z_]+"\s*:/, // serialized objects
@@ -96,24 +101,91 @@ export function canonicalScalars(value, out = new Set()) {
 }
 
 const ISO_DATE = /\d{4}-\d{2}-\d{2}(?:T[\d:.]+Z?)?/g;
+// A document number ("INV-202608-00027") is ONE token, for the same reason an ISO
+// date is: split into its numeric runs it becomes "202608" and "00027", neither of
+// which is a value any evidence item carries, so a correctly cited invoice number
+// was rejected as an unsupported number. Two-or-more `-digits` groups is what
+// separates it from ordinary hyphenated prose ("top-10" is not a document number);
+// the real format is always `<prefix>-<YYYYMM>-<sequence>`.
+const DOC_NUMBER = /\b[A-Za-z]{2,}(?:-\d+){2,}\b/g;
+// A quantity spelled as a word is a value like any other and must resolve like one.
+// Deliberately NARROW: it counts only a bare number-word that reaches a plural noun
+// within a few words ("twenty past due invoices"), and it is fenced off from the
+// constructions where the same word is prose or a fragment —
+//
+// - "one of the leads", "one-off": a partitive or hyphenated word is not a count;
+// - "eighty-two", "one hundred": read piecewise a compound figure yields meaningless
+//   fragments, and "two" out of "eighty-two dollars" resolves to nothing, which would
+//   reject a true sentence.
+//
+// The asymmetry is deliberate: a missed quantity stays unchecked exactly as it is
+// today, while a false positive rejects an honest answer — the over-rejection that
+// made counting questions unanswerable in the first place.
+const WORD_NUMBER =
+  /(?<![\w-])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?![\w-])(?!\s+(?:of|off|or|hundred|thousand|million)\b)(?=(?:\s+[a-z][a-z-]*){0,3}\s+[a-z][a-z-]*s\b)/gi;
+const WORD_VALUES = {
+  one: '1',
+  two: '2',
+  three: '3',
+  four: '4',
+  five: '5',
+  six: '6',
+  seven: '7',
+  eight: '8',
+  nine: '9',
+  ten: '10',
+  eleven: '11',
+  twelve: '12',
+  thirteen: '13',
+  fourteen: '14',
+  fifteen: '15',
+  sixteen: '16',
+  seventeen: '17',
+  eighteen: '18',
+  nineteen: '19',
+  twenty: '20',
+  thirty: '30',
+  forty: '40',
+  fifty: '50',
+  sixty: '60',
+  seventy: '70',
+  eighty: '80',
+  ninety: '90',
+};
 const NUMBER_TOKEN = /\d[\d,]*(?:\.\d+)?/g;
 
 /**
  * The numbers a reader sees in a sentence, canonicalised.
  *
- * ISO dates are extracted FIRST and as whole tokens, so "2026-09-12" resolves
- * against a date value instead of splitting into "2026", "09" and "12" and
- * failing. Thousands separators are stripped, so "₹1,500" yields "1500" and
- * resolves against a canonical 1500.
+ * ISO dates and document numbers are extracted FIRST and as whole tokens, so
+ * "2026-09-12" resolves against a date value instead of splitting into "2026",
+ * "09" and "12" and failing, and "INV-202608-00027" resolves against the invoice
+ * row that carries it instead of splitting into two unresolvable runs. Thousands
+ * separators are stripped, so "₹1,500" yields "1500" and resolves against a
+ * canonical 1500. A quantity spelled as a word is read as the number it names and
+ * must then resolve like any other (see WORD_NUMBER).
  */
 export function proseNumericTokens(text) {
   const source = String(text ?? '');
   const tokens = [];
+  const blank = (match) => ' '.repeat(match.length);
   const withoutDates = source.replace(ISO_DATE, (match) => {
     tokens.push(match);
-    return ' '.repeat(match.length);
+    return blank(match);
   });
-  for (const match of withoutDates.match(NUMBER_TOKEN) ?? []) tokens.push(match.replace(/,/g, ''));
+  const withoutDocNumbers = withoutDates.replace(DOC_NUMBER, (match) => {
+    tokens.push(match);
+    return blank(match);
+  });
+  // A spelled-out quantity resolves against the same values a digit one does, because
+  // canonicalScalar lowercases strings: a pushed '20' matches a canonical 20. Blanked
+  // after capture for the same reason dates and document numbers are — the replaced
+  // span keeps its offsets and cannot re-enter NUMBER_TOKEN.
+  const withoutWordNumbers = withoutDocNumbers.replace(WORD_NUMBER, (match) => {
+    tokens.push(WORD_VALUES[match.toLowerCase()]);
+    return blank(match);
+  });
+  for (const match of withoutWordNumbers.match(NUMBER_TOKEN) ?? []) tokens.push(match.replace(/,/g, ''));
   return tokens;
 }
 

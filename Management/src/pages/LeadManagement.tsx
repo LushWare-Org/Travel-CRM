@@ -40,6 +40,7 @@ import PageCopilot from "../features/copilot/PageCopilot";
 import LeadInsights from "../features/copilot/LeadInsights";
 import CollectionInsights from "../features/copilot/CollectionInsights";
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
+import PageHeader from '@/components/PageHeader';
 
 // Lifecycle status maps (10 states) plus old-status fallbacks
 const statusColors: Record<string, string> = {
@@ -132,6 +133,8 @@ const LeadManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const highlightedLeadId = searchParams.get("leadId");
+  const idsParam = searchParams.get("ids");
+  const shouldOpenLead = searchParams.get("open") === "1";
 
   const currentUser = authAPI.getStoredUser();
   const canDelete = currentUser?.role === 'admin' || currentUser?.role === 'super-admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin';
@@ -183,7 +186,13 @@ const LeadManagement = () => {
   useEffect(() => {
     fetchLeads();
     fetchLeadStats();
-  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, filterSources, currentPage]);
+  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, filterSources, currentPage, idsParam]);
+
+  useEffect(() => {
+    if (!shouldOpenLead || !highlightedLeadId) return;
+    const requested = leads.find((lead) => String(lead._id || lead.id) === highlightedLeadId);
+    if (requested) setDetailLead(requested);
+  }, [highlightedLeadId, leads, shouldOpenLead]);
 
   useEffect(() => {
     fetchSalesReps();
@@ -211,36 +220,31 @@ const LeadManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      const params: Record<string, any> = {
-        limit: leadsPerPage,
-        page: currentPage,
-      };
+      const params: Record<string, any> = idsParam
+        ? { ids: idsParam, limit: 200, page: 1 }
+        : { limit: leadsPerPage, page: currentPage };
 
-      if (debouncedSearch) params.query = debouncedSearch; // The backend uses ?query= for search
-      if (filterStatus !== "all") {
-        // PENDING_VERIFICATION is a carve-out visible to any salesRep — the
-        // backend gates it behind ?lifecycleStatus= (design doc #8), not the
-        // ownership-filtered ?status= path.
-        if (filterStatus === 'PENDING_VERIFICATION') {
-          params.lifecycleStatus = filterStatus;
-        } else {
-          params.status = filterStatus;
+      if (!idsParam) {
+        if (debouncedSearch) params.query = debouncedSearch; // The backend uses ?query= for search
+        if (filterStatus !== "all") {
+          // PENDING_VERIFICATION is a carve-out visible to any salesRep — the
+          // backend gates it behind ?lifecycleStatus= (design doc #8), not the
+          // ownership-filtered ?status= path.
+          if (filterStatus === 'PENDING_VERIFICATION') {
+            params.lifecycleStatus = filterStatus;
+          } else {
+            params.status = filterStatus;
+          }
         }
+        if (filterTravelDateStart) params['travelDate[gte]'] = filterTravelDateStart;
+        if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
+        if (filterSources.length > 0) params.source = filterSources.join(',');
+        if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
       }
-      if (filterTravelDateStart) params['travelDate[gte]'] = filterTravelDateStart;
-      if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
-      if (filterSources.length > 0) params.source = filterSources.join(',');
-      if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
 
-      // Note: backend search uses leadAPI.searchLeads for query, but standard filters for standard endpoint.
-      // If there is a search term, use the search endpoint, else standard endpoint.
-      let response;
-      if (debouncedSearch) {
-        response = await leadAPI.searchLeads(debouncedSearch);
-        // The search endpoint might not have full pagination built the same way
-      } else {
-        response = await leadAPI.getAllLeads(params);
-      }
+      const response = !idsParam && debouncedSearch
+        ? await leadAPI.searchLeads(debouncedSearch)
+        : await leadAPI.getAllLeads(params);
 
       if (response.success) {
         const leadsData = Array.isArray(response.data) ? response.data : response.data?.leads || [];
@@ -454,45 +458,38 @@ const LeadManagement = () => {
             heights is what keeps the two columns looking deliberately paired
             rather than one towering over a short list. */}
         <div className="flex h-dvh flex-col">
-          {/* Header */}
-          <div className="bg-card border-b border-border">
-            <div className="px-4 sm:px-6 py-4 sm:py-5">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-                <div className="pl-10 md:pl-0">
-                  <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Lead Management</h1>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                    Track and manage your leads efficiently
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                  <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'table' | 'grid')}>
-                    <TabsList>
-                      <TabsTrigger value="table" aria-label="Table view">
-                        <List className="w-4 h-4" />
-                      </TabsTrigger>
-                      <TabsTrigger value="grid" aria-label="Grid view">
-                        <LayoutGrid className="w-4 h-4" />
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <Button onClick={fetchLeads} disabled={loading} variant="outline">
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    <span className="hidden sm:inline">Refresh</span>
-                  </Button>
-                  <Button onClick={() => setShowSettingsDialog(true)} variant="outline">
-                    <Settings className="w-4 h-4" />
-                    <span className="hidden sm:inline">{assignmentSettings.mode === "auto"
-                      ? `Auto: ${assignmentSettings.strategy}`
-                      : "Manual"}</span>
-                  </Button>
-                  <Button onClick={() => setShowNewDialog(true)}>
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">New Lead</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            title="Lead Management"
+            subtitle="Track and manage your leads efficiently"
+            actions={
+              <>
+                <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'table' | 'grid')}>
+                  <TabsList>
+                    <TabsTrigger value="table" aria-label="Table view">
+                      <List className="w-4 h-4" />
+                    </TabsTrigger>
+                    <TabsTrigger value="grid" aria-label="Grid view">
+                      <LayoutGrid className="w-4 h-4" />
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <Button onClick={fetchLeads} disabled={loading} variant="outline">
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+                <Button onClick={() => setShowSettingsDialog(true)} variant="outline">
+                  <Settings className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    {assignmentSettings.mode === "auto" ? `Auto: ${assignmentSettings.strategy}` : "Manual"}
+                  </span>
+                </Button>
+                <Button onClick={() => setShowNewDialog(true)}>
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">New Lead</span>
+                </Button>
+              </>
+            }
+          />
 
           {/* `[&>*]:shrink-0` keeps each section at its natural height. Without it
               this flex column shrinks its tallest children to fit one viewport
@@ -521,6 +518,17 @@ const LeadManagement = () => {
               setFilterPlatforms={setFilterPlatforms}
               onAdvancedFilterClick={() => setShowFilterDialog(true)}
             />
+
+            {idsParam && (
+              <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+                <p className="text-sm text-foreground">
+                  Showing <span className="font-mono tabular-nums">{totalLeads}</span> selected leads
+                </p>
+                <Button variant="ghost" size="xs" onClick={() => setSearchParams({})}>
+                  Show all
+                </Button>
+              </div>
+            )}
 
             {/* Persistent record surface: the Evidence Lens reveals into these anchors. */}
             <LeadDetailPane lead={detailLead} salesReps={salesReps} onClose={() => setDetailLead(null)} />

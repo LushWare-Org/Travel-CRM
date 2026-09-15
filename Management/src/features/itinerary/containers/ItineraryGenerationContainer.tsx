@@ -45,6 +45,7 @@ import { createDefaultPackage } from '../types';
 // Sample data
 import { SAMPLE_PACKAGES } from './sampleData';
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
+import PageHeader from '../../../components/PageHeader';
 
 const ItineraryGenerationContainer = () => {
   const [, navigate] = useLocation();
@@ -597,43 +598,36 @@ const ItineraryGenerationContainer = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border">
-        <div className="px-4 sm:px-6 py-4 sm:py-5">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-            <div className="pl-10 md:pl-0">
-              <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
-                {statusFilter ? `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Packages` : 'All Packages'}
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{filteredPackages.length} packages found</p>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'grid' | 'list')}>
-                <TabsList>
-                  <TabsTrigger value="grid" aria-label="Grid view">
-                    <LayoutGrid className="w-4 h-4" />
-                  </TabsTrigger>
-                  <TabsTrigger value="list" aria-label="List view">
-                    <List className="w-4 h-4" />
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              {!isSalesRep && (
-                <Button onClick={handleAIPackageDialogOpen} variant="outline">
-                  <Sparkles className="w-4 h-4" />
-                  <span className="hidden sm:inline">AI Generate</span>
-                </Button>
-              )}
-              {(!isSalesRep || canEditPackages) && (
-                <Button onClick={handleNewPackageDialogOpen}>
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">New Package</span>
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title={statusFilter ? `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Packages` : 'All Packages'}
+        subtitle={`${filteredPackages.length} packages found`}
+        actions={
+          <>
+            <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'grid' | 'list')}>
+              <TabsList>
+                <TabsTrigger value="grid" aria-label="Grid view">
+                  <LayoutGrid className="w-4 h-4" />
+                </TabsTrigger>
+                <TabsTrigger value="list" aria-label="List view">
+                  <List className="w-4 h-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {!isSalesRep && (
+              <Button onClick={handleAIPackageDialogOpen} variant="outline">
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden sm:inline">AI Generate</span>
+              </Button>
+            )}
+            {(!isSalesRep || canEditPackages) && (
+              <Button onClick={handleNewPackageDialogOpen}>
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Package</span>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         <PackageStats stats={stats} />

@@ -7,6 +7,8 @@ import assistantRoutes from './routes/assistant.routes.js';
 import eventsRoutes from './routes/events.routes.js';
 import managementCopilotRoutes from './routes/managementCopilot.routes.js';
 import managementCopilotSeenRoutes from './routes/managementCopilotSeen.routes.js';
+import managementNotificationsRoutes from './routes/managementNotifications.routes.js';
+import managementNotificationsSeenRoutes from './routes/managementNotificationsSeen.routes.js';
 
 const app = express();
 
@@ -26,6 +28,8 @@ app.use('/api/v1/assistant/turn', assistantRoutes);
 app.use('/api/v1/assistant/events', eventsRoutes);
 app.use('/api/v1/assistant/management/turn', managementCopilotRoutes);
 app.use('/api/v1/assistant/management/seen', managementCopilotSeenRoutes);
+app.use('/api/v1/assistant/management/notifications', managementNotificationsRoutes);
+app.use('/api/v1/assistant/management/notifications/seen', managementNotificationsSeenRoutes);
 
 app.use((req, res) => res.status(404).json({ success: false, message: `Route not found: ${req.path}` }));
 app.use(errorHandler);

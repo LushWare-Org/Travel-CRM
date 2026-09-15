@@ -1,0 +1,36 @@
+# Files `wt step copy-ignored` may copy into a fresh worktree.
+# A file must be BOTH gitignored AND listed here to be copied.
+#
+# `.worktreeinclude` itself is tracked; the files it names are copied at the
+# filesystem level by `wt step copy-ignored` and are never staged (every path
+# below is covered by .gitignore). Secrets therefore stay on disk, not in git.
+
+# ── Machine-local state every parallel session needs ─────────────────────────
+
+# Per-package environment files (live credentials — copied, never committed).
+.env
+.env.e2e
+*.env.e2e
+
+# Agent tooling config (MCP servers, editors) — same as the primary worktree.
+.mcp.json
+opencode.json
+config/
+.codex/
+.cursor/
+.gemini/
+.goose/
+.vscode/
+.zed/
+
+# Deploy runbook skill (gitignored; contains live deploy secrets — copied, not committed).
+.claude/skills/deploy-travelcrm/
+
+# ── Deliberately NOT copied ─────────────────────────────────────────────────
+# node_modules/    — 15 packages, no root workspace; install only what a session
+#                    runs, or symlink the primary tree. A full copy is heavy and
+#                    on ext4 there is no reflink.
+# .gstack/         — browser-daemon runtime state; copying it fights the live daemon.
+# .firebase/       — local Firebase deploy cache.
+# env_backup/      — secret backups; no reason to duplicate them per worktree.
+# Management/playwright-report/, test-results/ — test output, regenerate.
