@@ -619,6 +619,56 @@ Deferred during `/plan-eng-review` on `docs/designs/actionable-insight-ranking-a
 **Priority:** P2
 **Depends on:** None.
 
+## Voice Agent (Retell AI)
+
+### Playback route for a call recording
+
+**What:** `VoiceCall.recordingUrl` is persisted from Retell's post-call payload, and Management's AI tab already renders an `<audio>` player gated on `call.hasRecording` — but no route serves the audio. `voiceAPI.recordingUrl()` builds `/api/v1/voice/calls/:id/recording`, which voice-service does not implement, and `listCallsForLead` never returns `hasRecording`.
+
+**Why:** The player is unreachable rather than broken (its gate is never true), so nothing regresses today — but a recording is the only verbatim evidence of what was said, and the rep-callback email already tells the sales team to find it on that tab. The audio element also cannot send the `Authorization` header the gateway demands on `/api/v1/voice`, so this needs a tokenised URL or a client-side blob fetch, not just a handler.
+
+**Context:** `Services/voice-service/src/controllers/call.controller.js`, `src/routes/call.routes.js`; `Management/src/features/lead-management/components/LeadAiCallsTab.tsx` and `Management/src/services/api.js` (`voiceAPI`). Decide whether to redirect to Retell's own signed URL (hands anyone with lead-read access a third-party URL) or stream through voice-service.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None.
+
+### Idempotency key for the write tools
+
+**What:** `attach_package` and `adjust_itinerary` call lead-service's internal endpoints with no idempotency key, while voice-service's client aborts the caller's fetch on timeout (8s write / 18s itinerary) without cancelling the server-side transaction. A write that committed but timed out returns `{error: true}` to the agent, which retries and applies the change twice.
+
+**Why:** This failure class is already recorded on the lead-service side — CLAUDE.md's itinerary-snapshot note describes a retried edit producing 7 nights from a 3-night trip. Nothing here prevents it: the audit row is best-effort and the retry is deliberate.
+
+**Context:** `Services/voice-service/src/controllers/toolDispatch.controller.js` (`wrap`), `src/services/lead.client.js` (per-call timeouts), and lead-service's `POST /internal/:id/packages/attach` + `POST /internal/:id/itinerary/adjust`. A key derived from `call_id` + function + args hash, carried as a header and deduped in lead-service, fixes it without the agent needing to know.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None.
+
+### Post-call intake failure is swallowed with a 200
+
+**What:** When `submitIntake` fails after a call, `webhook.controller.js` logs the error and still answers 200, and Retell retries only non-2xx — so the lead is never created and never retried. The call row survives with `leadId: null`, and `listCallsForLead` filters IN_PROGRESS rows out, so the call is invisible in Management and only a human can recover it.
+
+**Why:** Observed live during the merge verification: a stale Prisma client made intake 500 and the smoke test's "call linked to a lead" check failed with nothing visible in the UI. The same gap applies to any transient lead-service outage.
+
+**Context:** `Services/voice-service/src/controllers/webhook.controller.js` (`handlePostCall`), `src/controllers/call.controller.js` (`listCallsForLead`). Either a bounded retry reusing the same deterministic `sessionId` (intake is upsert-keyed, so it is retry-safe) or a visible "no result" state for unadopted calls.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None.
+
+### Confirm Retell's tool-call envelope against a real call
+
+**What:** `extractToolContext` accepts the call id from `body.call.call_id`, `body.call_id` or `body.args.call_id`, but only the two lifecycle webhooks have been confirmed against a real captured Retell request; the tool envelope is written defensively from the documented `CustomTool` shape.
+
+**Why:** If the real payload nests differently, tool calls resolve no call and every lead-bound tool answers "unavailable" mid-conversation. The merge narrowed the blast radius (only `IN_PROGRESS` calls may act, and every attempt is audited) but did not settle the shape.
+
+**Context:** `Services/voice-service/src/controllers/toolDispatch.controller.js`, `src/validators/retell.schema.js`, and `docs/voice-agent-prompt.md`'s "First real call" section. One real call with tool-call logging at debug level settles it.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None.
+
 ## Completed
 
 ### Honor Gemini's RetryInfo.retryDelay on 429 quota errors
