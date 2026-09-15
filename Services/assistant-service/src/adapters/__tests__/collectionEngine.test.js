@@ -151,6 +151,65 @@ describe('happy path', () => {
     expect(bundle.aggregates['outstanding-total']).toBe(47);
   });
 
+  it('ands every `where` condition, so one count can name several fields at once', async () => {
+    // "Past due" needs three conditions together — issued, unsettled, behind its
+    // due date — and the single field/cmp pair that could only say the last of
+    // them is how a panel came to call already-paid invoices past due.
+    globalThis.fetch = vi.fn(() =>
+      jsonResponse(
+        listBody([
+          invoice('a', { status: 'sent', paymentStatus: 'unpaid', outstandingAmount: 10 }),
+          invoice('b', { status: 'viewed', paymentStatus: 'partial', outstandingAmount: 32 }),
+          invoice('c', { status: 'draft', paymentStatus: 'unpaid', outstandingAmount: 5 }),
+          invoice('d', { status: 'cancelled', paymentStatus: 'unpaid', outstandingAmount: 7 }),
+          invoice('e', { status: 'sent', paymentStatus: 'paid', outstandingAmount: 0 }),
+          invoice('f', {
+            status: 'sent',
+            paymentStatus: 'unpaid',
+            dueDate: new Date(Date.now() + 86_400_000).toISOString(),
+            outstandingAmount: 3,
+          }),
+        ]),
+      ),
+    );
+
+    const adapter = createPageAdapter(
+      descriptor({
+        aggregates: [
+          {
+            name: 'invoices-past-due',
+            op: 'countWhere',
+            where: [
+              { field: 'status', cmp: 'notIn', values: ['draft', 'cancelled'] },
+              { field: 'paymentStatus', cmp: 'in', values: ['unpaid', 'partial'] },
+              { field: 'dueDate', cmp: 'ltNow' },
+            ],
+            label: 'Past due',
+          },
+          {
+            name: 'outstanding-total',
+            op: 'sumWhere',
+            where: [
+              { field: 'status', cmp: 'notIn', values: ['draft', 'cancelled'] },
+              { field: 'paymentStatus', cmp: 'in', values: ['unpaid', 'partial'] },
+            ],
+            sumField: 'outstandingAmount',
+            label: 'Outstanding',
+          },
+        ],
+      }),
+    );
+
+    const bundle = await adapter.loadEvidence(ctx, {}, { mode: 'deterministic' });
+
+    // a and b count: `viewed` is issued, so it is in; c is a draft, d is
+    // cancelled, e is paid, f is not due yet. The sum is the issued-and-unsettled
+    // set with no date condition — it answers "what is still owed", not "what is
+    // late" — so f is in it and c, d and e are not: 10 + 32 + 3.
+    expect(bundle.aggregates['invoices-past-due']).toBe(2);
+    expect(bundle.aggregates['outstanding-total']).toBe(45);
+  });
+
   it('produces no insights when no rule fires', async () => {
     globalThis.fetch = vi.fn(() =>
       jsonResponse(listBody([invoice('a', { paymentStatus: 'paid', dueDate: new Date().toISOString() })])),

@@ -85,13 +85,14 @@ const INVOICE_PROJECTION = [
   'overdue',
 ];
 
-// billing-service's own overdue set: its invoice-stat query and the dashboard
-// count both read `status IN ('sent','partial','overdue')` with a past due date
-// (invoice.controller.js:259, billing.controller.js:45). Kept here verbatim so
-// this tool's counts cannot disagree with the page the question is about.
-// `status` is read off the RAW record for these two decisions only and stays out
-// of the projection above, where payment truth comes from `paymentStatus`.
-const INVOICE_OVERDUE_STATUSES = ['sent', 'partial', 'overdue'];
+// A document that was never issued (draft) or has been withdrawn (cancelled) is
+// not late money. `status` is the issuance lifecycle — draft/sent/viewed/
+// cancelled, per the billing descriptor's field trap 1 — which is exactly the
+// question being asked here, and a different one from payment truth (that stays
+// `paymentStatus`). Stated as the two values to EXCLUDE rather than the three to
+// include, because billing-service's own `status IN ('sent','partial','overdue')`
+// (invoice.controller.js:259, billing.controller.js:45) silently misses `viewed`.
+const INVOICE_UNISSUED_STATUSES = ['draft', 'cancelled'];
 
 function project(record, fields) {
   const out = {};
@@ -197,7 +198,7 @@ const listLeadsTool = {
 const listInvoicesTool = {
   name: 'listInvoices',
   description:
-    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Cancelled invoices are never included, and `overdue` means the document was issued and its due date has passed — the same definition the invoices page uses, so these counts match it. Reads the WHOLE book by default and needs no page context. When it read the whole book the result also carries `total` and `overdueTotal` — the invoice counts an answer may state. Pass `leadId` ONLY when the question names one specific lead — never to narrow an invoice question down to whatever lead happens to be on screen, which returns nothing and reads as "invoices are unavailable". Use `limit` to bound how many are returned.',
+    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Cancelled invoices are never included, and `overdue` means the document was issued — not a draft, not cancelled — and its due date has passed: the same invoices the page counts as overdue, so these numbers match it. Reads the WHOLE book by default and needs no page context. When it read the whole book the result also carries `total` and `overdueTotal` — the invoice counts an answer may state. Pass `leadId` ONLY when the question names one specific lead — never to narrow an invoice question down to whatever lead happens to be on screen, which returns nothing and reads as "invoices are unavailable". Use `limit` to bound how many are returned.',
   argsSchema: z
     .object({
       limit: z.number().int().min(1).max(MAX_TOOL_ROWS).optional(),
@@ -250,7 +251,7 @@ const listInvoicesTool = {
         // and a second definition here is how the copilot ended up contradicting
         // the page the question is about.
         const overdue =
-          Number.isFinite(dueAt) && dueAt < now && INVOICE_OVERDUE_STATUSES.includes(row?.status);
+          Number.isFinite(dueAt) && dueAt < now && !INVOICE_UNISSUED_STATUSES.includes(row?.status);
         return { ...row, overdue, dueAt };
       });
     rows.sort(byDueDateAscending);

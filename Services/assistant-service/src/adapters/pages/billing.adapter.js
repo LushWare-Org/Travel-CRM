@@ -103,17 +103,36 @@ export const billingAdapter = createPageAdapter({
 
   aggregates: [
     {
-      // `field` with `cmp: 'ltNow'` scopes this to past-due invoices, matching
-      // how getOverdueInvoices derives overdue from dueDate.
+      // "Past due" means an invoice that was ISSUED — not a draft the customer has
+      // never seen, not a cancelled document — and is still unsettled, with its due
+      // date behind it. It takes three conditions, not one: the earlier single
+      // `dueDate < now` counted every invoice with an old due date, the already-paid
+      // ones included, so the panel said "35 past due" while the invoices page,
+      // reading the same table, said 15.
+      //
+      // Field choice follows the descriptor's trap 1: `paymentStatus` decides
+      // whether money is owed (a document can be `partial` there while its lifecycle
+      // says `sent`), while `status` decides whether the customer ever received it.
       name: 'invoices-past-due',
       op: 'countWhere',
-      field: 'dueDate',
-      cmp: 'ltNow',
+      where: [
+        { field: 'status', cmp: 'notIn', values: ['draft', 'cancelled'] },
+        { field: 'paymentStatus', cmp: 'in', values: ['unpaid', 'partial'] },
+        { field: 'dueDate', cmp: 'ltNow' },
+      ],
       label: 'Invoices past due',
     },
     {
+      // The money still owed on that same issued-and-unsettled set, so the amount
+      // quoted beside the count can never describe a different population. Summing
+      // every row's `outstandingAmount` — drafts and cancelled documents included —
+      // is how the panel reported 108,449.56 against the page's 51,501.87.
       name: 'outstanding-total',
       op: 'sumWhere',
+      where: [
+        { field: 'status', cmp: 'notIn', values: ['draft', 'cancelled'] },
+        { field: 'paymentStatus', cmp: 'in', values: ['unpaid', 'partial'] },
+      ],
       sumField: 'outstandingAmount',
       label: 'Outstanding total',
     },

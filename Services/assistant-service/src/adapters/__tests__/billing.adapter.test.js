@@ -48,6 +48,32 @@ describe('field traps', () => {
     // document, so a rule using it could never fire.
     expect(billingAdapter.descriptor.rules.map((r) => r.rule)).not.toContain('unassigned');
   });
+
+  it('counts only issued, unsettled, past-due invoices as past due', () => {
+    // The regression an operator hit: a single `dueDate < now` counted every
+    // invoice with an old due date — the already-paid ones included — so the panel
+    // reported 35 past due while the invoices page, reading the same table, said
+    // 15. `status` answers "did the customer ever receive it" (trap 1), and
+    // `paymentStatus` answers "is money owed"; both are needed here.
+    const pastDue = billingAdapter.descriptor.aggregates.find((a) => a.name === 'invoices-past-due');
+    expect(pastDue.op).toBe('countWhere');
+    expect(pastDue.where).toEqual([
+      { field: 'status', cmp: 'notIn', values: ['draft', 'cancelled'] },
+      { field: 'paymentStatus', cmp: 'in', values: ['unpaid', 'partial'] },
+      { field: 'dueDate', cmp: 'ltNow' },
+    ]);
+
+    // The amount beside that count must describe the same population, or the panel
+    // quotes money nobody can collect (drafts and cancelled documents carry
+    // outstanding balances too).
+    const outstanding = billingAdapter.descriptor.aggregates.find((a) => a.name === 'outstanding-total');
+    expect(outstanding.op).toBe('sumWhere');
+    expect(outstanding.sumField).toBe('outstandingAmount');
+    expect(outstanding.where).toEqual([
+      { field: 'status', cmp: 'notIn', values: ['draft', 'cancelled'] },
+      { field: 'paymentStatus', cmp: 'in', values: ['unpaid', 'partial'] },
+    ]);
+  });
 });
 
 describe('declared sources', () => {

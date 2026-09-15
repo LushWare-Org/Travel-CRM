@@ -215,19 +215,32 @@ async function fetchSource(source, ctx, mode, bundle) {
   }
 }
 
+/** One declared condition, e.g. { field: 'status', cmp: 'notIn', values: [...] }. */
+function matchesCondition(record, { field, cmp, value, values }) {
+  if (cmp === 'ltNow') {
+    const at = toMs(record[field]);
+    return at !== null && at < Date.now();
+  }
+  if (cmp === 'eq') return record[field] === value;
+  if (cmp === 'in') return Array.isArray(values) && values.includes(record[field]);
+  if (cmp === 'notIn') return Array.isArray(values) && !values.includes(record[field]);
+  return true;
+}
+
 /** Evaluate a descriptor's declared aggregates over the fetched records. */
 function computeAggregates(descriptor, records) {
   const out = {};
   for (const aggregate of descriptor.aggregates ?? []) {
-    const matching = records.filter((record) => {
-      if (!aggregate.field) return true;
-      if (aggregate.cmp === 'ltNow') {
-        const at = toMs(record[aggregate.field]);
-        return at !== null && at < Date.now();
-      }
-      if (aggregate.cmp === 'eq') return record[aggregate.field] === aggregate.value;
-      return true;
-    });
+    // `where` ANDs several conditions, because one field is not always enough to
+    // name what is being counted: "past due" means an issued, unsettled invoice
+    // whose due date has passed, and a single field/cmp pair cannot say that. The
+    // older one-condition shorthand is kept working for descriptors that predate
+    // this — it is just the one-element form.
+    const conditions = aggregate.where
+      ?? (aggregate.field
+        ? [{ field: aggregate.field, cmp: aggregate.cmp, value: aggregate.value, values: aggregate.values }]
+        : []);
+    const matching = records.filter((record) => conditions.every((condition) => matchesCondition(record, condition)));
     if (aggregate.op === 'count') out[aggregate.name] = records.length;
     else if (aggregate.op === 'countWhere') out[aggregate.name] = matching.length;
     else if (aggregate.op === 'sumWhere') {
