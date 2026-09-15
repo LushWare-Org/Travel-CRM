@@ -9,6 +9,7 @@ const mockVoiceNumberFindFirst = vi.fn();
 const mockVoiceCallCreate = vi.fn();
 const mockVoiceCallUpdate = vi.fn();
 const mockVoiceCallFindFirst = vi.fn();
+const mockVoiceCallFindMany = vi.fn();
 const mockVoiceCallCount = vi.fn();
 
 vi.mock('../../db/client.js', () => ({
@@ -18,6 +19,7 @@ vi.mock('../../db/client.js', () => ({
       create: (...a) => mockVoiceCallCreate(...a),
       update: (...a) => mockVoiceCallUpdate(...a),
       findFirst: (...a) => mockVoiceCallFindFirst(...a),
+      findMany: (...a) => mockVoiceCallFindMany(...a),
       count: (...a) => mockVoiceCallCount(...a),
     },
   },
@@ -83,6 +85,9 @@ beforeEach(() => {
   mockVoiceCallCreate.mockResolvedValue({ id: 'vc-1', leadId: null });
   mockVoiceCallUpdate.mockResolvedValue({ id: 'vc-1' });
   mockVoiceCallFindFirst.mockResolvedValue(null);
+  // The number-less adoption fallback reads candidates with findMany; with none
+  // it must decline to adopt rather than guess.
+  mockVoiceCallFindMany.mockResolvedValue([]);
   mockVoiceCallCount.mockResolvedValue(0); // well under the daily cap by default
   mockLookup.mockResolvedValue({ count: 0, matches: [] });
   mockSubmitIntake.mockResolvedValue({ leadId: 'lead-9', created: true });

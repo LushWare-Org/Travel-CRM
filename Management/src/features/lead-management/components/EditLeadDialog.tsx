@@ -166,9 +166,12 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
   useEffect(() => {
     if (isOpen) {
       fetchPackages();
-      setActiveView(lead?.needsRepFollowup ? 'ai' : 'overview');
+      // The AI tab strip only exists for an AI-handled lead, so a lead that
+      // merely needs a rep follow-up must not open on it — that lands on a body
+      // with no switcher and no way back to Overview.
+      setActiveView(isAiHandled(lead) && lead?.needsRepFollowup ? 'ai' : 'overview');
     }
-  }, [isOpen, lead?.needsRepFollowup]);
+  }, [isOpen, lead?.needsRepFollowup, lead?.aiHandled]);
 
   const fetchPackages = async () => {
     try {

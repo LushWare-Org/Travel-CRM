@@ -30,7 +30,7 @@ describe('vendored error modules', () => {
   it('ships a byte-identical errorHandler.js in every service', () => {
     const files = contentsOf(join('src', 'middleware', 'errorHandler.js'));
 
-    expect(files.length).toBe(11);
+    expect(files.length).toBe(12);
 
     const [reference, ...rest] = files;
     const drifted = rest.filter((file) => file.content !== reference.content).map((f) => f.service);
@@ -41,7 +41,7 @@ describe('vendored error modules', () => {
   it('ships a byte-identical appError.js in every service', () => {
     const files = contentsOf(join('src', 'utils', 'appError.js'));
 
-    expect(files.length).toBe(11);
+    expect(files.length).toBe(12);
 
     const [reference, ...rest] = files;
     const drifted = rest.filter((file) => file.content !== reference.content).map((f) => f.service);

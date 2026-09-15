@@ -16,6 +16,7 @@ on:
       - 'Services/notification-service/**'
       - 'Services/package-service/**'
       - 'Services/user-service/**'
+      - 'Services/voice-service/**'
       - 'Management/**'
       - '.github/workflows/microservices-ci.yml'
   push:
@@ -67,6 +68,7 @@ jobs:
           - { service: lead-service,         contracts: true,  lint: true }
           - { service: billing-service,      contracts: true,  lint: true }
           - { service: assistant-service,    contracts: true,  lint: true }
+          - { service: voice-service,        contracts: false, lint: true }
           - { service: user-service,         contracts: true,  lint: false }
           - { service: analytics-service,    contracts: false, lint: false }
           - { service: auth-service,         contracts: false, lint: false }

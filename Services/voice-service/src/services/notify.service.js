@@ -40,7 +40,7 @@ async function fetchNotifyTargets(requestId) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${base}/api/v1/salesReps/internal/notify-targets`, {
+    const res = await fetch(`${base}/api/v1/sales-reps/internal/notify-targets`, {
       headers: {
         'x-internal-token': token,
         ...(requestId ? { 'x-request-id': requestId } : {}),

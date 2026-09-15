@@ -121,6 +121,16 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_invoker_notification"
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.services["gateway"].email}"
 }
+# The voice webhooks and the CustomTool endpoints both arrive through the
+# gateway (`/api/v1/webhooks/voice/*`), which is the only path that authenticates
+# them — Retell calls the public gateway host, never this service directly.
+resource "google_cloud_run_v2_service_iam_member" "gateway_invoker_voice" {
+  project  = var.project_id
+  location = var.region
+  name     = module.voice_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["gateway"].email}"
+}
 
 # Service-to-service invoker grants (deliberately NOT the gateway identity).
 # The Management copilot reads the lead record straight from lead-service —
@@ -219,4 +229,51 @@ resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_booking" {
   name     = module.booking_service.name
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}
+# ── Voice agent (voice-service) ────────────────────────────────────────────
+# The agent reads and prepares state through the domain services during a call:
+# caller identity and trip status from lead-service, catalog search from
+# package-service, the latest sent document and the four resend routes from
+# billing-service, and the sales-rep lookup from user-service. notification-service
+# carries the "a rep must call this person back" email. Same rule as above — the
+# URL in cloud_run.tf is inert without the grant here, and a call that cannot
+# reach a service tells the caller the tool failed.
+resource "google_cloud_run_v2_service_iam_member" "voice_invoker_lead" {
+  project  = var.project_id
+  location = var.region
+  name     = module.lead_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["voice-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "voice_invoker_billing" {
+  project  = var.project_id
+  location = var.region
+  name     = module.billing_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["voice-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "voice_invoker_user" {
+  project  = var.project_id
+  location = var.region
+  name     = module.user_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["voice-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "voice_invoker_package" {
+  project  = var.project_id
+  location = var.region
+  name     = module.package_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["voice-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "voice_invoker_notification" {
+  project  = var.project_id
+  location = var.region
+  name     = module.notification_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["voice-service"].email}"
 }

@@ -617,7 +617,14 @@ const LeadTable = ({
                     )}
                   </TableCell>
                   <TableCell className="px-4 py-2 text-sm font-semibold text-foreground border-r border-border">
-                    <div className="max-w-[170px] truncate" title={String(lead.name || '')}>{lead.name || 'N/A'}</div>
+                    {/* The table is the default view (LeadManagement defaults to
+                        it at every desktop width), so the AI badges have to
+                        live beside the name here too — a rep scanning rows must
+                        not have to switch to grid view to spot AI involvement. */}
+                    <div className="flex items-center gap-2">
+                      <div className="max-w-[170px] truncate" title={String(lead.name || '')}>{lead.name || 'N/A'}</div>
+                      <AiLeadBadges lead={lead} compact />
+                    </div>
                   </TableCell>
                   <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
                     <div className="max-w-[130px] truncate" title={String(lead.phone || '')}>{lead.phone || 'N/A'}</div>

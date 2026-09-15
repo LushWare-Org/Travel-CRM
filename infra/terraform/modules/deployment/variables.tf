@@ -414,4 +414,26 @@ variable "management_notifications_enabled" {
   type        = string
   default     = "false"
 }
+# ── Voice agent (Retell AI) ────────────────────────────────────────────────
+# Empty is fail-closed, not inert: without the webhook secret the two lifecycle
+# webhooks answer 503 and nothing is ever recorded; without the tool secret
+# (or its webhook-secret fallback) every CustomTool call is rejected. That is
+# deliberate — these routes are on the gateway's public allowlist, so an
+# unconfigured environment must not accept anything. The values belong in each
+# environment's TF_VARS_* secret (infra/CI-CD-SETUP.md); the empty default
+# exists so a plan against an environment that has not been given them yet
+# still succeeds.
+variable "retell_webhook_secret" {
+  description = "Retell signing secret for the inbound/post-call lifecycle webhooks (secret id <env>-retell-webhook-secret → RETELL_WEBHOOK_SECRET on voice-service). Also the fallback the CustomTool check uses when retell_tool_secret is empty."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "retell_tool_secret" {
+  description = "Shared secret the Retell CustomTools carry in their own `headers` field (secret id <env>-retell-tool-secret → RETELL_TOOL_SECRET on voice-service). Retell documents no signature scheme for tool-call webhooks the way it does for the lifecycle ones, so this secret is what protects the seven tool endpoints."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
 

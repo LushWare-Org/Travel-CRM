@@ -1,5 +1,5 @@
 # Full Secret Manager table from the deployment plan (26 rows, logical ids
-# below). Actual secret ids are env-prefixed ("<env>-<logical id>") because
+# below, plus the voice agent's two). Actual secret ids are env-prefixed ("<env>-<logical id>") because
 # Secret Manager ids are unique per project and all three environments share
 # one GCP project — the second environment's apply must not collide.
 locals {
@@ -27,6 +27,8 @@ locals {
     travelport-api-base-url    = var.travelport_api_base_url
     travelport-access-group    = var.travelport_access_group
     liteapi-api-key            = var.liteapi_api_key
+    retell-webhook-secret      = var.retell_webhook_secret
+    retell-tool-secret         = var.retell_tool_secret
   }
 }
 

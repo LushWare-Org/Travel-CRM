@@ -14,7 +14,7 @@ the primary place for coverage; this suite is intentionally narrow).
 ## Prerequisites
 
 1. The full backend stack running locally: `cd Services && npm run dev`
-   (boots the gateway + all 10 microservices via `concurrently`).
+   (boots the gateway + all 12 microservices via `concurrently`).
 2. Seed data present in whatever database that stack points at:
    `cd Services && node seed.mjs && node seed-extended.mjs && node update-passwords.mjs`
    (only needs to be run once against a given database — these tests reuse

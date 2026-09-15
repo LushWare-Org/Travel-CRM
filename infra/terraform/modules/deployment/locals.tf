@@ -1,4 +1,4 @@
-# All 11 Cloud Run services, one per Services/* directory. `name` and the
+# All 13 Cloud Run services, one per Services/* directory. `name` and the
 # matching service-account id are env-prefixed ("<env>-<service>") because
 # Cloud Run service names and service-account ids are unique per project and
 # all three environments share one GCP project (longest resulting id,
@@ -8,7 +8,7 @@
 # (consumers per the plan's Secret Manager table); `plain_env` holds the
 # plain (non-secret) vars set directly on the service. `allow_unauthenticated`
 # is true only for the gateway — the two SPAs call it directly — and false
-# for all 10 backends, which are reachable only via the gateway's
+# for all 12 backends, which are reachable only via the gateway's
 # run.invoker grant (iam.tf) plus its Google-signed ID token.
 locals {
   services = {
@@ -46,7 +46,7 @@ locals {
       cpu     = "1"
       secrets = ["${var.env}-database-url", "${var.env}-direct-url", "${var.env}-internal-service-key", "${var.env}-cloudinary-api-key", "${var.env}-cloudinary-api-secret", "${var.env}-gemini-api-key", "${var.env}-liteapi-api-key"]
       plain_env = {
-        NODE_ENV                 = "production"
+        NODE_ENV = "production"
         # The code default is a thinking model, and the customer Client aborts
         # these AI routes at 15s, so the lite tier is what can actually finish
         # inside that window.
@@ -180,18 +180,18 @@ locals {
         # smaller than a real briefing, which overran the generation deadline
         # and reached operators as "I could not generate an answer just now".
         # The lite tier does no thinking and returns the same structured answer.
-        GEMINI_MODEL                              = "gemini-3.5-flash-lite"
+        GEMINI_MODEL = "gemini-3.5-flash-lite"
         # Classified inside a 1.5s budget (assistantRouter.js), which the
         # thinking default can never meet.
-        GEMINI_ROUTER_MODEL                       = "gemini-3.5-flash-lite"
-        ASSISTANT_ROUTER_SOCIAL_ENABLED           = "false"
-        ASSISTANT_ROUTER_OFF_TOPIC_ENABLED        = "false"
-        ASSISTANT_ROUTER_SOCIAL_THRESHOLD         = "0.95"
-        ASSISTANT_ROUTER_OFF_TOPIC_THRESHOLD      = "0.95"
+        GEMINI_ROUTER_MODEL                  = "gemini-3.5-flash-lite"
+        ASSISTANT_ROUTER_SOCIAL_ENABLED      = "false"
+        ASSISTANT_ROUTER_OFF_TOPIC_ENABLED   = "false"
+        ASSISTANT_ROUTER_SOCIAL_THRESHOLD    = "0.95"
+        ASSISTANT_ROUTER_OFF_TOPIC_THRESHOLD = "0.95"
         # Grounded travel search. Billed per search query the model executes, and
         # scoped by src/ai/travelDomain.js rather than by this flag; set it to
         # "false" to switch the tool off in an environment entirely.
-        ASSISTANT_TRAVEL_SEARCH_ENABLED           = "true"
+        ASSISTANT_TRAVEL_SEARCH_ENABLED = "true"
       }
       allow_unauthenticated = false
     }
@@ -210,6 +210,25 @@ locals {
         WHATSAPP_PHONE_NUMBER_ID     = var.whatsapp_phone_number_id
         WHATSAPP_BUSINESS_ACCOUNT_ID = var.whatsapp_business_account_id
         WHATSAPP_API_VERSION         = "v23.0"
+      }
+      allow_unauthenticated = false
+    }
+    voice-service = {
+      name    = "${var.env}-voice-service"
+      memory  = "512Mi"
+      cpu     = "1"
+      secrets = ["${var.env}-database-url", "${var.env}-direct-url", "${var.env}-internal-service-key", "${var.env}-internal-events-token", "${var.env}-retell-webhook-secret", "${var.env}-retell-tool-secret"]
+      plain_env = {
+        NODE_ENV   = "production"
+        CLIENT_URL = "https://lush-ware-client-${var.env}.web.app"
+        # The sales-team email and the record deep-links both point at the
+        # Management portal, so this service needs that URL too.
+        MANAGEMENT_URL = "https://lush-ware-management-${var.env}.web.app"
+        # Calls from one number acted on per rolling 24h. Retell has no
+        # documented way to refuse a call already ringing, so the call is
+        # answered either way — past the cap this only stops the forwarding
+        # into lead-service/notification-service.
+        VOICE_MAX_CALLS_PER_NUMBER_PER_DAY = "20"
       }
       allow_unauthenticated = false
     }

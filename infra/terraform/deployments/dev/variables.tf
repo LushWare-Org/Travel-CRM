@@ -394,4 +394,20 @@ variable "management_notifications_enabled" {
   type        = string
   default     = "false"
 }
+# ── Voice agent (Retell AI) ────────────────────────────────────────────────
+# Both are empty until this environment's TF_VARS_* secret carries them; the
+# service rejects every webhook (503) and every tool call until then.
+variable "retell_webhook_secret" {
+  description = "Retell signing secret for the lifecycle webhooks (RETELL_WEBHOOK_SECRET on voice-service)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "retell_tool_secret" {
+  description = "Shared secret the Retell CustomTools send in their headers field (RETELL_TOOL_SECRET on voice-service). Falls back to retell_webhook_secret when empty."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
 

@@ -57,3 +57,7 @@ output "notification_service_url" {
   description = "URL of this environment's notification-service Cloud Run service."
   value       = module.notification_service.uri
 }
+output "voice_service_url" {
+  description = "URL of this environment's voice-service Cloud Run service. Retell posts the two lifecycle webhooks and the seven CustomTool calls to the gateway, so this URL is only used for direct diagnosis."
+  value       = module.voice_service.uri
+}

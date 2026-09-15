@@ -63,6 +63,18 @@ Landing is a standalone marketing page with no backend. `scripts/deploy-landing.
 
 ## Not deployed
 
+- **`voice-service`.** Wired end-to-end in this repo — Dockerfile, both `deploy.yml`
+  matrices (build + deploy), `Services/package.json`'s dev/start scripts, its
+  `microservices-ci.yml` matrix slot, and a Terraform `voice_service` module with
+  its gateway URL, `run.invoker` grants in both directions, and the two Retell
+  secrets — but nothing has been applied or deployed yet. Bringing it live is
+  **apply first, then push**: `TF_VARS_DEV` needs `retell_webhook_secret` and
+  `retell_tool_secret` added, then a Terraform apply creates `dev-voice-service`
+  (the service the gateway's new `/api/v1/webhooks/voice/*` route proxies to).
+  Deploy CI before that apply and `gcloud run deploy` creates the service
+  unmanaged, which makes the next apply collide and need an import. Until both
+  happen, the voice routes answer 502 in `dev`.
+
 - **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates). No Firebase Hosting sites exist for `client-staging`/`client-prod`/`management-staging`/`management-prod` either. `infra/CI-CD-SETUP.md`'s WIF setup would need repeating per-environment (new pool/provider or per-env SAs) before CI could target them.
 
 ## Known placeholder / inactive config in `dev`

@@ -1,5 +1,5 @@
 import { DEFAULTS } from './config.js';
-import { PRICING_MODEL } from '@travel-crm/constants';
+import { PRICING_MODEL } from '../../constants/src/index.js';
 
 /**
  * @param {Array<{pricingModel: string, unitCost: number, distanceKm?: number|null}>} transports

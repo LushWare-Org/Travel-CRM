@@ -57,6 +57,11 @@ module "deployment" {
   # LiteAPI hotel-search key
   liteapi_api_key = var.liteapi_api_key
 
+  # Voice agent (Retell AI) signing secrets. Empty until this environment's
+  # TF_VARS_* secret carries them — the service fails closed meanwhile.
+  retell_webhook_secret = var.retell_webhook_secret
+  retell_tool_secret    = var.retell_tool_secret
+
   # Branding / invoice / bank / admin-email plain config
   company_name                  = var.company_name
   company_short_name            = var.company_short_name

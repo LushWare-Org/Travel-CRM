@@ -11,8 +11,9 @@
 # which includes the referencing instance itself — an unavoidable dependency
 # cycle. Literal per-service module addresses keep the graph acyclic: the
 # only peer references are gateway -> all backends, billing -> user/lead/
-# notification, package -> user, lead -> notification/package, and
-# auth -> notification (notification's lead URL comes from
+# notification, package -> user, lead -> notification/package, voice ->
+# lead/billing/user/package/notification, and auth -> notification
+# (notification's lead URL comes from
 # var.notification_lead_service_url, lead's billing URL comes from
 # var.lead_billing_service_url; two cycle-breaker variables total).
 #
@@ -53,6 +54,7 @@ module "gateway" {
     NOTIFICATION_SERVICE_URL = module.notification_service.uri
     ANALYTICS_SERVICE_URL    = module.analytics_service.uri
     ASSISTANT_SERVICE_URL    = module.assistant_service.uri
+    VOICE_SERVICE_URL        = module.voice_service.uri
   })
   memory                = local.services.gateway.memory
   cpu                   = local.services.gateway.cpu
@@ -339,7 +341,7 @@ module "assistant_service" {
     # here. A URL without the matching run.invoker grant (iam.tf) is worse than
     # no URL at all — the fetch fails at the Cloud Run edge instead of falling
     # back, so the visitor is told the booking could not be sent.
-    BOOKING_SERVICE_URL   = module.booking_service.uri
+    BOOKING_SERVICE_URL = module.booking_service.uri
   })
   memory                = local.services.assistant-service.memory
   cpu                   = local.services.assistant-service.cpu
@@ -371,6 +373,39 @@ module "notification_service" {
   memory                = local.services.notification-service.memory
   cpu                   = local.services.notification-service.cpu
   allow_unauthenticated = local.services.notification-service.allow_unauthenticated
+  min_instances         = 0
+  max_instances         = 10
+  env                   = var.env
+  company_slug          = var.company_slug
+  depends_on            = [google_secret_manager_secret_version.secrets]
+}
+module "voice_service" {
+  source = "./modules/cloud-run-service"
+
+  name                  = local.services.voice-service.name
+  project_id            = var.project_id
+  region                = var.region
+  image                 = "${var.region}-docker.pkg.dev/${var.project_id}/travel-crm/voice-service:${var.env}-${var.image_tag}"
+  service_account_email = google_service_account.services["voice-service"].email
+  secrets = [
+    for id in local.services.voice-service.secrets : {
+      secret_id = id
+      env_var   = local.secret_env_names[id]
+    }
+  ]
+  plain_env = merge(local.services.voice-service.plain_env, {
+    # Every URL here needs a matching run.invoker grant in iam.tf. Cloud Run
+    # rejects an ungranted call at the platform edge, so a missing grant reads
+    # inside a live call as "that tool failed", not as a fallback.
+    LEAD_SERVICE_URL         = module.lead_service.uri
+    BILLING_SERVICE_URL      = module.billing_service.uri
+    USER_SERVICE_URL         = module.user_service.uri
+    PACKAGE_SERVICE_URL      = module.package_service.uri
+    NOTIFICATION_SERVICE_URL = module.notification_service.uri
+  })
+  memory                = local.services.voice-service.memory
+  cpu                   = local.services.voice-service.cpu
+  allow_unauthenticated = local.services.voice-service.allow_unauthenticated
   min_instances         = 0
   max_instances         = 10
   env                   = var.env

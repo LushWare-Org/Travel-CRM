@@ -77,9 +77,19 @@ export default function LeadAiCallsTab({ lead, onVerified }: LeadAiCallsTabProps
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [verifying, setVerifying] = useState(false);
+  // Deliberately separate from `error`, which gates the whole render: a failed
+  // "Mark as checked" must not blank the call history the rep came here to read,
+  // so this one reports inline under the header instead.
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!leadId) return;
+    // A lead with no id can never have calls, but `loading` starts true and is
+    // only cleared in the `finally` below — bailing out before that would leave
+    // the spinner up forever, with no error and no way to retry.
+    if (!leadId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -117,11 +127,12 @@ export default function LeadAiCallsTab({ lead, onVerified }: LeadAiCallsTabProps
 
   const handleVerify = async () => {
     setVerifying(true);
+    setVerifyError(null);
     try {
       await leadAPI.verifyAiLead(leadId);
       onVerified?.();
     } catch {
-      setError('Could not mark this lead as verified.');
+      setVerifyError('Could not mark this lead as verified.');
     } finally {
       setVerifying(false);
     }
@@ -215,6 +226,10 @@ export default function LeadAiCallsTab({ lead, onVerified }: LeadAiCallsTabProps
           </Button>
         )}
       </div>
+
+      {verifyError && (
+        <p role="alert" className="text-sm text-destructive">{verifyError}</p>
+      )}
 
       {calls.map((call, idx) => {
         const isOpen = expanded[call.id];

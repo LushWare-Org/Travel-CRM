@@ -64,7 +64,7 @@ describe('search_packages — needs no active lead', () => {
 
 describe('lead-bound tools — never trust an id from args', () => {
   it('get_trip_status resolves the lead from the call record, ignoring any lead id in args', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-real' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-real', disposition: 'IN_PROGRESS' });
     mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
     await getTripStatusTool(reqWith({
       call: { call_id: 'call_1' },
@@ -74,7 +74,7 @@ describe('lead-bound tools — never trust an id from args', () => {
   });
 
   it('get_trip_status reports unavailable when the call has no bound lead', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: null });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: null, disposition: 'IN_PROGRESS' });
     const r = res();
     await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
     expect(r.json.mock.calls[0][0]).toEqual({ available: false });
@@ -89,7 +89,7 @@ describe('lead-bound tools — never trust an id from args', () => {
   });
 
   it('attach_package resolves the lead from the call, never from args', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-real' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-real', disposition: 'IN_PROGRESS' });
     mockAttachPackage.mockResolvedValue({ selectionId: 'sel-1' });
     await attachPackageTool(reqWith({
       call: { call_id: 'call_1' },
@@ -101,7 +101,7 @@ describe('lead-bound tools — never trust an id from args', () => {
 
 describe('attach_package / adjust_itinerary — trip confirmation is required', () => {
   it('attach_package refuses when trip_confirmed is not explicitly true', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     const r = res();
     await attachPackageTool(reqWith({ call: { call_id: 'call_1' }, args: { package_id: 'pkg-1' } }), r, next);
     expect(r.json.mock.calls[0][0]).toEqual({ attached: false, reason: 'trip_not_confirmed' });
@@ -109,7 +109,7 @@ describe('attach_package / adjust_itinerary — trip confirmation is required', 
   });
 
   it('adjust_itinerary refuses when trip_confirmed is not explicitly true', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     const r = res();
     await adjustItineraryTool(reqWith({ call: { call_id: 'call_1' }, args: { add_nights: 2 } }), r, next);
     expect(r.json.mock.calls[0][0]).toEqual({ adjusted: false, reason: 'trip_not_confirmed' });
@@ -119,7 +119,7 @@ describe('attach_package / adjust_itinerary — trip confirmation is required', 
 
 describe('get_payment_status — money gating', () => {
   it('passes through hasQuote:false untouched — the gate lives in lead-service, this only relays it', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetPaymentBrief.mockResolvedValue({ hasQuote: false });
     const r = res();
     await getPaymentStatusTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
@@ -129,7 +129,7 @@ describe('get_payment_status — money gating', () => {
 
 describe('attach_package — argument validation', () => {
   it('refuses when no package_id is given', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     const r = res();
     await attachPackageTool(reqWith({ call: { call_id: 'call_1' }, args: { trip_confirmed: true } }), r, next);
     expect(r.json.mock.calls[0][0]).toEqual({ attached: false, reason: 'missing_package_id' });
@@ -139,7 +139,7 @@ describe('attach_package — argument validation', () => {
 
 describe('adjust_itinerary — argument mapping', () => {
   it('maps add_nights/remove_nights/hotel_name/destination to the internal shape', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockAdjustItinerary.mockResolvedValue({ nights: 5 });
     await adjustItineraryTool(reqWith({
       call: { call_id: 'call_1' },
@@ -151,14 +151,14 @@ describe('adjust_itinerary — argument mapping', () => {
   });
 
   it('refuses when none of the recognised arguments are present', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     const r = res();
     await adjustItineraryTool(reqWith({ call: { call_id: 'call_1' }, args: { trip_confirmed: true } }), r, next);
     expect(r.json.mock.calls[0][0]).toEqual({ adjusted: false, reason: 'no_changes_given' });
   });
 
   it('ignores a non-string hotel_name rather than passing it through', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockAdjustItinerary.mockResolvedValue({ nights: 3 });
     await adjustItineraryTool(reqWith({
       call: { call_id: 'call_1' }, args: { add_nights: 1, hotel_name: 12345, trip_confirmed: true },
@@ -169,7 +169,7 @@ describe('adjust_itinerary — argument mapping', () => {
 
 describe('preview_price — the figure is never returned to the agent', () => {
   it('does not include any financial figure in the tool response', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockPreviewPricing.mockResolvedValue({ financials: { totalAmount: 2400, balanceDue: 1680 }, persisted: false });
     const r = res();
     await previewPriceTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
@@ -177,7 +177,7 @@ describe('preview_price — the figure is never returned to the agent', () => {
   });
 
   it('still calls previewPricing so the draft has fresh numbers for a rep', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockPreviewPricing.mockResolvedValue({ financials: {}, persisted: false });
     await previewPriceTool(reqWith({ call: { call_id: 'call_1' } }), res(), next);
     expect(mockPreviewPricing).toHaveBeenCalledWith('lead-1', 'req-1');
@@ -186,7 +186,7 @@ describe('preview_price — the figure is never returned to the agent', () => {
 
 describe('resend_document — only ever re-sends what already exists', () => {
   it('reports no_active_lead when the call has no bound lead', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: null });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: null, disposition: 'IN_PROGRESS' });
     const r = res();
     await resendDocumentTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
     expect(r.json.mock.calls[0][0]).toEqual({ sent: false, reason: 'no_active_lead' });
@@ -194,7 +194,7 @@ describe('resend_document — only ever re-sends what already exists', () => {
   });
 
   it('reports nothing_sent_yet when the lead has never had anything sent', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetLatestSentDocument.mockResolvedValue({ latest: null });
     const r = res();
     await resendDocumentTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
@@ -203,7 +203,7 @@ describe('resend_document — only ever re-sends what already exists', () => {
   });
 
   it('resends using the document found on the lead, never an id from args', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetLatestSentDocument.mockResolvedValue({ latest: { type: 'quotation', id: 'quote-real' } });
     mockResendDocument.mockResolvedValue({ email: 'sent', whatsapp: 'sent' });
     await resendDocumentTool(reqWith({
@@ -213,7 +213,7 @@ describe('resend_document — only ever re-sends what already exists', () => {
   });
 
   it('resends whichever type was most recently sent, e.g. an invoice', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetLatestSentDocument.mockResolvedValue({ latest: { type: 'invoice', id: 'inv-1' } });
     mockResendDocument.mockResolvedValue({ email: 'sent', whatsapp: null });
     const r = res();
@@ -223,7 +223,7 @@ describe('resend_document — only ever re-sends what already exists', () => {
   });
 
   it('reports sent:true when at least one channel succeeds', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetLatestSentDocument.mockResolvedValue({ latest: { type: 'quotation', id: 'quote-1' } });
     mockResendDocument.mockResolvedValue({ email: 'sent', whatsapp: 'failed' });
     const r = res();
@@ -232,7 +232,7 @@ describe('resend_document — only ever re-sends what already exists', () => {
   });
 
   it('reports sent:false when every channel fails', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetLatestSentDocument.mockResolvedValue({ latest: { type: 'quotation', id: 'quote-1' } });
     mockResendDocument.mockResolvedValue({ email: 'failed', whatsapp: 'failed' });
     const r = res();
@@ -243,7 +243,7 @@ describe('resend_document — only ever re-sends what already exists', () => {
 
 describe('audit trail', () => {
   it('logs a VoiceCallEvent for a successful call', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
     await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), res(), next);
     expect(mockVoiceCallEventCreate).toHaveBeenCalledWith(expect.objectContaining({
@@ -252,7 +252,7 @@ describe('audit trail', () => {
   });
 
   it('logs a failed call as succeeded:false rather than crashing the webhook', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetTripBrief.mockRejectedValue(new Error('lead-service down'));
     const r = res();
     await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
@@ -274,7 +274,7 @@ describe('audit trail', () => {
   // database before this fix (zero events ever landed); this pins the fix
   // so it can't regress back to a Date.now()-derived value.
   it('numbers the first event on a call as sequence 0, not a timestamp', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockVoiceCallEventCount.mockResolvedValue(0);
     mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
     await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), res(), next);
@@ -284,7 +284,7 @@ describe('audit trail', () => {
   });
 
   it('numbers a second event on the same call as sequence 1', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockVoiceCallEventCount.mockResolvedValue(1);
     mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
     await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), res(), next);
@@ -292,7 +292,7 @@ describe('audit trail', () => {
   });
 
   it('logs loudly, via the structured logger, when the audit write itself fails', async () => {
-    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1' });
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
     mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
     mockVoiceCallEventCreate.mockRejectedValue(new Error('P2002 unique violation'));
     const log = { error: vi.fn() };
@@ -301,5 +301,109 @@ describe('audit trail', () => {
       expect.objectContaining({ callId: 'call_1', functionName: 'get_trip_status' }),
       'Failed to log VoiceCallEvent'
     );
+  });
+});
+
+describe('only the call in progress may act', () => {
+  it('refuses get_trip_status for a completed call, without ever calling the downstream client', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'COMPLETED' });
+    const r = res();
+    await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
+    expect(r.json.mock.calls[0][0]).toEqual({ available: false });
+    expect(mockGetTripBrief).not.toHaveBeenCalled();
+  });
+
+  it('does not honour a call id arriving through args.call_id when that call has already completed', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'COMPLETED' });
+    const r = res();
+    await getTripStatusTool(reqWith({ args: { call_id: 'call_1' } }), r, next);
+    expect(mockVoiceCallFindUnique).toHaveBeenCalledWith({ where: { retellCallId: 'call_1' } });
+    expect(r.json.mock.calls[0][0]).toEqual({ available: false });
+    expect(mockGetTripBrief).not.toHaveBeenCalled();
+  });
+
+  it('coerces a numeric-string add_nights but never invents one from an empty or null add_nights', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
+    mockAdjustItinerary.mockResolvedValue({ nights: 5 });
+
+    await adjustItineraryTool(reqWith({
+      call: { call_id: 'call_1' }, args: { add_nights: '2', trip_confirmed: true },
+    }), res(), next);
+    expect(mockAdjustItinerary).toHaveBeenCalledWith('lead-1', { addNights: 2 }, 'req-1');
+
+    // Number('') and Number(null) are both 0 — accepting either would invent an
+    // "add zero nights" change nobody asked for.
+    for (const addNights of ['', null]) {
+      const r = res();
+      await adjustItineraryTool(reqWith({
+        call: { call_id: 'call_1' }, args: { add_nights: addNights, trip_confirmed: true },
+      }), r, next);
+      expect(r.json.mock.calls[0][0]).toEqual({ adjusted: false, reason: 'no_changes_given' });
+    }
+    expect(mockAdjustItinerary).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('audit-write failures are never fatal', () => {
+  it('answers with the handler result even when the audit insert rejects', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
+    mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
+    mockVoiceCallEventCreate.mockRejectedValueOnce(new Error('audit table down'));
+    const r = res();
+    await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
+    expect(r.json.mock.calls[0][0]).toEqual({ available: true, statusClass: 'quote_sent' });
+  });
+
+  it('retries a P2002 rejection exactly once with a freshly-read count', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
+    mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
+    mockVoiceCallEventCount.mockResolvedValueOnce(3).mockResolvedValueOnce(4);
+    mockVoiceCallEventCreate
+      .mockRejectedValueOnce(Object.assign(new Error('unique violation'), { code: 'P2002' }))
+      .mockResolvedValueOnce({});
+    const r = res();
+    await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
+    expect(mockVoiceCallEventCreate).toHaveBeenCalledTimes(2);
+    expect(mockVoiceCallEventCount).toHaveBeenCalledTimes(2);
+    expect(mockVoiceCallEventCreate.mock.calls[1][0].data.sequence).toBe(4);
+    expect(r.json.mock.calls[0][0]).toEqual({ available: true, statusClass: 'quote_sent' });
+  });
+
+  it('does not retry a non-P2002 audit rejection', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: 'lead-1', disposition: 'IN_PROGRESS' });
+    mockGetTripBrief.mockResolvedValue({ statusClass: 'quote_sent' });
+    mockVoiceCallEventCreate.mockRejectedValueOnce(new Error('connection reset'));
+    await getTripStatusTool(reqWith({ call: { call_id: 'call_1' } }), res(), next);
+    expect(mockVoiceCallEventCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('lead-bound tools degrade honestly when there is no active lead', () => {
+  it('attach_package reports no_active_lead rather than an error', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: null, disposition: 'IN_PROGRESS' });
+    const r = res();
+    await attachPackageTool(reqWith({
+      call: { call_id: 'call_1' }, args: { package_id: 'pkg-1', trip_confirmed: true },
+    }), r, next);
+    expect(r.json.mock.calls[0][0]).toEqual({ attached: false, reason: 'no_active_lead' });
+    expect(mockAttachPackage).not.toHaveBeenCalled();
+  });
+
+  it('adjust_itinerary reports no_active_lead rather than an error', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: null, disposition: 'IN_PROGRESS' });
+    const r = res();
+    await adjustItineraryTool(reqWith({
+      call: { call_id: 'call_1' }, args: { add_nights: 2, trip_confirmed: true },
+    }), r, next);
+    expect(r.json.mock.calls[0][0]).toEqual({ adjusted: false, reason: 'no_active_lead' });
+    expect(mockAdjustItinerary).not.toHaveBeenCalled();
+  });
+
+  it('get_payment_status reports unavailable rather than an error', async () => {
+    mockVoiceCallFindUnique.mockResolvedValue({ id: 'vc-1', leadId: null, disposition: 'IN_PROGRESS' });
+    const r = res();
+    await getPaymentStatusTool(reqWith({ call: { call_id: 'call_1' } }), r, next);
+    expect(r.json.mock.calls[0][0]).toEqual({ available: false });
+    expect(mockGetPaymentBrief).not.toHaveBeenCalled();
   });
 });

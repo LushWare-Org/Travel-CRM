@@ -207,3 +207,48 @@ describe('LeadTable — Sales Rep column', () => {
     expect(screen.getByText('Rita Rep')).toBeInTheDocument();
   });
 });
+
+const aiLead = {
+  _id: 'ai-1',
+  id: 'ai-1',
+  name: 'AI Handled Lead',
+  lifecycleStatus: 'NEW',
+  aiHandled: true,
+  needsRepFollowup: true,
+};
+
+describe('LeadTable — AI badges', () => {
+  // Table is the view the app actually opens on, so the badge has to be there
+  // and not only on the grid card.
+  it('marks an AI-handled lead in the table row', () => {
+    renderTable({ leads: [aiLead], viewMode: 'table' });
+
+    const row = screen.getByText('AI Handled Lead').closest('tr');
+    expect(within(row).getByLabelText('Created or updated by the voice agent')).toBeInTheDocument();
+    expect(within(row).getByLabelText(/could not resolve/)).toBeInTheDocument();
+  });
+
+  it('marks an AI-handled lead on the grid card too', () => {
+    renderTable({ leads: [aiLead], viewMode: 'grid' });
+
+    expect(screen.getByLabelText('Created or updated by the voice agent')).toBeInTheDocument();
+  });
+
+  it('shows the verified badge once a rep has reviewed the call', () => {
+    renderTable({
+      leads: [{ ...aiLead, needsRepFollowup: false, aiVerifiedAt: '2026-09-12T09:00:00.000Z' }],
+      viewMode: 'table',
+    });
+
+    const row = screen.getByText('AI Handled Lead').closest('tr');
+    expect(within(row).getByLabelText(/has reviewed/)).toBeInTheDocument();
+    expect(within(row).queryByLabelText(/could not resolve/)).not.toBeInTheDocument();
+  });
+
+  it('adds no badge to a lead the voice agent never touched', () => {
+    renderTable({ leads: [newLead], viewMode: 'table' });
+
+    const row = screen.getByText('New Lead').closest('tr');
+    expect(within(row).queryByLabelText(/voice agent/)).not.toBeInTheDocument();
+  });
+});

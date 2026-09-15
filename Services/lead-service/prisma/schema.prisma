@@ -56,7 +56,6 @@ enum LeadPlatform {
   Walk_in      @map("Walk-in")
   Chatbot_Wizard @map("Chatbot Wizard")
   Voice_Agent  @map("Voice Agent")
-  Voice_Agent    @map("Voice Agent")
 
   @@schema("crm_leads")
 }

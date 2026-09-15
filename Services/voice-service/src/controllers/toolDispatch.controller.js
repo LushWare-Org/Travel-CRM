@@ -12,20 +12,25 @@ function extractToolContext(body) {
   return { callId, args };
 }
 
+// The call's own database row is the only source of the acting lead — never a
+// tool argument. That rule is not enough on its own: `call_id` itself arrives
+// as a plain argument too (see extractToolContext), so binding to any row that
+// has ever existed would let anyone holding the tool secret mutate an
+// arbitrary lead through a call that finished months ago. Only the call
+// currently in progress may act. Every lead-bound tool below degrades honestly
+// on null — an explicit unavailable/failed result, never a success shape.
 async function resolveLeadId(callId) {
   if (!callId) return null;
   const call = await prisma.voiceCall.findUnique({ where: { retellCallId: callId } });
-  return call?.leadId ?? null;
+  if (!call || call.disposition !== 'IN_PROGRESS') return null;
+  return call.leadId ?? null;
 }
 
-async function logEvent(callId, functionName, args, result, succeeded, startedAt, log) {
-  if (!callId) return;
-  const call = await prisma.voiceCall.findUnique({ where: { retellCallId: callId } });
-  if (!call) return;
-  const count = await prisma.voiceCallEvent.count({ where: { voiceCallId: call.id } });
+async function insertEvent(voiceCallId, functionName, args, result, succeeded, startedAt) {
+  const count = await prisma.voiceCallEvent.count({ where: { voiceCallId } });
   await prisma.voiceCallEvent.create({
     data: {
-      voiceCallId: call.id,
+      voiceCallId,
       sequence: count,
       functionName,
       args,
@@ -33,12 +38,43 @@ async function logEvent(callId, functionName, args, result, succeeded, startedAt
       succeeded,
       latencyMs: Date.now() - startedAt,
     },
-  }).catch((err) => {
-    // Audit logging must never fail the tool call itself, but a silent
-    // failure here is exactly the bug this comment now guards against —
-    // log it loudly instead of swallowing it a second time.
-    log?.error({ err, callId, functionName }, 'Failed to log VoiceCallEvent');
   });
+}
+
+// `sequence` comes from a count() read rather than a database-side counter, so
+// two tool calls overlapping on one call can both read the same count and race
+// for the same @@unique([voiceCallId, sequence]) slot — one of the two inserts
+// is rejected. A single retry with a freshly-read count is enough to place the
+// event; beyond that the event is dropped loudly rather than failing the tool
+// call it describes (whose write has, by then, already committed).
+const EVENT_WRITE_ATTEMPTS = 2;
+
+async function logEvent(callId, functionName, args, result, succeeded, startedAt, log) {
+  if (!callId) return;
+  try {
+    const call = await prisma.voiceCall.findUnique({ where: { retellCallId: callId } });
+    if (!call) return;
+    for (let attempt = 1; attempt <= EVENT_WRITE_ATTEMPTS; attempt += 1) {
+      try {
+        await insertEvent(call.id, functionName, args, result, succeeded, startedAt);
+        return;
+      } catch (err) {
+        // P2002 is the only rejection worth a second attempt: it means another
+        // tool call took our sequence number between the count() and the
+        // insert, which re-reading the count resolves.
+        if (err?.code === 'P2002' && attempt < EVENT_WRITE_ATTEMPTS) continue;
+        // Audit logging must never fail the tool call itself, but a silent
+        // failure here is exactly the bug this comment now guards against —
+        // log it loudly instead of swallowing it a second time.
+        log?.error({ err, callId, functionName }, 'Failed to log VoiceCallEvent');
+        return;
+      }
+    }
+  } catch (err) {
+    // The call lookup itself failed (database hiccup) — same rule: loud in the
+    // logs, never fatal to the tool call it describes.
+    log?.error({ err, callId, functionName }, 'Failed to log VoiceCallEvent');
+  }
 }
 
 function wrap(functionName, handler) {
@@ -54,7 +90,16 @@ function wrap(functionName, handler) {
       req.log.error({ err, functionName, callId }, 'Voice tool call failed');
       result = { error: true, message: 'Could not complete that right now.' };
     }
-    await logEvent(callId, functionName, args, result, succeeded, startedAt, req.log);
+    // The handler's write has already committed by the time we get here. Letting
+    // an audit failure escape would turn a successful tool call into a 500, and
+    // Retell retries failed tool calls — applying the same change twice. The
+    // audit write is therefore its own failure domain: loud in the logs, never
+    // fatal to the result the handler produced.
+    try {
+      await logEvent(callId, functionName, args, result, succeeded, startedAt, req.log);
+    } catch (err) {
+      req.log.error({ err, functionName, callId }, 'Failed to log VoiceCallEvent');
+    }
     res.json(result);
   });
 }
@@ -110,13 +155,27 @@ export const attachPackageTool = wrap('attach_package', async ({ callId, args, r
   return { attached: true, ...result };
 });
 
+// Numeric tool arguments arrive as JSON that the LLM routinely fills with
+// strings ("2"), and Number.isFinite('2') is false — so the night count was
+// dropped and the tool answered no_changes_given while the agent believed it
+// had applied the change. Coerce first, but only values a caller could
+// plausibly mean as a number: Number(null) and Number('') are 0, which would
+// invent a real change (add zero nights) out of an argument nobody sent.
+function toNightCount(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
+}
+
 export const adjustItineraryTool = wrap('adjust_itinerary', async ({ callId, args, requestId }) => {
   const leadId = await resolveLeadId(callId);
   if (!leadId) return { adjusted: false, reason: 'no_active_lead' };
   if (!requireTripConfirmed(args)) return { adjusted: false, reason: 'trip_not_confirmed' };
+  const addNights = toNightCount(args?.add_nights);
+  const removeNights = toNightCount(args?.remove_nights);
   const changes = {
-    ...(Number.isFinite(args?.add_nights) ? { addNights: Number(args.add_nights) } : {}),
-    ...(Number.isFinite(args?.remove_nights) ? { removeNights: Number(args.remove_nights) } : {}),
+    ...(Number.isFinite(addNights) ? { addNights } : {}),
+    ...(Number.isFinite(removeNights) ? { removeNights } : {}),
     ...(typeof args?.hotel_name === 'string' && args.hotel_name.trim() ? { hotelName: args.hotel_name.trim() } : {}),
     ...(typeof args?.destination === 'string' && args.destination.trim() ? { destination: args.destination.trim() } : {}),
   };

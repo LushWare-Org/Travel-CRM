@@ -11,22 +11,54 @@ import { normalizePhone, maskPhone } from '../utils/phone.js';
 
 const PENDING_ADOPTION_WINDOW_MS = 6 * 60 * 60 * 1000;
 
-function findAdoptableCall(callId, fromNumber) {
+// The pending row's key is `pending:${toNumber}:${fromNumber}:${Date.now()}`
+// (see handleInboundCall) — built from the webhook's own payload numbers, and
+// the number pair sits in the id precisely so a later event can find its own
+// row again. The epoch suffix is unknowable here, so the match is on that
+// prefix. Matching `pending:%` from the same number instead would let two
+// calls from one number adopt each other's row and swap transcripts.
+//
+// Both numbers are optional on the post-call payload, so when either is
+// missing there is only the number column (normalized, matching how the row
+// stored it) to go on — and that looser match is used only when exactly one
+// pending row qualifies. With two or more there is no way to tell which call a
+// transcript belongs to, and picking the newest is the swap this guards
+// against.
+async function findAdoptableCall(callId, { fromNumber, toNumber }) {
   const adoptAfter = new Date(Date.now() - PENDING_ADOPTION_WINDOW_MS);
-  return prisma.voiceCall.findFirst({
+  const pendingPrefix = toNumber && fromNumber ? `pending:${toNumber}:${fromNumber}:` : null;
+
+  const exact = await prisma.voiceCall.findFirst({
     where: {
       OR: [
         { retellCallId: callId },
-        {
-          retellCallId: { startsWith: 'pending:' },
-          fromNumber,
-          disposition: 'IN_PROGRESS',
-          startedAt: { gte: adoptAfter },
-        },
+        ...(pendingPrefix
+          ? [{
+            retellCallId: { startsWith: pendingPrefix },
+            disposition: 'IN_PROGRESS',
+            startedAt: { gte: adoptAfter },
+          }]
+          : []),
       ],
     },
     orderBy: { startedAt: 'desc' },
   });
+  if (exact) return exact;
+
+  const normalizedFrom = normalizePhone(fromNumber);
+  if (!normalizedFrom) return null;
+
+  const loose = await prisma.voiceCall.findMany({
+    where: {
+      retellCallId: { startsWith: 'pending:' },
+      fromNumber: normalizedFrom,
+      disposition: 'IN_PROGRESS',
+      startedAt: { gte: adoptAfter },
+    },
+    orderBy: { startedAt: 'desc' },
+    take: 2,
+  });
+  return loose.length === 1 ? loose[0] : null;
 }
 
 export const handleInboundCall = asyncHandler(async (req, res) => {
@@ -114,7 +146,7 @@ export const handlePostCall = asyncHandler(async (req, res) => {
   // live in-call tool calls, which happen mid-conversation, long before this
   // webhook's `call_analyzed` event ever fires.
   if (event === 'call_started') {
-    const adoptable = await findAdoptableCall(call.call_id, fromNumber);
+    const adoptable = await findAdoptableCall(call.call_id, { fromNumber: call.from_number, toNumber: call.to_number });
     if (adoptable && adoptable.retellCallId !== call.call_id) {
       await prisma.voiceCall.update({ where: { id: adoptable.id }, data: { retellCallId: call.call_id } });
     }
@@ -123,7 +155,7 @@ export const handlePostCall = asyncHandler(async (req, res) => {
 
   const startedAt = call.start_timestamp ? new Date(call.start_timestamp) : new Date();
   const stored = toStoredTranscript(call.transcript_object ?? []);
-  const existing = await findAdoptableCall(call.call_id, fromNumber);
+  const existing = await findAdoptableCall(call.call_id, { fromNumber: call.from_number, toNumber: call.to_number });
 
   const data = {
     retellCallId: call.call_id,
@@ -138,6 +170,11 @@ export const handlePostCall = asyncHandler(async (req, res) => {
     summary: call.call_analysis?.call_summary ?? null,
     sentiment: call.call_analysis?.user_sentiment ?? null,
     costCents: call.call_cost?.combined_cost != null ? Math.round(call.call_cost.combined_cost * 100) : null,
+    // Retell holds the audio, and only for as long as they keep it — nothing
+    // else in this system stores it, so a dropped write here loses the
+    // recording permanently. Management's AI tab has a player waiting for the
+    // URL; until a playback route exists this is what keeps it recoverable.
+    recordingUrl: call.recording_url ?? null,
   };
 
   const voiceCall = existing
@@ -193,7 +230,7 @@ export const handlePostCall = asyncHandler(async (req, res) => {
     // Best-effort: the agent already told the caller a human would ring back, so
     // a failure here must be loud in the logs but must never fail the webhook —
     // Retell would retry the whole call and duplicate the lead work.
-    if (followup) {
+    if (followup && followup !== voiceCall.needsRepFollowup) {
       try {
         await notifyRepsOfCallback(
           { call: { ...voiceCall, ...data }, slots, leadId },

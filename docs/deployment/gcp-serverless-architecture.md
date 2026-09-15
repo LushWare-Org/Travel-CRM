@@ -9,9 +9,9 @@ Status: accepted. This document is the durable architecture record for Travel-CR
 | Client SPA | Firebase Hosting — one site per environment (`Client/dist`) | First-party customer-facing SPA served as a static build; gets real custom domains (`lushtravelcloud.com`, `www.lushtravelcloud.com`) via Firebase Hosting's region-independent, free custom-domain feature. |
 | Management SPA | Firebase Hosting — one site per environment (`Management/dist`) | First-party admin SPA served as a static build; gets `manage.lushtravelcloud.com` the same way; no server-side compute. |
 | Landing page | Firebase Hosting — one site per environment (`Landing/dist`) | Standalone marketing page (Vite + React + Tailwind) with no backend of its own; every CTA links out to the Client/Management sites, whose URLs are baked in at build time. |
-| Services (gateway + 11 microservices) | Cloud Run ×12 + Supabase Postgres | All stateless Express apps — one Cloud Run service per `Services/*` directory (11 services) plus `Services/gateway`; they share one Supabase Postgres database with one schema per service, matching the existing `schema.prisma` `schemas` arrays with zero schema changes. |
+| Services (gateway + 12 microservices) | Cloud Run ×13 + Supabase Postgres | All stateless Express apps — one Cloud Run service per `Services/*` directory (12 services) plus `Services/gateway`; they share one Supabase Postgres database with one schema per service, matching the existing `schema.prisma` `schemas` arrays with zero schema changes. |
 
-**Compute.** Cloud Run, one service per `Services/*` directory (11 services) + `Services/gateway` = 12 Cloud Run services. All are stateless Express apps; no code changes needed for Cloud Run compatibility except the gateway ID-token change (see "Service exposure").
+**Compute.** Cloud Run, one service per `Services/*` directory (12 services) + `Services/gateway` = 13 Cloud Run services. All are stateless Express apps; no code changes needed for Cloud Run compatibility except the gateway ID-token change (see "Service exposure").
 
 **Static hosting.** Firebase Hosting, three sites per environment in one Firebase project — `Client/dist`, `Management/dist` and `Landing/dist` (`Landing/` is the backendless marketing page; `infra/README.md` records the deployed dev URLs).
 
@@ -76,7 +76,7 @@ All secrets live in Secret Manager. Because all three environments share one GCP
 
 Plain env vars (set directly on the Cloud Run service, not Secret Manager):
 
-- `NODE_ENV=production` — all 12 services.
+- `NODE_ENV=production` — all 13 services.
 - `CLIENT_URL` / `MANAGEMENT_URL` — that environment's two Firebase Hosting site URLs (gateway, booking, analytics).
 - `CLOUDINARY_CLOUD_NAME` — package, billing, career (not a secret; it's part of every public Cloudinary asset URL).
 - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`/absent, `EMAIL_FROM` — notification, booking.

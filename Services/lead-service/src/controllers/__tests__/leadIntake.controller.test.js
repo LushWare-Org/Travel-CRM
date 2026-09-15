@@ -17,6 +17,10 @@ const {
   mockLeadRemarkCreate,
   mockLeadStatusHistoryCreate,
   mockLeadPackageSelectionCount,
+  mockLeadPackageSelectionFindFirst,
+  mockLeadPackageSelectionCreate,
+  mockAttachPackageToLead,
+  mockFetchPackage,
   mockSettingsUpsert,
   mockSettingsUpdate,
   mockTransaction,
@@ -37,6 +41,10 @@ const {
   mockLeadRemarkCreate: vi.fn(),
   mockLeadStatusHistoryCreate: vi.fn(),
   mockLeadPackageSelectionCount: vi.fn(),
+  mockLeadPackageSelectionFindFirst: vi.fn(),
+  mockLeadPackageSelectionCreate: vi.fn(),
+  mockAttachPackageToLead: vi.fn(),
+  mockFetchPackage: vi.fn(),
   mockSettingsUpsert: vi.fn(),
   mockSettingsUpdate: vi.fn(),
   mockTransaction: vi.fn(),
@@ -63,7 +71,11 @@ vi.mock('../../db/client.js', () => ({
     },
     leadRemark: { create: mockLeadRemarkCreate },
     leadStatusHistory: { create: mockLeadStatusHistoryCreate },
-    leadPackageSelection: { count: mockLeadPackageSelectionCount },
+    leadPackageSelection: {
+      count: mockLeadPackageSelectionCount,
+      findFirst: mockLeadPackageSelectionFindFirst,
+      create: mockLeadPackageSelectionCreate,
+    },
     settings: { upsert: mockSettingsUpsert, update: mockSettingsUpdate },
     $transaction: mockTransaction,
   },
@@ -77,6 +89,20 @@ vi.mock('../../services/gatekeeper.service.js', () => ({
 vi.mock('../../services/notification.client.js', () => ({
   sendWhatsappText: vi.fn(async () => ({ success: true })),
 }));
+
+// Intake's package attach is a best-effort call into lead-selection.service.js,
+// which reads the live package over HTTP. Keep the real implementation (the
+// response's `packageSelection` is its return value) but spy on the call, and
+// stub the package-service fetch so no test touches the network.
+vi.mock('../../services/lead-selection.service.js', async () => {
+  const actual = await vi.importActual('../../services/lead-selection.service.js');
+  return { ...actual, attachPackageToLead: mockAttachPackageToLead.mockImplementation(actual.attachPackageToLead) };
+});
+
+vi.mock('../../services/lead-draft.service.js', async () => {
+  const actual = await vi.importActual('../../services/lead-draft.service.js');
+  return { ...actual, fetchPackage: mockFetchPackage };
+});
 
 process.env.INTERNAL_EVENTS_TOKEN = 'test-internal-token';
 
@@ -142,6 +168,11 @@ beforeEach(() => {
   mockLeadRemarkCreate.mockReset();
   mockLeadStatusHistoryCreate.mockReset().mockResolvedValue({ id: 'hist-1' });
   mockLeadPackageSelectionCount.mockReset();
+  mockLeadPackageSelectionFindFirst.mockReset().mockResolvedValue(null);
+  mockLeadPackageSelectionCreate.mockReset().mockResolvedValue({ id: 'sel-1', packageName: 'Bali Escape' });
+  mockFetchPackage.mockReset().mockResolvedValue({ title: 'Bali Escape' });
+  // mockClear, not mockReset: this spy delegates to the real service implementation.
+  mockAttachPackageToLead.mockClear();
   mockSettingsUpsert.mockReset();
   mockSettingsUpdate.mockReset();
   mockTransaction.mockReset().mockImplementation(async (fn) => fn(txClient));
@@ -164,7 +195,17 @@ describe('POST /api/v1/leads/internal/intake', () => {
       .send(validBody());
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, data: { leadId: 'lead-1', lifecycleStatus: 'PENDING_VERIFICATION', created: true } });
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        leadId: 'lead-1',
+        lifecycleStatus: 'PENDING_VERIFICATION',
+        created: true,
+        packageSelection: null,
+      },
+    });
+    // No selectedPackageId in the body — the best-effort attach is never tried.
+    expect(mockAttachPackageToLead).not.toHaveBeenCalled();
 
     const [option] = mockLeadUpsert.mock.calls[0];
     expect(option.where).toEqual({
@@ -213,7 +254,15 @@ describe('POST /api/v1/leads/internal/intake', () => {
       .send(validBody());
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, data: { leadId: 'lead-1', lifecycleStatus: 'PENDING_VERIFICATION', created: false } });
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        leadId: 'lead-1',
+        lifecycleStatus: 'PENDING_VERIFICATION',
+        created: false,
+        packageSelection: null,
+      },
+    });
 
     const [option] = mockLeadUpsert.mock.calls[0];
     expect(option.update).toEqual(expect.objectContaining({
@@ -256,20 +305,40 @@ describe('POST /api/v1/leads/internal/intake', () => {
     expect(option.update.message).toBe('Trip duration: 5 days; Preferences: beach holiday');
   });
 
-  it('folds selectedPackageId into the message so it is never silently dropped', async () => {
+  it('attaches selectedPackageId as a real package selection instead of a message breadcrumb', async () => {
+    const PACKAGE_ID = 'b0000000-0000-4000-8000-000000000001';
     mockLeadFindUnique.mockResolvedValue(null);
-    mockLeadUpsert.mockResolvedValue({ id: 'lead-pkg', lifecycleStatus: 'PENDING_VERIFICATION' });
+    // The upserted row already carries a primary selection, so the attach must
+    // receive — and therefore not re-point — it.
+    mockLeadUpsert.mockResolvedValue({
+      id: 'lead-pkg', lifecycleStatus: 'PENDING_VERIFICATION', primarySelectionId: 'sel-primary',
+    });
     mockLeadCommLogFindMany.mockResolvedValue([]);
     mockLeadCommLogCreateMany.mockResolvedValue({ count: 2 });
 
     const res = await request(app)
       .post('/api/v1/leads/internal/intake')
       .set('x-internal-token', process.env.INTERNAL_EVENTS_TOKEN)
-      .send(validBody({ selectedPackageId: 'b0000000-0000-4000-8000-000000000001' }));
+      .send(validBody({ selectedPackageId: PACKAGE_ID }));
 
     expect(res.status).toBe(200);
+    expect(mockAttachPackageToLead).toHaveBeenCalledWith('lead-pkg', PACKAGE_ID, { primarySelectionId: 'sel-primary' });
+    // The attach's own result is what the response reports back.
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        leadId: 'lead-pkg',
+        lifecycleStatus: 'PENDING_VERIFICATION',
+        created: true,
+        packageSelection: { selectionId: 'sel-1', packageName: 'Bali Escape', alreadyAttached: false },
+      },
+    });
+    // The id is a real selection now, so the free-text message no longer
+    // carries it...
     const [option] = mockLeadUpsert.mock.calls[0];
-    expect(option.create.message).toContain('Selected package: b0000000-0000-4000-8000-000000000001');
+    expect(option.create.message).not.toContain(PACKAGE_ID);
+    // ...and forwarding the existing primary is why nothing re-points it.
+    expect(mockLeadUpdate).not.toHaveBeenCalled();
   });
 
   it('appends transcript only (no scalar change) when the same-session lead has already left PENDING_VERIFICATION', async () => {
@@ -286,14 +355,29 @@ describe('POST /api/v1/leads/internal/intake', () => {
     const res = await request(app)
       .post('/api/v1/leads/internal/intake')
       .set('x-internal-token', process.env.INTERNAL_EVENTS_TOKEN)
-      .send(validBody({ sessionId: 'session-1', slots: { destination: 'Maldives' } }));
+      .send(validBody({
+        sessionId: 'session-1',
+        slots: { destination: 'Maldives' },
+        selectedPackageId: 'b0000000-0000-4000-8000-000000000001',
+      }));
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, data: { leadId: 'lead-9', lifecycleStatus: 'NEW', created: false } });
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        leadId: 'lead-9',
+        lifecycleStatus: 'NEW',
+        created: false,
+        packageSelection: null,
+      },
+    });
     expect(mockLeadUpsert).not.toHaveBeenCalled();
     expect(mockLeadCommLogCreateMany).toHaveBeenCalled();
     // The requested destination was NOT written to any scalar field.
     expect(mockLeadUpdate).not.toHaveBeenCalled();
+    // A package named this late is a change to an already-claimed lead, not a
+    // fresh selection, so the attach is skipped even though the id was sent.
+    expect(mockAttachPackageToLead).not.toHaveBeenCalled();
   });
 
   it('never merges into a different lead matched only by contact — no cross-session dedupe-by-contact exists (security)', async () => {

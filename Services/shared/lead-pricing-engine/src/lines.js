@@ -1,4 +1,4 @@
-import { DEFAULTS } from '@travel-crm/pricing-engine/config';
+import { DEFAULTS } from '../../pricing-engine/src/config.js';
 import { toCents, fromCents } from './money.js';
 
 /**
