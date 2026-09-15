@@ -228,8 +228,22 @@ describe('refreshSelection', () => {
     expect(prismaClient.leadPricing.deleteMany).toHaveBeenCalledWith({ where: { leadPackageSelectionId: 'sel-1' } });
     expect(prismaClient.leadPackageSelection.update).toHaveBeenCalledWith({
       where: { id: 'sel-1' },
-      data: { sourcePackageId: null },
+      data: { sourcePackageId: null, pendingAiChange: null },
     });
+  });
+
+  it('clears any pending AI change when refreshing — this is the "Discard" action for a voice-agent edit', async () => {
+    const prismaClient = mockPrisma({
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'sel-1', isManual: false, currentQuoteId: null }),
+        update: vi.fn().mockResolvedValue({ id: 'sel-1', pendingAiChange: null }),
+      },
+      leadItineraryDay: { deleteMany: vi.fn() },
+      leadCostLine: { deleteMany: vi.fn() },
+      leadPricing: { deleteMany: vi.fn() },
+    });
+    await refreshSelection({ selectionId: 'sel-1', prismaClient });
+    expect(prismaClient.leadPackageSelection.update.mock.calls[0][0].data.pendingAiChange).toBeNull();
   });
 
   it('refuses to refresh the manual slot', async () => {

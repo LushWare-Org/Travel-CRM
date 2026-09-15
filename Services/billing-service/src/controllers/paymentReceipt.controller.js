@@ -249,6 +249,53 @@ export const sendPaymentReceipt = asyncHandler(async (req, res) => {
   }
 });
 
+// ─── POST /:id/resend-voice ─────────────────────────────────────
+export const resendPaymentReceiptForVoice = asyncHandler(async (req, res) => {
+  const receipt = await prisma.paymentReceipt.findUnique({ where: { id: req.params.id }, include: receiptWithInvoiceInclude });
+  if (!receipt) throw new AppError('Payment receipt not found', 404);
+  if (!receipt.sentAt) throw new AppError('This receipt has not been sent yet — a specialist needs to send it the first time', 409);
+
+  const results = { email: null, whatsapp: null };
+  const pdf = await generatePaymentReceiptPDF(receipt);
+  const now = new Date();
+
+  if (receipt.customerEmail) {
+    try {
+      await sendReceiptEmail({ receipt, recipientEmail: receipt.customerEmail, pdfBuffer: pdf });
+      await prisma.paymentReceipt.update({ where: { id: receipt.id }, data: { emailSent: true } });
+      results.email = 'sent';
+    } catch (err) {
+      req.log.error({ err, receiptId: receipt.id }, 'Voice resend: email failed');
+      results.email = 'failed';
+    }
+  }
+
+  if (receipt.customerPhone) {
+    try {
+      const mediaUrl = await uploadPdfBuffer(pdf, `receipt-${receipt.receiptNumber}`);
+      await sendReceiptWhatsapp({ receipt, phone: receipt.customerPhone, mediaUrl });
+      await prisma.paymentReceipt.update({ where: { id: receipt.id }, data: { whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl } });
+      results.whatsapp = 'sent';
+    } catch (err) {
+      req.log.error({ err, receiptId: receipt.id }, 'Voice resend: WhatsApp failed');
+      results.whatsapp = 'failed';
+    }
+  }
+
+  if (results.email === 'sent' || results.whatsapp === 'sent') {
+    try {
+      await logLeadCommunication({
+        leadId: receipt.leadId, type: 'message',
+        notes: `Payment receipt ${receipt.receiptNumber} resent by voice agent (email: ${results.email ?? 'n/a'}, WhatsApp: ${results.whatsapp ?? 'n/a'})`,
+      });
+    } catch (err) {
+      req.log.error({ err, leadId: receipt.leadId }, 'Failed to log voice resend on lead timeline');
+    }
+  }
+
+  res.json({ success: true, data: results });
+});
+
 export const getPaymentReceiptStats = asyncHandler(async (req, res) => {
   const [total, verified, reconciled] = await Promise.all([
     prisma.paymentReceipt.count({ where: { receiptStatus: { not: 'cancelled' } } }),

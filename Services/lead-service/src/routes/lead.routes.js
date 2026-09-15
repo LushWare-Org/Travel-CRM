@@ -1,6 +1,6 @@
 import express from 'express';
 import { extractUser, requireAuth, authorize } from '../middleware/auth.js';
-import { intakeLead, claimLead } from '../controllers/leadIntake.controller.js';
+import { intakeLead, claimLead, lookupLeadsByPhone, verifyAiLead, getRelatedLeads } from '../controllers/leadIntake.controller.js';
 import {
   createLead, getLeads, getLead, updateLead, deleteLead,
   addRemark, getLeadRemarks, assignLead, unassignLead,
@@ -19,6 +19,10 @@ import {
 } from '../controllers/lead-package-selection.controller.js';
 import { previewPricing } from '../controllers/pricing.controller.js';
 import { getAssignmentSettings, updateAssignmentSettings } from '../controllers/settings.controller.js';
+import {
+  getTripBrief, getPaymentBrief, attachPackageForVoice, adjustItineraryForVoice, previewPricingForVoice,
+  approveAiChange,
+} from '../controllers/voiceActions.controller.js';
 
 const router = express.Router();
 router.use(extractUser);
@@ -38,6 +42,12 @@ router.post('/internal/events', internalTokenAuth, handleInternalEvent);
 router.post('/internal/facebook-lead', internalTokenAuth, handleFacebookLeadEvent);
 router.post('/internal/communication-logs', internalTokenAuth, logCommunication);
 router.post('/internal/intake', internalTokenAuth, intakeLead);
+router.get('/internal/by-phone', internalTokenAuth, lookupLeadsByPhone);
+router.get('/internal/:id/trip-brief', internalTokenAuth, getTripBrief);
+router.get('/internal/:id/payment-brief', internalTokenAuth, getPaymentBrief);
+router.post('/internal/:id/packages/attach', internalTokenAuth, attachPackageForVoice);
+router.post('/internal/:id/itinerary/adjust', internalTokenAuth, adjustItineraryForVoice);
+router.post('/internal/:id/pricing/preview', internalTokenAuth, previewPricingForVoice);
 
 // Protected
 router.use(requireAuth);
@@ -58,6 +68,8 @@ router.patch('/:id/unassign', authorize('admin', 'salesRep'), unassignLead);
 router.get('/:id/itinerary/pdf', authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
 router.post('/:id/whatsapp-reply', authorize('admin', 'salesRep'), sendWhatsappReply);
 router.post('/:id/claim', authorize('admin', 'salesRep'), claimLead);
+router.post('/:id/ai-verify', authorize('admin', 'salesRep'), verifyAiLead);
+router.get('/:id/related', authorize('admin', 'salesRep'), getRelatedLeads);
 
 // Per-package selections — a lead can hold many packages (plus one manual
 // slot) at once; each owns its own itinerary/cost-lines/pricing/quote state.
@@ -70,6 +82,9 @@ router.route('/:id/packages/:selectionId')
   .delete(authorize('admin', 'salesRep'), deletePackageSelection);
 router.put('/:id/packages/:selectionId/itinerary', authorize('admin', 'salesRep'), updateSelectionItinerary);
 router.post('/:id/packages/:selectionId/refresh', authorize('admin', 'salesRep'), refreshPackageSelection);
+// Rep accepts the voice agent's pending itinerary edit. "Discard" is the
+// refresh route above, which clears the same flag by reverting the draft.
+router.post('/:id/packages/:selectionId/approve-ai-change', authorize('admin', 'salesRep'), approveAiChange);
 router.post('/:id/packages/:selectionId/quote', authorize('admin', 'salesRep'), quotePackageSelection);
 router.get('/:id/packages/:selectionId/pricing', authorize('admin', 'salesRep'), getSelectionPricing);
 router.post('/:id/packages/:selectionId/pricing/calculate', authorize('admin', 'salesRep'), calculateSelectionPricing);

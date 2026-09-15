@@ -1,7 +1,7 @@
 /**
  * Runs `prisma migrate deploy` across every Prisma-backed microservice.
  *
- * All 9 services below share one physical Postgres database (same host,
+ * All 10 services below share one physical Postgres database (same host,
  * same database — just a different `@@schema` namespace per service), so
  * Prisma's `_prisma_migrations` bookkeeping table is effectively shared
  * too: any service's `migrate status` will list every other service's
@@ -83,6 +83,7 @@ const SERVICES = [
   'career-service',
   'flight-service',
   'assistant-service',
+  'voice-service',
 ];
 
 let failed = false;

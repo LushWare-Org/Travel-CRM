@@ -1,4 +1,6 @@
-import { Search, X, Filter } from 'lucide-react';
+import { Search, X, Filter, Sparkles, AlertTriangle, CheckCircle2, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -43,6 +45,13 @@ const PLATFORM_OPTIONS = [
   { id: 'Email', label: 'Email' },
   { id: 'Walk_in', label: 'Walk-in' },
   { id: 'Chatbot_Wizard', label: 'Chatbot' },
+  { id: 'Voice_Agent', label: 'Voice Agent' },
+];
+
+const AI_OPTIONS: { id: string; label: string; icon: LucideIcon; activeTone: string }[] = [
+  { id: 'needsRepFollowup', label: 'Needs check', icon: AlertTriangle, activeTone: 'bg-amber-500 text-white' },
+  { id: 'aiHandled', label: 'AI handled', icon: Sparkles, activeTone: 'bg-purple-600 text-white' },
+  { id: 'aiVerified', label: 'AI verified', icon: CheckCircle2, activeTone: 'bg-emerald-600 text-white' },
 ];
 
 interface LeadFiltersProps {
@@ -55,6 +64,8 @@ interface LeadFiltersProps {
   setFilterSources: (value: string[]) => void;
   filterPlatforms: string[];
   setFilterPlatforms: (value: string[]) => void;
+  filterAi?: string[];
+  setFilterAi?: (value: string[]) => void;
   onAdvancedFilterClick: () => void;
 }
 
@@ -68,10 +79,31 @@ const LeadFilters = ({
   setFilterSources,
   filterPlatforms,
   setFilterPlatforms,
+  filterAi = [],
+  setFilterAi,
   onAdvancedFilterClick,
 }: LeadFiltersProps) => {
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (aiRef.current && !aiRef.current.contains(e.target as Node)) {
+        setAiOpen(false);
+      }
+    };
+    if (aiOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [aiOpen]);
+
+  const toggleAi = (id: string) => {
+    setFilterAi?.(filterAi.includes(id) ? filterAi.filter((v) => v !== id) : [...filterAi, id]);
+  };
+
   return (
-    <Card className="p-3 sm:p-4">
+    <Card className="p-3 sm:p-4 overflow-visible">
       <div className="flex flex-col gap-3 sm:gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -177,6 +209,57 @@ const LeadFilters = ({
             </div>
           </div>
         </div>
+
+        {setFilterAi && (
+          <div ref={aiRef} className="relative z-50">
+              <button
+                onClick={() => setAiOpen(!aiOpen)}
+                className="h-8 px-3 rounded-lg text-sm font-medium bg-muted text-muted-foreground hover:bg-muted/70 inline-flex items-center gap-1.5"
+              >
+                Voice Agent
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              {aiOpen && (
+                <div className="absolute top-full mt-1 left-0 bg-card border border-input rounded-lg shadow-lg z-50 min-w-48">
+                {AI_OPTIONS.map((opt) => {
+                  const isSelected = filterAi.includes(opt.id);
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => toggleAi(opt.id)}
+                      className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 hover:bg-muted ${
+                        isSelected ? 'bg-muted' : ''
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="w-4 h-4"
+                      />
+                      <Icon className="w-3.5 h-3.5" />
+                      {opt.label}
+                    </button>
+                  );
+                })}
+                {filterAi.length > 0 && (
+                  <div className="border-t border-input pt-1 pb-1">
+                    <button
+                      onClick={() => {
+                        setFilterAi?.([]);
+                        setAiOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
+        )}
       </div>
     </Card>
   );

@@ -79,6 +79,7 @@ const LeadManagement = () => {
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
   const [filterSources, setFilterSources] = useState<string[]>([]);
+  const [filterAi, setFilterAi] = useState<string[]>([]);
 
   const [statsSummary, setStatsSummary] = useState<any>(null);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ all: 0 });
@@ -186,7 +187,7 @@ const LeadManagement = () => {
   useEffect(() => {
     fetchLeads();
     fetchLeadStats();
-  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, filterSources, currentPage, idsParam]);
+  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, filterSources, filterAi, currentPage, idsParam]);
 
   useEffect(() => {
     if (!shouldOpenLead || !highlightedLeadId) return;
@@ -240,7 +241,11 @@ const LeadManagement = () => {
         if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
         if (filterSources.length > 0) params.source = filterSources.join(',');
         if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
+        if (filterAi.includes('aiHandled')) params.aiHandled = 'true';
+        if (filterAi.includes('needsRepFollowup')) params.needsRepFollowup = 'true';
+        if (filterAi.includes('aiVerified')) params.aiVerified = 'true';
       }
+
 
       const response = !idsParam && debouncedSearch
         ? await leadAPI.searchLeads(debouncedSearch)
@@ -505,19 +510,21 @@ const LeadManagement = () => {
               onAssignSuccess={() => { fetchLeads(); fetchLeadStats(); }}
             />
 
-            {/* Filters */}
-            <LeadFilters
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              filterStatus={filterStatus}
-              setFilterStatus={setFilterStatus}
-              statusCounts={statusCounts}
-              filterSources={filterSources}
-              setFilterSources={setFilterSources}
-              filterPlatforms={filterPlatforms}
-              setFilterPlatforms={setFilterPlatforms}
-              onAdvancedFilterClick={() => setShowFilterDialog(true)}
-            />
+        {/* Filters */}
+        <LeadFilters
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          statusCounts={statusCounts}
+          filterSources={filterSources}
+          setFilterSources={setFilterSources}
+          filterPlatforms={filterPlatforms}
+          setFilterPlatforms={setFilterPlatforms}
+          filterAi={filterAi}
+          setFilterAi={setFilterAi}
+          onAdvancedFilterClick={() => setShowFilterDialog(true)}
+        />
 
             {idsParam && (
               <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">

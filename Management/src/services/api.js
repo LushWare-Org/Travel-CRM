@@ -265,6 +265,21 @@ export const leadAPI = {
     return api.post(`/leads/${id}/claim`);
   },
 
+  verifyAiLead: async (id) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/ai-verify`);
+  },
+
+  getRelatedLeads: async (id) => {
+    const api = new ApiService();
+    return api.get(`/leads/${id}/related`);
+  },
+
+  approveAiChange: async (id, selectionId) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/packages/${selectionId}/approve-ai-change`);
+  },
+
   // Send a free-form WhatsApp reply to the lead (only valid within Meta's
   // 24h session window — the caller/UI is responsible for that check).
   sendWhatsappReply: async (id, text) => {
@@ -926,6 +941,18 @@ export const activityAPI = {
   create: async (data) => {
     const api = new ApiService();
     return api.post('/activities', data);
+  },
+};
+
+export const voiceAPI = {
+  getCallsForLead: async (leadId) => {
+    const api = new ApiService();
+    return api.get(`/voice/leads/${leadId}/calls`);
+  },
+
+  recordingUrl: (callId) => {
+    const api = new ApiService();
+    return `${api.baseURL}/voice/calls/${callId}/recording`;
   },
 };
 
