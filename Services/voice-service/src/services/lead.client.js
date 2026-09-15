@@ -1,4 +1,5 @@
 import AppError from '../utils/appError.js';
+import { domainAuthHeader } from '../utils/cloudRunAuth.js';
 
 const BASE = () => process.env.LEAD_SERVICE_URL || 'http://localhost:3004';
 const LOOKUP_TIMEOUT_MS = 2000;
@@ -17,6 +18,10 @@ async function call(path, { method = 'POST', body, requestId, timeoutMs = LOOKUP
     const res = await fetch(`${BASE()}${path}`, {
       method,
       headers: {
+        // Cloud Run rejects an unauthenticated call at its edge (403) before the
+        // container runs — see cloudRunAuth.js. This is empty off Cloud Run, so
+        // local development still talks to plain http://localhost URLs.
+        ...(await domainAuthHeader(BASE())),
         'content-type': 'application/json',
         'x-internal-token': token,
         ...(requestId ? { 'x-request-id': requestId } : {}),

@@ -1,4 +1,5 @@
 import { maskPhone } from '../utils/phone.js';
+import { domainAuthHeader } from '../utils/cloudRunAuth.js';
 
 const TIMEOUT_MS = 8000;
 
@@ -18,6 +19,7 @@ async function post(base, path, body, requestId, tokenEnv) {
     const res = await fetch(`${base}${path}`, {
       method: 'POST',
       headers: {
+        ...(await domainAuthHeader(base)),
         'content-type': 'application/json',
         'x-internal-token': token,
         ...(requestId ? { 'x-request-id': requestId } : {}),
@@ -42,6 +44,7 @@ async function fetchNotifyTargets(requestId) {
   try {
     const res = await fetch(`${base}/api/v1/sales-reps/internal/notify-targets`, {
       headers: {
+        ...(await domainAuthHeader(base)),
         'x-internal-token': token,
         ...(requestId ? { 'x-request-id': requestId } : {}),
       },

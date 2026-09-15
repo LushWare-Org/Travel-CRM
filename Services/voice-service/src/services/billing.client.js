@@ -1,4 +1,5 @@
 import AppError from '../utils/appError.js';
+import { domainAuthHeader } from '../utils/cloudRunAuth.js';
 
 const BASE = () => process.env.BILLING_SERVICE_URL || 'http://localhost:3006';
 const LOOKUP_TIMEOUT_MS = 3000;
@@ -20,6 +21,7 @@ async function call(path, { method = 'GET', requestId, timeoutMs } = {}) {
     const res = await fetch(`${BASE()}${path}`, {
       method,
       headers: {
+        ...(await domainAuthHeader(BASE())),
         'content-type': 'application/json',
         'x-internal-token': token,
         ...(requestId ? { 'x-request-id': requestId } : {}),

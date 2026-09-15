@@ -1,3 +1,5 @@
+import { domainAuthHeader } from '../utils/cloudRunAuth.js';
+
 const BASE = () => process.env.PACKAGE_SERVICE_URL || 'http://localhost:3003';
 const TIMEOUT_MS = 3000;
 const MAX_RESULTS = 5;
@@ -10,7 +12,10 @@ export async function searchPackages(query, requestId) {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(`${BASE()}/api/v1/packages/search/query?q=${encodeURIComponent(q)}`, {
-      headers: requestId ? { 'x-request-id': requestId } : {},
+      headers: {
+        ...(await domainAuthHeader(BASE())),
+        ...(requestId ? { 'x-request-id': requestId } : {}),
+      },
       signal: controller.signal,
     });
     if (!res.ok) return [];
