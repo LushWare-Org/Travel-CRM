@@ -85,6 +85,14 @@ const INVOICE_PROJECTION = [
   'overdue',
 ];
 
+// billing-service's own overdue set: its invoice-stat query and the dashboard
+// count both read `status IN ('sent','partial','overdue')` with a past due date
+// (invoice.controller.js:259, billing.controller.js:45). Kept here verbatim so
+// this tool's counts cannot disagree with the page the question is about.
+// `status` is read off the RAW record for these two decisions only and stays out
+// of the projection above, where payment truth comes from `paymentStatus`.
+const INVOICE_OVERDUE_STATUSES = ['sent', 'partial', 'overdue'];
+
 function project(record, fields) {
   const out = {};
   for (const field of fields) out[field] = record?.[field] ?? null;
@@ -189,7 +197,7 @@ const listLeadsTool = {
 const listInvoicesTool = {
   name: 'listInvoices',
   description:
-    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Reads the WHOLE book by default and needs no page context. When it read the whole book the result also carries `total` and `overdueTotal` — the invoice counts an answer may state. Pass `leadId` ONLY when the question names one specific lead — never to narrow an invoice question down to whatever lead happens to be on screen, which returns nothing and reads as "invoices are unavailable". Use `limit` to bound how many are returned.',
+    'List invoices that are unpaid or part-paid (id, number, customer, amounts, payment status, due date, overdue flag), most overdue first. Cancelled invoices are never included, and `overdue` means the document was issued and its due date has passed — the same definition the invoices page uses, so these counts match it. Reads the WHOLE book by default and needs no page context. When it read the whole book the result also carries `total` and `overdueTotal` — the invoice counts an answer may state. Pass `leadId` ONLY when the question names one specific lead — never to narrow an invoice question down to whatever lead happens to be on screen, which returns nothing and reads as "invoices are unavailable". Use `limit` to bound how many are returned.',
   argsSchema: z
     .object({
       limit: z.number().int().min(1).max(MAX_TOOL_ROWS).optional(),
@@ -198,7 +206,16 @@ const listInvoicesTool = {
       // existed. Without it the call was rejected, the model repeated it
       // identically, and the loop burned its budget on schema errors before
       // producing nothing.
-      leadId: z.string().min(1).max(255).optional(),
+      // Its way of saying "no lead in particular" is an empty string (or null),
+      // and rejecting that costs the whole answer: live, `{ leadId: "" }` made the
+      // loop repeat the identical call three times and then report "tool calls
+      // failed due to invalid arguments" for a plain "tell me about those
+      // invoices". Absent and empty mean the same thing to the endpoint, so both
+      // read the whole book.
+      leadId: z.preprocess(
+        (value) => (value === null || (typeof value === 'string' && value.trim() === '') ? undefined : value),
+        z.string().min(1).max(255).optional(),
+      ),
     })
     .strict(),
   projection: INVOICE_PROJECTION,
@@ -217,12 +234,24 @@ const listInvoicesTool = {
     const raw = Array.isArray(result.data) ? result.data : result.data ? [result.data] : [];
     const rows = raw
       .filter((row) => row?.paymentStatus === 'unpaid' || row?.paymentStatus === 'partial')
+      // A cancelled document is not money anyone can chase, and billing's own
+      // counts leave it out. Counting it as overdue is how this tool told an
+      // operator there were 23 overdue invoices when the invoices page, reading
+      // the same table, said 15.
+      .filter((row) => row?.status !== 'cancelled' && !row?.cancelledAt)
       .map((row) => {
         // Parse each dueDate once and carry the numeric value for the sort
         // below — re-parsing both operands per comparison cost 2·n·log n
         // Date.parse calls over a 1000-row page.
         const dueAt = Date.parse(row?.dueDate);
-        return { ...row, overdue: Number.isFinite(dueAt) && dueAt < now, dueAt };
+        // "Overdue" is billing-service's definition, not this tool's: its stat
+        // cards and GET /invoices/overdue both require an issued document, so a
+        // draft that was never sent to the customer cannot be a late payment —
+        // and a second definition here is how the copilot ended up contradicting
+        // the page the question is about.
+        const overdue =
+          Number.isFinite(dueAt) && dueAt < now && INVOICE_OVERDUE_STATUSES.includes(row?.status);
+        return { ...row, overdue, dueAt };
       });
     rows.sort(byDueDateAscending);
     const limit = args.limit ?? DEFAULT_LIST_LIMIT;

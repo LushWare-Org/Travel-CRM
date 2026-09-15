@@ -154,7 +154,7 @@ describe('argument validation', () => {
   it('wraps a single record from the by-lead read rather than discarding it as no rows', async () => {
     captureFetch({
       success: true,
-      data: { id: 'inv-1', paymentStatus: 'unpaid', dueDate: '2020-01-01T00:00:00.000Z' },
+      data: { id: 'inv-1', paymentStatus: 'unpaid', status: 'sent', dueDate: '2020-01-01T00:00:00.000Z' },
     });
 
     const result = await executeTool('listInvoices', { leadId: 'lead-1' }, ctx, ['listInvoices']);
@@ -163,9 +163,47 @@ describe('argument validation', () => {
     expect(result.data[0].overdue).toBe(true);
   });
 
-  it('still rejects an empty leadId', async () => {
-    const result = await executeTool('listInvoices', { leadId: '' }, ctx, ['listInvoices']);
-    expect(result.error).toMatch(/^invalid args for listInvoices:/);
+  it('treats an empty or null leadId as "no lead" and reads the whole book', async () => {
+    // Live, the model sent { leadId: '' } to mean "no lead in particular" and the
+    // strict schema rejected it for being too short. The loop then repeated the
+    // identical call three times and the operator got "tool calls failed due to
+    // invalid arguments" instead of an answer about their overdue invoices.
+    for (const args of [{ leadId: '' }, { leadId: '   ' }, { leadId: null }, {}]) {
+      const calls = captureFetch({ success: true, total: 0, data: [] });
+
+      await executeTool('listInvoices', args, ctx, ['listInvoices']);
+
+      expect(calls[0].url).toBe(`${BILLING}/api/v1/billing/invoices?limit=${MAX_TOOL_ROWS}`);
+    }
+  });
+
+  it('leaves a cancelled invoice out of the list and out of the counts', async () => {
+    captureFetch({
+      success: true,
+      total: 3,
+      data: [
+        { id: 'inv-live', paymentStatus: 'unpaid', status: 'sent', dueDate: '2020-01-01T00:00:00.000Z' },
+        {
+          id: 'inv-cancelled',
+          paymentStatus: 'unpaid',
+          status: 'cancelled',
+          cancelledAt: '2021-01-01T00:00:00.000Z',
+          dueDate: '2020-01-01T00:00:00.000Z',
+        },
+        { id: 'inv-draft', paymentStatus: 'unpaid', status: 'draft', dueDate: '2020-01-01T00:00:00.000Z' },
+      ],
+    });
+
+    const result = await executeTool('listInvoices', {}, ctx, ['listInvoices']);
+
+    // A cancelled document is money nobody can chase, so it is not listed at all …
+    expect(result.data.map((row) => row.id)).toEqual(['inv-live', 'inv-draft']);
+    expect(result.total).toBe(2);
+    // … and a draft was never issued to the customer, so a past due date on one is
+    // not a late payment. Both rules are what make these counts the ones the
+    // invoices page shows, which is the whole point of stating them.
+    expect(result.overdueTotal).toBe(1);
+    expect(result.data.find((row) => row.id === 'inv-draft').overdue).toBe(false);
   });
 });
 
@@ -412,7 +450,10 @@ describe('listInvoices filters, orders and derives overdue (S5)', () => {
   it('never trusts the document status for payment truth and drops unprojected fields', async () => {
     captureFetch({
       success: true,
-      data: [invoice({ id: 'inv-1', paymentStatus: 'unpaid', status: 'cancelled', remindersSent: 9 })],
+      // `status` disagrees with `paymentStatus` on purpose: payment truth comes from
+      // `paymentStatus` alone. A cancelled document is a different question — it is
+      // dropped from the list entirely, which the cancelled test above covers.
+      data: [invoice({ id: 'inv-1', paymentStatus: 'unpaid', status: 'paid', remindersSent: 9 })],
     });
 
     const result = await executeTool('listInvoices', { limit: 1 }, ctx, ['listInvoices']);

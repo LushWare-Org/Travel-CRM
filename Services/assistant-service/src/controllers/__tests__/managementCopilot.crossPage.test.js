@@ -63,6 +63,7 @@ const invoice = (invoiceNumber) => ({
   leadId: 'lead-1',
   currency: 'USD',
   paymentStatus: 'unpaid',
+  status: 'sent',
   totalAmount: 5000,
   paidAmount: 0,
   outstandingAmount: 5000,
