@@ -7,9 +7,13 @@ type CopilotSurfaceProps = {
 };
 
 /**
- * The panel's single scroll container, owned here so the dock and the drawer
- * cannot drift apart. Both callers wrap it in their own positioning element and
- * hand in only their padding via `className`.
+ * A tab panel's scroll container, owned here so the insights panel and the
+ * conversation panel cannot drift apart in how they scroll. Each panel renders
+ * its own — one scroller per panel, because one shared scroller cannot hold two
+ * scroll offsets — and hands in only its padding via `className`.
+ *
+ * It is no longer rendered by the dock or the drawer: those now pass children
+ * through to `CopilotTabs`, which owns both surfaces.
  *
  * Two properties make this the wrap contract rather than a cosmetic fix:
  *

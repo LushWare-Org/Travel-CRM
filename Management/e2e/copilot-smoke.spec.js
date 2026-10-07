@@ -12,7 +12,12 @@ import { SURFACE_SELECTOR } from './utils/copilot.js';
 // the counting question cannot be answered by a fixture. Run it against the local
 // microservices stack (`cd Services && npm start`) with GEMINI_API_KEY set.
 
-const DOCK = 'section[aria-labelledby="copilot-insights-heading"]';
+// The PANEL, despite the name: it is the element carrying `data-copilot-panel`,
+// and it renders both inside the desktop dock and inside the drawer. It used to
+// be found by the heading that named it, which the tab strip replaced.
+const DOCK = '[data-copilot-panel]';
+// The tab strip, which is the panel's title and sits OUTSIDE the panel element.
+const COPILOT_TABS = '[data-copilot-tabs]';
 const RANKED_ITEM = '[data-copilot-item]';
 const BAND_RANK = { critical: 0, warning: 1, info: 2 };
 
@@ -22,12 +27,15 @@ test.describe('copilot smoke — the counting question', () => {
   test('the /leads panel renders a ranked list that explains itself', async ({ adminPage: page }) => {
     await page.goto('/leads');
 
+    // The panel is closed by default; open it from the floating trigger.
+    await page.getByRole('button', { name: /open copilot/i }).click();
+
     const dock = page.locator(DOCK);
     await expect(dock).toBeVisible({ timeout: 30_000 });
 
-    // The panel is "Insights", and the page it is anchored to is named beneath the
-    // heading rather than in it — the rename this check exists to catch.
-    await expect(dock.getByRole('heading', { name: 'Insights' })).toBeVisible();
+    // The tab IS the panel's title now, and the page it is anchored to is named
+    // beneath it rather than in it — the rename this check exists to catch.
+    await expect(page.locator(COPILOT_TABS).getByRole('tab', { name: 'Insights' })).toBeVisible();
     await expect(dock).toContainText('Leads');
 
     // Ranked rows, not the legacy sectioned list: these hooks exist only on the
@@ -70,10 +78,20 @@ test.describe('copilot smoke — the counting question', () => {
   test('a counting question gets an answer that carries the number @requires-model', async ({ adminPage: page }) => {
     await page.goto('/leads');
 
-    const surface = page.locator(SURFACE_SELECTOR);
+    // The panel is closed by default. This test never had the step: it was written
+    // while the dock still auto-opened, and d72e29e added the click to the other
+    // test in this file only — so it has failed on its first assertion since.
+    await page.getByRole('button', { name: /open copilot/i }).click();
+
+    // The composer is on the Copilot tab and the panel opens on Insights, so the
+    // tab has to be selected before the composer exists on screen. The inactive
+    // panel stays mounted, so scope to the VISIBLE surface rather than the count.
+    await page.getByRole('tab', { name: 'Copilot' }).click();
+
+    const surface = page.locator(`${SURFACE_SELECTOR}:visible`);
     await expect(surface).toBeVisible({ timeout: 30_000 });
 
-    const composer = surface.getByRole('textbox', { name: /^Ask about / });
+    const composer = surface.getByRole('textbox', { name: 'Ask the copilot' });
     await expect(composer).toBeVisible({ timeout: 30_000 });
     await composer.fill('which destinations have the most leads?');
     await surface.getByRole('button', { name: 'Ask' }).click();
@@ -84,11 +102,13 @@ test.describe('copilot smoke — the counting question', () => {
     // The pending row is the completion signal: it is replaced by either the
     // answer or the refusal, so waiting for it to clear waits for the outcome
     // without polling for a shape.
-    await expect(conversation).not.toContainText('Checking', { timeout: 90_000 });
+    await expect(conversation).not.toContainText('Looking that up', { timeout: 90_000 });
 
-    // THE ACCEPTANCE CRITERION. Before this work, this exact question produced
-    // this exact sentence, on every page, every time.
+    // THE ACCEPTANCE CRITERION. The refusal used to blame the page — "nothing in
+    // its data matched it" — which was never true: reading is the actor's, not the
+    // page's. Neither the sentence it replaced nor the current opening may appear.
     await expect(conversation).not.toContainText('No grounded answer for that question.');
+    await expect(conversation).not.toContainText('I could not ground an answer');
 
     // A count-bearing answer, not merely a non-refusal: the rendered text has to
     // contain a number, which is what the old validator deleted.

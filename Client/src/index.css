@@ -186,6 +186,14 @@
 @utility z-floating-action {
   z-index: 70;
 }
+
+/* The assistant panel while a dialog is open (DESIGN.md's Assistant Affordances
+   section): modal content sits at z-modal (100), so a form-hosted modal would put
+   the assistant out of reach. The panel takes this layer only while a dialog is
+   open and returns to z-floating-action after. */
+@utility z-floating-assistant {
+  z-index: 110;
+}
 @utility z-overlay {
   z-index: 90;
 }

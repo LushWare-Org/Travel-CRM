@@ -7,12 +7,42 @@ import type { AssistantTurnMessageT } from '../../../services/api/assistantTurn'
 import { sendAssistantEvent } from '../../../services/api/assistantEvents';
 import { ASSISTANT_PANEL_BOTTOM_OFFSET_PX } from '../../../config/floatingActions';
 import { isAssistantExcludedPath } from '../../../config/assistantRoutes';
+import { Badge } from '../../../components/ui/badge';
+import { formatCurrency } from '../../../lib/currency';
 import { setAssistantLauncherOpen, useAssistantLauncherOpen } from '../../../components/shared/floating-actions/assistantLauncherState';
+import { useAssistantDialogHost } from '../capabilities/AssistantCapabilityProvider';
 
 const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + route.slice(1);
 
+// The filter chips under a count answer. The map exists so a chip reads like the
+// page's own control rather than like a query parameter; a key it does not know
+// is humanised from its own name, and the value is always shown as the page
+// reported it — the one thing this block must not do is paraphrase a number or a
+// filter into something the page did not say.
+const FILTER_LABELS: Record<string, string> = {
+  destination: 'Destination',
+  category: 'Category',
+  priceMax: 'Under',
+  priceMin: 'From',
+  durationMax: 'Up to',
+  durationMin: 'At least',
+  rating: 'Rating',
+  sort: 'Sorted by',
+  view: 'View',
+  page: 'Page',
+};
+
+const filterLabel = (key: string, value: string): string => {
+  const name = FILTER_LABELS[key] ?? `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+  if (/^\d+$/.test(value) && (key === 'priceMin' || key === 'priceMax')) {
+    return `${name} ${formatCurrency(Number(value))}`;
+  }
+  if (key === 'durationMin' || key === 'durationMax') return `${name} ${value} days`;
+  return `${name}: ${value}`;
+};
+
 const GREETING =
-  "Hi! I can help with destinations, packages, site navigation, and LushWare policy questions. What are you planning?";
+  "Hi! I can help you find a package, build a custom trip with AI, or answer questions about LushWare. What are you planning?";
 
 const PANEL_CLASS =
   'pointer-events-auto w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-floating';
@@ -27,9 +57,10 @@ interface AssistantTurnExtrasProps {
   data: AssistantTurnData;
   onNavigate: (route: string, path: string) => void;
   onSendMessage: (text: string) => void;
+  onResolvePrefill: (choice: 'replace' | 'keep') => void;
 }
 
-function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnExtrasProps) {
+function AssistantTurnExtras({ data, onNavigate, onSendMessage, onResolvePrefill }: AssistantTurnExtrasProps) {
   if (data.tool === 'navigate') {
     if (!data.path) return null;
     return (
@@ -38,6 +69,57 @@ function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnE
           <ArrowRight className="w-3 h-3" />
           Go to {routeLabel(data.route)}
         </button>
+      </div>
+    );
+  }
+
+  if (data.tool === 'page_action' && data.pending && Object.keys(data.pending.fields).length > 0) {
+    // The collision confirm: a control inside the bubble, not a turn. Two buttons
+    // at the button radius, each a 44px target, keyboard operable, and "keep mine"
+    // leaves the visitor's own text exactly as it was.
+    return (
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => onResolvePrefill('replace')}
+          className="inline-flex min-h-[44px] items-center rounded-xl border border-brand-200 bg-white px-3 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50"
+        >
+          Replace it
+        </button>
+        <button
+          type="button"
+          onClick={() => onResolvePrefill('keep')}
+          className="inline-flex min-h-[44px] items-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          Keep mine
+        </button>
+      </div>
+    );
+  }
+
+  if (data.tool === 'answer_current_view') {
+    const { count, renderedCount, params } = data.view;
+    // Nothing to summarise: the page could not count and named no filters, so the
+    // reply text is the whole answer.
+    if (count === null && params.length === 0) return null;
+
+    return (
+      <div className="mt-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+        {count !== null && (
+          <p className="font-display text-display-md leading-none text-brand-600">{count.toLocaleString('en-US')}</p>
+        )}
+        {params.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {params.map(({ key, value }) => (
+              <Badge key={`${key}:${value}`} variant="outline">
+                {filterLabel(key, value)}
+              </Badge>
+            ))}
+          </div>
+        )}
+        {count !== null && typeof renderedCount === 'number' && renderedCount < count && (
+          <p className="mt-1 text-sm text-gray-600">{renderedCount.toLocaleString('en-US')} shown so far</p>
+        )}
       </div>
     );
   }
@@ -111,6 +193,42 @@ function AssistantTurnExtras({ data, onNavigate, onSendMessage }: AssistantTurnE
     return null;
   }
 
+  if (data.tool === 'page_action') {
+    // The page executed this, so the sentence is the page's own report of what
+    // it did — or of why it did not. Nothing is rendered while the action is
+    // still running: the page's own spinner is the pending signal, and a
+    // "working on it" line here would be the second place a change is claimed.
+    if (!data.announcement) return null;
+    return (
+      <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
+        <p className="text-sm text-gray-700">{data.announcement}</p>
+      </div>
+    );
+  }
+
+  if (data.tool === 'search_travel_info') {
+    if (data.citations.length === 0) return null;
+    return (
+      <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Sources</p>
+        <ul className="mt-1 space-y-1">
+          {data.citations.map((citation) => (
+            <li key={citation.uri}>
+              <a
+                href={citation.uri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-brand-700 underline break-all"
+              >
+                {citation.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   if (data.tool === 'hand_off') {
     const { handoff } = data;
     return (
@@ -157,9 +275,16 @@ interface MessageRowProps {
   turnData: AssistantTurnData | undefined;
   onNavigate: (route: string, path: string) => void;
   onSendMessage: (text: string) => void;
+  onResolvePrefill: (assistantMessageId: string, choice: 'replace' | 'keep') => void;
 }
 
-const MessageRow = memo(function MessageRow({ message, turnData, onNavigate, onSendMessage }: MessageRowProps) {
+const MessageRow = memo(function MessageRow({
+  message,
+  turnData,
+  onNavigate,
+  onSendMessage,
+  onResolvePrefill,
+}: MessageRowProps) {
   if (message.role === 'user') {
     return (
       <div className="flex items-start gap-2 flex-row-reverse">
@@ -174,7 +299,14 @@ const MessageRow = memo(function MessageRow({ message, turnData, onNavigate, onS
       <Bot className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" />
       <div className="min-w-0 space-y-2">
         <p className="text-sm bg-white rounded-xl px-3 py-2 shadow-sm">{message.content}</p>
-        {turnData && <AssistantTurnExtras data={turnData} onNavigate={onNavigate} onSendMessage={onSendMessage} />}
+        {turnData && (
+          <AssistantTurnExtras
+            data={turnData}
+            onNavigate={onNavigate}
+            onSendMessage={onSendMessage}
+            onResolvePrefill={(choice) => onResolvePrefill(message.id, choice)}
+          />
+        )}
       </div>
     </div>
   );
@@ -199,6 +331,9 @@ export default function AssistantWidget() {
   const navigate = useNavigate();
   const chat = useAssistantChat();
   const isOpen = useAssistantLauncherOpen();
+  const dialogHost = useAssistantDialogHost();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const returnFocusTo = useRef<Element | null>(null);
   const [input, setInput] = useState('');
   const openedEventFired = useRef(false);
   const mountPathname = useRef(location.pathname);
@@ -261,6 +396,27 @@ export default function AssistantWidget() {
   const handleChipSend = useCallback((text: string) => {
     void sendMessageRef.current(text);
   }, []);
+  // Same reason as the send ref above: the chip is a prop of the memoized row, and
+  // a fresh closure per keystroke would re-render the whole transcript.
+  const resolvePrefillRef = useRef(chat.resolvePrefill);
+  resolvePrefillRef.current = chat.resolvePrefill;
+  const handleResolvePrefill = useCallback((assistantMessageId: string, choice: 'replace' | 'keep') => {
+    resolvePrefillRef.current(assistantMessageId, choice);
+  }, []);
+
+  // Opening moves focus into the panel; closing gives it back to whatever had it.
+  // Both are what makes the assistant usable from inside a dialog without the
+  // dialog's own focus trap swallowing it. Declared before the early returns
+  // below, like every other hook here.
+  useEffect(() => {
+    if (isOpen) {
+      returnFocusTo.current = document.activeElement;
+      panelRef.current?.focus();
+      return;
+    }
+    const target = returnFocusTo.current;
+    if (target instanceof HTMLElement) target.focus();
+  }, [isOpen]);
 
   if (isAssistantExcludedPath(location.pathname)) return null;
   if (!isOpen) return null;
@@ -275,8 +431,17 @@ export default function AssistantWidget() {
 
   return (
     <div
-      className="fixed right-3 z-floating-action pointer-events-none"
+      className={`fixed right-3 pointer-events-none ${dialogHost ? 'z-floating-assistant' : 'z-floating-action'}`}
       style={{ bottom: `${ASSISTANT_PANEL_BOTTOM_OFFSET_PX}px` }}
+      // Escape closes the assistant FIRST, and only the assistant: the capture
+      // phase stops the dialog underneath from seeing the same key.
+      onKeyDownCapture={(event) => {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        handleClose();
+      }}
+      tabIndex={-1}
+      ref={panelRef}
     >
       <div role="dialog" aria-label="Travel assistant panel" className={PANEL_CLASS}>
         <div className="flex items-center justify-between gap-2 bg-brand-800 px-4 py-3 text-white">
@@ -284,7 +449,7 @@ export default function AssistantWidget() {
             <Bot className="w-5 h-5 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-tight">Travel Assistant</p>
-              <p className="text-xs text-white/80 leading-tight">Travel help, navigation &amp; policies</p>
+              <p className="text-xs text-white/80 leading-tight">Travel help, planning &amp; policies</p>
             </div>
           </div>
           <button
@@ -309,6 +474,7 @@ export default function AssistantWidget() {
               turnData={turnByMessageId.get(message.id)}
               onNavigate={handleChipClick}
               onSendMessage={handleChipSend}
+              onResolvePrefill={handleResolvePrefill}
             />
           ))}
           {chat.isSending && (

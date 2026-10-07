@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../../constants/managementCopilot.js';
 
 const { runAgentLoop } = await import('../agentRunner.js');
 const {
@@ -268,12 +269,12 @@ describe('one overall loop budget (T2)', () => {
 
     const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured });
 
-    // Tool rounds draw on the budget MINUS the answer reserve (6s of the 17s), so
+    // Tool rounds draw on the budget MINUS the answer reserve (6s of the deadline), so
     // the last of them stops 6s short and the forced answer always has time to
     // run. Before the reserve, every live ask spent the whole budget gathering and
     // the answer never happened.
-    expect(timeouts).toEqual([11_000, 6_000, 1_000]);
-    expect(timeouts.every((ms) => ms > 0 && ms <= 11_000)).toBe(true);
+    expect(timeouts).toEqual([MANAGEMENT_GENERATION_DEADLINE_MS - 6_000, MANAGEMENT_GENERATION_DEADLINE_MS - 11_000, MANAGEMENT_GENERATION_DEADLINE_MS - 16_000]);
+    expect(timeouts.every((ms) => ms > 0 && ms <= MANAGEMENT_GENERATION_DEADLINE_MS - 6_000)).toBe(true);
     expect(result.answerBlocks).toEqual([]);
   });
 
@@ -302,7 +303,7 @@ describe('one overall loop budget (T2)', () => {
     globalThis.fetch = stubFetch(LEAD_ROWS);
 
     const generateStructured = vi.fn(async () => {
-      clock += 20_000; // the first call alone outlives the whole budget
+      clock += MANAGEMENT_GENERATION_DEADLINE_MS; // the first call alone outlives the whole budget
       return { tool: 'listLeads', args: { limit: 1 } };
     });
 
@@ -319,7 +320,7 @@ describe('one overall loop budget (T2)', () => {
     globalThis.fetch = stubFetch(LEAD_ROWS);
 
     const generateStructured = vi.fn(async () => {
-      clock += 16_500;
+      clock += MANAGEMENT_GENERATION_DEADLINE_MS - 500; // leaves under MIN_CALL_TIMEOUT_MS, so a second call could never finish
       return { tool: 'listLeads', args: { limit: 1 } };
     });
 
@@ -341,5 +342,41 @@ describe('one overall loop budget (T2)', () => {
 
     expect(result.answerBlocks).toEqual([]);
     expect(result.toolEvidence).toHaveLength(1);
+  });
+
+  it('derives its calls from the budget it is handed, not the constant', async () => {
+    let clock = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    globalThis.fetch = stubFetch(LEAD_ROWS);
+
+    const timeouts = [];
+    let step = 0;
+    const generateStructured = vi.fn(async (args) => {
+      timeouts.push(args.timeoutMs);
+      clock += 1_000; // each generation consumes 1s of the one budget
+      return step++ < 1
+        ? { tool: 'listLeads', args: { limit: 1 } }
+        : { tool: 'final_answer', args: { claims: [] } };
+    });
+
+    const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured, budgetMs: 8_000 });
+
+    // 8s of turn, not 17s: the tool rounds draw on 8s MINUS the 6s answer reserve,
+    // so the first call gets 2s and the one after it the remaining second. A loop
+    // that ignored `budgetMs` would bill 11s and 6s here.
+    expect(timeouts).toEqual([2_000, 1_000]);
+    expect(timeouts.every((ms) => ms > 0 && ms <= 2_000)).toBe(true);
+    expect(result.answerBlocks).toEqual([]);
+  });
+
+  it('does not call the model when it arrives with less than the minimum budget', async () => {
+    const generateStructured = vi.fn(async () => ({ tool: 'final_answer', args: { claims: [] } }));
+
+    const result = await runAgentLoop({ ...base, tools: ['listLeads'], generateStructured, budgetMs: 400 });
+
+    // A call handed less than the floor cannot answer before the client gives up,
+    // so the turn says so instead of spending a provider request on it.
+    expect(generateStructured).not.toHaveBeenCalled();
+    expect(result).toEqual({ answerBlocks: [], toolEvidence: [], reason: 'budget-exhausted' });
   });
 });

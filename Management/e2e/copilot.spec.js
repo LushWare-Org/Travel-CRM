@@ -17,7 +17,12 @@ import { SURFACE_SELECTOR, UNBREAKABLE_TOKEN, surfacesWithHorizontalOverflow } f
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-const DOCK = 'section[aria-labelledby="copilot-insights-heading"]';
+// The PANEL, despite the name: it is the element carrying `data-copilot-panel`,
+// and it renders both inside the desktop dock and inside the drawer. It used to
+// be found by the heading that named it, which the tab strip replaced.
+const DOCK = '[data-copilot-panel]';
+// The tab strip, which is the panel's title and sits OUTSIDE the panel element.
+const COPILOT_TABS = '[data-copilot-tabs]';
 const DETAIL_PANE = '[aria-label="Lead detail"]';
 
 let createdLeadId;
@@ -76,9 +81,13 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
     });
 
     await test.step('the dock opens without covering the record', async () => {
+      // The panel is closed by default; the operator opens it from the floating
+      // trigger. (There is no first-visit auto-open any more.)
+      await page.getByRole('button', { name: /open copilot/i }).click();
+
       const dock = page.locator(DOCK);
       await expect(dock).toBeVisible({ timeout: 15_000 });
-      await expect(dock.getByRole('heading', { name: 'Insights' })).toBeVisible();
+      await expect(page.locator(COPILOT_TABS).getByRole('tab', { name: 'Insights' })).toBeVisible();
 
       // Layout, not overlay: the dock must not be position: fixed, and the
       // record and dock must not overlap.
@@ -102,9 +111,12 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
       // The composer is the deterministic driver — the user turn is committed
       // before the request starts, so the transcript holds the token without
       // waiting on model output.
-      const surface = page.locator(SURFACE_SELECTOR);
+      // One surface per tab panel, and the inactive panel is kept mounted so a
+      // tab switch cannot discard its scroll offset — so there are two in the
+      // DOM. Assert on the visible one, never on the count.
+      const surface = page.locator(`${SURFACE_SELECTOR}:visible`);
       await expect(surface).toHaveCount(1);
-      await surface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
+      await surface.getByRole('textbox', { name: 'Ask the copilot' }).fill(UNBREAKABLE_TOKEN);
       await surface.getByRole('button', { name: 'Ask' }).click();
       await expect(surface.getByText(UNBREAKABLE_TOKEN, { exact: true }).first()).toBeVisible();
 
@@ -159,7 +171,9 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
 
       const drawer = page.locator(`[role="dialog"] ${DOCK}`);
       await expect(drawer).toBeVisible();
-      await expect(drawer.getByRole('heading', { name: 'Insights' })).toBeVisible();
+      await expect(
+        page.locator(`[role="dialog"] ${COPILOT_TABS}`).getByRole('tab', { name: 'Insights' })
+      ).toBeVisible();
 
       // The modal makes the record inert, so the same action falls back to the
       // inline evidence detail rather than moving focus behind the drawer.
@@ -185,9 +199,9 @@ test.describe('Management copilot — Evidence Lens @requires-model', () => {
     await test.step('a 120-character token wraps inside the drawer instead of widening it', async () => {
       // The drawer hosts the same CopilotSurface below `xl`, so the same token
       // must wrap there too — asserted on the scroller, never on the dialog.
-      const drawerSurface = page.locator(`[role="dialog"] ${SURFACE_SELECTOR}`);
+      const drawerSurface = page.locator(`[role="dialog"] ${SURFACE_SELECTOR}:visible`);
       await expect(drawerSurface).toHaveCount(1);
-      await drawerSurface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
+      await drawerSurface.getByRole('textbox', { name: 'Ask the copilot' }).fill(UNBREAKABLE_TOKEN);
       await drawerSurface.getByRole('button', { name: 'Ask' }).click();
       await expect(drawerSurface.getByText(UNBREAKABLE_TOKEN, { exact: true }).first()).toBeVisible();
 

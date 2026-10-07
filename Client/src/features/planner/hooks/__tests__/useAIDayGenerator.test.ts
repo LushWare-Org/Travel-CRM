@@ -65,7 +65,7 @@ describe('useAIDayGenerator', () => {
       useAIDayGenerator({ getContext: baseContext, mapDay: (day) => day, onDayGenerated, onDaysGenerated: vi.fn() }),
     );
 
-    let generatePromise!: Promise<void>;
+    let generatePromise!: Promise<'generated' | 'failed'>;
     act(() => {
       generatePromise = result.current.generateDay(2);
     });

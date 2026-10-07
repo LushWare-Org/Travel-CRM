@@ -27,13 +27,14 @@ const buildLeadFilter = async (user) => {
 };
 
 export const getAllInvoices = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, status, startDate, endDate } = req.query;
+  const { page = 1, limit = 20, ids, status, startDate, endDate } = req.query;
   const skip = (Number(page) - 1) * Number(limit);
   const leadFilter = await buildLeadFilter(req.user);
 
   const where = {
     ...leadFilter,
     ...(status && { status }),
+    ...(ids && { id: { in: ids.split(',').filter(Boolean).slice(0, 200) } }),
     ...(startDate || endDate
       ? {
           createdAt: {

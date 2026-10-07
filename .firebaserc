@@ -10,6 +10,9 @@
         ],
         "management-dev": [
           "lush-ware-management-dev"
+        ],
+        "landing-dev": [
+          "lush-ware-landing-dev"
         ]
       }
     }

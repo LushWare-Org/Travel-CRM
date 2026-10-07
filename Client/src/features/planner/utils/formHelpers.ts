@@ -148,11 +148,74 @@ export const computeDurationDays = (start: string, end: string): number => {
   return diffDays < 0 ? 0 : diffDays + 1;
 };
 
+/** Today as a local YYYY-MM-DD. Local, not UTC: the date fields and the
+ * "cannot be in the past" rule are about the visitor's own calendar day.
+ * Shared by both containers' date validation and the assistant's
+ * set_trip_details action. */
+export const localTodayISO = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
 /** Adds `days` whole days to an ISO date string, returning an ISO date string. */
 export const addDaysISO = (isoDate: string, days: number): string => {
   const d = new Date(isoDate);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+};
+
+// ── Assistant day edits (add / remove entries on one day) ──
+// A day's lists are plain strings the visitor can also type by hand, so a match
+// has to survive how a person phrases a removal: "remove the temple visit" has
+// to find an entry called "Temple of the Tooth". Equality is tried first, then a
+// shared significant word.
+
+/** Words that carry no identity in a day entry, so they never make a match. */
+const DAY_ENTRY_STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'for', 'from', 'with', 'plus',
+  'my', 'our', 'your', 'this', 'that', 'it', 'its', 'day', 'days', 'night', 'nights',
+  'add', 'remove', 'delete', 'drop', 'change', 'please', 'also', 'then', 'visit', 'trip',
+]);
+
+/** The words in a wanted phrase that could identify a day entry (4+ chars, not a stopword). */
+const significantWords = (value: string): string[] =>
+  value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 4 && !DAY_ENTRY_STOPWORDS.has(word));
+
+/** The first wanted phrase that identifies `entry`, or null. */
+const matchingWanted = (entry: string, wanted: string[]): string | null => {
+  const lowerEntry = entry.toLowerCase();
+  for (const phrase of wanted) {
+    const lowerPhrase = phrase.toLowerCase().trim();
+    if (!lowerPhrase) continue;
+    if (lowerEntry === lowerPhrase || lowerEntry.includes(lowerPhrase) || lowerPhrase.includes(lowerEntry)) {
+      return phrase;
+    }
+    if (significantWords(phrase).some((word) => lowerEntry.includes(word))) return phrase;
+  }
+  return null;
+};
+
+/**
+ * `entries` with every wanted phrase appended that is not already there,
+ * compared without case. Returns the same array identity when nothing is added,
+ * so a caller can tell "no change" from "changed".
+ */
+export const withAddedEntries = (entries: string[], wanted: string[]): string[] => {
+  const added = wanted.filter((phrase) => phrase.trim() && !matchingWanted(phrase, entries));
+  return added.length ? [...entries, ...added.map((phrase) => phrase.trim())] : entries;
+};
+
+/**
+ * `entries` with every one removed that a wanted phrase identifies. Returns the
+ * same array identity when nothing matched, so an unmatched removal ("day 2 has
+ * no temple visit") is distinguishable from a removal that happened.
+ */
+export const withoutMatchingEntries = (entries: string[], wanted: string[]): string[] => {
+  const kept = entries.filter((entry) => matchingWanted(entry, wanted) === null);
+  return kept.length === entries.length ? entries : kept;
 };
 
 // ── Per-day AI generation helpers (regenerate one day / fill remaining) ──

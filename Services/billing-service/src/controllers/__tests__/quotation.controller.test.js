@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  mockFindUnique, mockUpdate,
+  mockFindUnique, mockFindMany, mockCount, mockUpdate,
   mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload,
   mockCreateOrVersion, mockLogLeadCommunication,
 } = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
+  mockFindMany: vi.fn(),
+  mockCount: vi.fn(),
   mockUpdate: vi.fn(),
   mockGeneratePDF: vi.fn(),
   mockSendEmail: vi.fn(),
@@ -16,7 +18,7 @@ const {
 }));
 
 vi.mock('../../db/client.js', () => ({
-  default: { quotation: { findUnique: mockFindUnique, update: mockUpdate } },
+  default: { quotation: { findUnique: mockFindUnique, findMany: mockFindMany, count: mockCount, update: mockUpdate } },
 }));
 vi.mock('../../utils/quotationPDFGenerator.js', () => ({ generateQuotationPDF: mockGeneratePDF }));
 vi.mock('../../utils/emailService.js', () => ({ sendQuotationEmail: mockSendEmail }));
@@ -28,7 +30,7 @@ vi.mock('../../services/quotation.service.js', () => ({
   quotationTotals: vi.fn(),
 }));
 
-import { sendQuotation, createQuotationFromLead } from '../quotation.controller.js';
+import { getAllQuotations, sendQuotation, createQuotationFromLead } from '../quotation.controller.js';
 
 const quotation = {
   id: 'q-1',
@@ -62,6 +64,21 @@ beforeEach(() => {
   mockSendWhatsapp.mockResolvedValue({ sid: 'SM1' });
   mockUpload.mockResolvedValue('https://cdn.example.com/quotations/q.pdf');
   mockLogLeadCommunication.mockResolvedValue({ matched: true });
+});
+
+describe('getAllQuotations', () => {
+  it('restricts the result to a bounded comma-separated id set', async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+    const { nextErr } = await run(getAllQuotations, {
+      query: { ids: 'quote-1,quote-2,,quote-3' },
+    });
+
+    expect(nextErr).toBeUndefined();
+    expect(mockFindMany.mock.calls[0][0].where).toEqual({
+      id: { in: ['quote-1', 'quote-2', 'quote-3'] },
+    });
+  });
 });
 
 describe('sendQuotation', () => {

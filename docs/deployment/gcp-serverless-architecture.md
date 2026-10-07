@@ -8,11 +8,12 @@ Status: accepted. This document is the durable architecture record for Travel-CR
 |---|---|---|
 | Client SPA | Firebase Hosting — one site per environment (`Client/dist`) | First-party customer-facing SPA served as a static build; gets real custom domains (`lushtravelcloud.com`, `www.lushtravelcloud.com`) via Firebase Hosting's region-independent, free custom-domain feature. |
 | Management SPA | Firebase Hosting — one site per environment (`Management/dist`) | First-party admin SPA served as a static build; gets `manage.lushtravelcloud.com` the same way; no server-side compute. |
+| Landing page | Firebase Hosting — one site per environment (`Landing/dist`) | Standalone marketing page (Vite + React + Tailwind) with no backend of its own; every CTA links out to the Client/Management sites, whose URLs are baked in at build time. |
 | Services (gateway + 11 microservices) | Cloud Run ×12 + Supabase Postgres | All stateless Express apps — one Cloud Run service per `Services/*` directory (11 services) plus `Services/gateway`; they share one Supabase Postgres database with one schema per service, matching the existing `schema.prisma` `schemas` arrays with zero schema changes. |
 
 **Compute.** Cloud Run, one service per `Services/*` directory (11 services) + `Services/gateway` = 12 Cloud Run services. All are stateless Express apps; no code changes needed for Cloud Run compatibility except the gateway ID-token change (see "Service exposure").
 
-**Static hosting.** Firebase Hosting, two sites in one Firebase project — `Client/dist` and `Management/dist`.
+**Static hosting.** Firebase Hosting, three sites per environment in one Firebase project — `Client/dist`, `Management/dist` and `Landing/dist` (`Landing/` is the backendless marketing page; `infra/README.md` records the deployed dev URLs).
 
 **Database.** Supabase Postgres (not Cloud SQL) — external managed Postgres, region `ap-south-1` (Mumbai) to match Cloud Run region `asia-south1`. Single database, one Postgres schema per service (`crm_assistant`, `crm_auth`, `crm_users`, `crm_packages`, `crm_leads`, `crm_bookings`, `crm_billing`, `crm_careers`, `crm_flights`), exactly matching the existing `schema.prisma` `schemas` arrays — zero schema changes. Supabase's Supavisor pooler (port 6543, `?pgbouncer=true`) is `DATABASE_URL`; the direct connection (port 5432) is `DIRECT_URL`, used only by `prisma migrate deploy`. This is not new design — `Services/booking-service/.env.example`, `Services/flight-service/.env.example`, and `Services/analytics-service/.env.example` already document exactly this pattern; the other 6 DB-backed services' `.env.example` files are stale and were brought in line by this plan.
 
@@ -81,8 +82,8 @@ Plain env vars (set directly on the Cloud Run service, not Secret Manager):
 - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`/absent, `EMAIL_FROM` — notification, booking.
 - `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_API_VERSION` — notification.
 - `TRAVELPORT_ENV=sandbox`, `TRAVELPORT_MOCK_MODE` — flight (leave `true` until real Travelport credentials are supplied).
-- `GEMINI_ROUTER_MODEL=gemini-3.5-flash` — assistant; this model is pinned independently from the resolver.
-- `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED=false` — assistant; keep the compatible resolver outcomes disabled until the client bundle has propagated and the rollback window has been tested.
+- `GEMINI_ROUTER_MODEL=gemini-3.5-flash-lite` — assistant; this model is pinned independently from the resolver, on the lite tier because the stage-1 classifier has a 1.5s budget.
+- `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED=true` — assistant; the conversational pair and the stage-1 router are both gated by this. It ships enabled now that the client bundle has propagated and the rollback window has been tested; the flag itself is a removal candidate.
 - `ASSISTANT_ROUTER_SOCIAL_ENABLED=false` and `ASSISTANT_ROUTER_OFF_TOPIC_ENABLED=false` — assistant; these direct-response classes remain independently disabled until their evaluation gates pass.
 - `ASSISTANT_ROUTER_SOCIAL_THRESHOLD=0.95` and `ASSISTANT_ROUTER_OFF_TOPIC_THRESHOLD=0.95` — assistant confidence thresholds for the corresponding direct-response classes.
 - Every `*_SERVICE_URL` var — resolved from that same environment's `module.services[...].uri` outputs, so an environment's gateway only ever points at that same environment's backends, never another environment's.

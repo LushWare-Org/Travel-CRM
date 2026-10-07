@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../services/api/packages';
 import { useAuth } from '../contexts/AuthContext';
 import LazyIcon from '../components/shared/LazyIcon';
+import BrandLogo from '../components/shared/BrandLogo';
 import { ChevronDown, Phone, Mail, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
 import BRANDING from '../config/branding';
 import { PAGE_CONFIG } from '../config/pages';
@@ -182,7 +183,7 @@ export default function Header({ onNavigate }: HeaderProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
           <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
-            <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-14 w-auto" />
+            <BrandLogo />
           </a>
 
           <nav className="hidden lg:flex items-center space-x-2 flex-shrink-0">
@@ -336,7 +337,7 @@ export default function Header({ onNavigate }: HeaderProps) {
         }`}
       >
         <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
-          <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-12 w-auto" />
+          <BrandLogo />
           <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-white/5 rounded-lg transition-all" aria-label="Close menu">
             <LazyIcon name="X" size={22} className="w-5 h-5 text-white" />
           </button>

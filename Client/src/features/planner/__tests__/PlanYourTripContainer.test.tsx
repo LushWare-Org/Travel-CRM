@@ -42,6 +42,29 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: mocks.useAuth,
 }));
 
+// The page registers what the assistant may execute through this module. Mocked
+// (not provided) so the tests can read the registration the page builds and call
+// its runAction directly — the same seam the widget uses, without rendering it.
+const mockPageRegistration = vi.hoisted(() => vi.fn());
+
+vi.mock('../../assistant/capabilities/AssistantCapabilityProvider', () => ({
+  useAssistantPageRegistration: mockPageRegistration,
+}));
+
+/** The registration the container last handed the assistant. */
+const lastRegistration = () => {
+  const calls = mockPageRegistration.mock.calls;
+  return calls[calls.length - 1]?.[0] as
+    | {
+        surface: string;
+        revision: string;
+        actions: string[];
+        pageContext: Record<string, unknown>;
+        runAction: (action: unknown) => Promise<string>;
+      }
+    | undefined;
+};
+
 const submitMock = vi.mocked(submitManualItineraryRequest);
 const generateItineraryPreviewMock = vi.mocked(generateItineraryPreview);
 const generateDayPreviewMock = vi.mocked(generateDayPreview);
@@ -100,6 +123,21 @@ const renderWithRouter = (initialEntry = '/planner') => {
   return { router, unmount: view.unmount };
 };
 
+/** Establishes a trip on the page the way a visitor does: destination by hand,
+ * then dates through the page's own calendar. The assistant cannot set dates —
+ * measured against the live provider, a date pair is the one thing this model
+ * will not extract — so a chat-driven test has to get them the way a person
+ * does. Leaves the wizard on the dates step. */
+const seedTripWithDates = async (user: UserEvent, destination = 'Bali, Indonesia') => {
+  await user.click(screen.getByText('Choose your destination...'));
+  await user.click(screen.getByRole('button', { name: destination }));
+  await user.click(screen.getByRole('button', { name: /Next/ }));
+  await user.click(screen.getByPlaceholderText('Select start date'));
+  await openStep2Calendar(user);
+  await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+  await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+};
+
 /** Deterministic future ISO date (today + offset days) for fixtures that
  * must stay future-valid on any run date. */
 const isoDaysFromToday = (offsetDays: number): string => {
@@ -118,6 +156,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  mockPageRegistration.mockReset();
   mocks.useAuth.mockReturnValue({ user: null });
   mocks.swalFire.mockReset();
   submitMock.mockReset();
@@ -958,5 +997,252 @@ describe('PlanYourTripContainer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
     expect(screen.getByText(/Day 1 of 6/)).toBeInTheDocument();
+  });
+});
+
+describe('assistant page actions', () => {
+  /** Runs one action the way the widget's runner does: through the registration
+   * the page handed the assistant, not through a second code path. */
+  const runAction = async (action: Record<string, unknown>): Promise<string> => {
+    const registration = lastRegistration();
+    if (!registration) throw new Error('the page registered no assistant surface');
+    let line = '';
+    await act(async () => {
+      line = await registration.runAction(action);
+    });
+    return line;
+  };
+
+  it('registers the planner surface, its actions and the trip state it holds', async () => {
+    renderContainer();
+
+    const registration = lastRegistration();
+    expect(registration?.surface).toBe('planner');
+    expect(registration?.revision).toBe('planner');
+    expect(registration?.actions).toEqual([
+      'set_destination',
+      'set_travellers',
+      'set_preferences',
+      'set_contact_details',
+      'go_to_step',
+      'generate_itinerary',
+      'regenerate_days',
+      'edit_day',
+    ]);
+    expect(registration?.pageContext).toMatchObject({ surface: 'planner', step: 1, travelers: 2, days: [] });
+  });
+
+  it('writes the destination the visitor named', async () => {
+    renderContainer();
+
+    expect(await runAction({ tool: 'set_destination', destination: 'Bali' })).toBe('Set your destination to Bali, Indonesia.');
+    expect(lastRegistration()?.pageContext.destination).toBe('Bali, Indonesia');
+  });
+
+  it('refuses a destination the catalogue does not have, and changes nothing', async () => {
+    renderContainer();
+
+    const line = await runAction({ tool: 'set_destination', destination: 'Atlantis' });
+
+    expect(line).toContain('I don\'t have "Atlantis" as a destination — pick one on the destination step.');
+    expect(lastRegistration()?.pageContext.destination).toBeUndefined();
+  });
+
+  it('writes the traveller count and the preferences the visitor stated', async () => {
+    renderContainer();
+
+    expect(await runAction({ tool: 'set_travellers', travelers: 3 })).toBe('Set 3 travellers.');
+    expect(await runAction({ tool: 'set_preferences', preferences: 'slow pace, vegetarian food' })).toBe(
+      'Saved your preferences.',
+    );
+    expect(lastRegistration()?.pageContext).toMatchObject({
+      travelers: 3,
+      preferences: 'slow pace, vegetarian food',
+    });
+  });
+
+  it('writes a contact detail the visitor gave, and refuses one that looks wrong', async () => {
+    renderContainer();
+
+    expect(await runAction({ tool: 'set_contact_details', field: 'email', value: 'ana@example.com' })).toBe(
+      'Saved your email address.',
+    );
+    expect(await runAction({ tool: 'set_contact_details', field: 'email', value: 'ana@' })).toBe(
+      'That email address does not look complete — say it again?',
+    );
+    expect(await runAction({ tool: 'set_contact_details', field: 'phone', value: '+94 11 234 5678' })).toBe(
+      'Saved your phone number.',
+    );
+    expect(await runAction({ tool: 'set_contact_details', field: 'name', value: 'Ana' })).toBe('Saved your name.');
+  });
+
+  it('moves the wizard to the step the visitor asked for', async () => {
+    renderContainer();
+
+    const line = await runAction({ tool: 'go_to_step', step: 3 });
+
+    expect(line).toBe('');
+    expect(screen.getByRole('heading', { name: 'Plan Your Itinerary' })).toBeInTheDocument();
+  });
+
+  it('refuses to build a plan before it knows where and when', async () => {
+    renderContainer();
+
+    const line = await runAction({ tool: 'generate_itinerary' });
+
+    expect(line).toBe('I need the destination and the dates before I can build the plan.');
+    expect(generateItineraryPreviewMock).not.toHaveBeenCalled();
+  });
+
+  it('builds the plan from the page\u2019s own trip state and moves to it', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Arrival in Bali', locations: ['Seminyak'], activities: ['Sunset walk'] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'set_travellers', travelers: 3 });
+
+    const line = await runAction({ tool: 'generate_itinerary' });
+
+    expect(line).toBe('Generated your day-by-day plan.');
+    expect(generateItineraryPreviewMock).toHaveBeenCalledWith({
+      destination: 'Bali, Indonesia',
+      duration: lastRegistration()?.pageContext.duration,
+      travelers: 3,
+      preferences: undefined,
+    });
+    expect(screen.getByRole('heading', { name: 'Plan Your Itinerary' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Arrival in Bali')).toBeInTheDocument();
+  });
+
+  it('refuses to regenerate days the trip does not have', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Arrival', locations: [], activities: [] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'generate_itinerary' });
+
+    const line = await runAction({ tool: 'regenerate_days', dayNumbers: [9] });
+
+    expect(line).toBe('None of those days are in this plan.');
+    expect(generateDaysRangePreviewMock).not.toHaveBeenCalled();
+  });
+
+  it('regenerates only the days the page actually has', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [
+        { dayNumber: 1, title: 'Arrival', locations: [], activities: [] },
+        { dayNumber: 2, title: 'Beach day', locations: [], activities: [] },
+      ],
+    });
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 2, title: 'Relaxed day', locations: [], activities: ['Spa'] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'generate_itinerary' });
+
+    const line = await runAction({ tool: 'regenerate_days', dayNumbers: [2, 7] });
+
+    expect(line).toBe('Regenerated 1 day.');
+    expect(generateDaysRangePreviewMock).toHaveBeenCalledWith(expect.objectContaining({ dayNumbers: [2] }));
+  });
+
+  it('adds what the visitor named to the day they named, with an undo', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Arrival', locations: ['Colombo'], activities: ['Beach'] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'generate_itinerary' });
+
+    const line = await runAction({
+      tool: 'edit_day',
+      dayNumber: 1,
+      operation: 'add_activities',
+      values: ['whale watching'],
+    });
+
+    expect(line).toBe('Updated Day 1.');
+    expect(await screen.findByText('Day 1 updated')).toBeInTheDocument();
+    expect(await screen.findByText('whale watching')).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Undo' }));
+    expect(screen.queryByText('whale watching')).not.toBeInTheDocument();
+  });
+
+  it('removes an entry the visitor described, matching their phrasing', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Temple day', locations: [], activities: ['Temple of the Tooth', 'Beach walk'] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'generate_itinerary' });
+
+    const line = await runAction({
+      tool: 'edit_day',
+      dayNumber: 1,
+      operation: 'remove_activities',
+      values: ['the temple visit'],
+    });
+
+    expect(line).toBe('Updated Day 1.');
+    expect(screen.queryByText('Temple of the Tooth')).not.toBeInTheDocument();
+    expect(await screen.findByText('Beach walk')).toBeInTheDocument();
+  });
+
+  it('says so when the day does not list what the visitor asked to remove', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Arrival', locations: [], activities: ['Beach walk'] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'generate_itinerary' });
+
+    const line = await runAction({
+      tool: 'edit_day',
+      dayNumber: 1,
+      operation: 'remove_activities',
+      values: ['helicopter tour'],
+    });
+
+    expect(line).toBe('Day 1 does not list that, so I left it alone.');
+    expect(await screen.findByText('Beach walk')).toBeInTheDocument();
+  });
+
+  it('renames a day', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Arrival', locations: [], activities: [] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'generate_itinerary' });
+
+    expect(await runAction({ tool: 'edit_day', dayNumber: 1, operation: 'set_title', values: ['Beach day'] })).toBe(
+      'Updated Day 1.',
+    );
+    expect(screen.getByDisplayValue('Beach day')).toBeInTheDocument();
+  });
+
+  it('says which day it could not find rather than inventing one', async () => {
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Arrival', locations: [], activities: [] }],
+    });
+    const user = userEvent.setup();
+    renderContainer();
+    await seedTripWithDates(user);
+    await runAction({ tool: 'generate_itinerary' });
+
+    expect(await runAction({ tool: 'edit_day', dayNumber: 9, operation: 'set_title', values: ['Nope'] })).toBe(
+      'There is no Day 9 in this plan.',
+    );
   });
 });

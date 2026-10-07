@@ -61,7 +61,6 @@ describe('FloatingActionStack', () => {
     '/contact',
     '/career',
     '/destinations-international',
-    '/reset-password/abc',
   ])('renders the launcher immediately, with no scroll gate, on %s', async (path) => {
     await renderStack(path);
 
@@ -70,7 +69,9 @@ describe('FloatingActionStack', () => {
     expect(launcherContainer()).not.toHaveClass('pointer-events-none');
   });
 
-  it.each(['/planner', '/planner/', '/package/123/customize', '/login', '/my-account'])(
+  // A reset link carries a credential, so the assistant does not mount there at
+  // all — the launcher is its only opener.
+  it.each(['/login', '/my-account', '/reset-password/abc'])(
     'renders no launcher at all on the assistant-excluded route %s',
     async (path) => {
       await renderStack(path);
@@ -121,7 +122,7 @@ describe('FloatingActionStack', () => {
     vi.stubEnv('VITE_FEATURE_WHATSAPP_BUTTON', 'false');
     vi.stubEnv('VITE_FEATURE_CALL_BUTTON', 'false');
     vi.stubEnv('VITE_FEATURE_SCROLL_TOP', 'false');
-    await renderStack('/planner');
+    await renderStack('/my-account');
 
     expect(screen.queryByRole('button', { name: 'Contact options' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Scroll to top' })).not.toBeInTheDocument();

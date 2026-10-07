@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockFindUnique, mockUpdate, mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload, mockLogLeadCommunication } = vi.hoisted(() => ({
+const {
+  mockFindUnique, mockFindMany, mockCount, mockUpdate,
+  mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload, mockLogLeadCommunication,
+} = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
+  mockFindMany: vi.fn(),
+  mockCount: vi.fn(),
   mockUpdate: vi.fn(),
   mockGeneratePDF: vi.fn(),
   mockSendEmail: vi.fn(),
@@ -11,7 +16,7 @@ const { mockFindUnique, mockUpdate, mockGeneratePDF, mockSendEmail, mockSendWhat
 }));
 
 vi.mock('../../db/client.js', () => ({
-  default: { invoice: { findUnique: mockFindUnique, update: mockUpdate } },
+  default: { invoice: { findUnique: mockFindUnique, findMany: mockFindMany, count: mockCount, update: mockUpdate } },
 }));
 vi.mock('../../utils/invoicePDFGenerator.js', () => ({ generateInvoicePDF: mockGeneratePDF }));
 vi.mock('../../utils/emailService.js', () => ({ sendInvoiceEmail: mockSendEmail }));
@@ -19,7 +24,7 @@ vi.mock('../../utils/whatsappService.js', () => ({ sendInvoiceWhatsapp: mockSend
 vi.mock('../../utils/cloudinary.js', () => ({ uploadPdfBuffer: mockUpload }));
 vi.mock('../../services/events.client.js', () => ({ logLeadCommunication: mockLogLeadCommunication }));
 
-import { downloadInvoicePDF, sendInvoice } from '../invoice.controller.js';
+import { downloadInvoicePDF, getAllInvoices, sendInvoice } from '../invoice.controller.js';
 import AppError from '../../utils/appError.js';
 
 const invoice = {
@@ -53,6 +58,22 @@ beforeEach(() => {
   mockSendWhatsapp.mockResolvedValue({ sid: 'SM1' });
   mockUpload.mockResolvedValue('https://cdn.example.com/invoices/inv.pdf');
   mockLogLeadCommunication.mockResolvedValue({ matched: true });
+});
+
+describe('getAllInvoices', () => {
+  it('combines the actor ownership filter with a bounded comma-separated id set', async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+    const { nextErr } = await run(getAllInvoices, {
+      query: { ids: 'invoice-1,invoice-2,,invoice-3' },
+      user: { id: 'admin-1', role: 'admin', isSuperAdmin: false },
+    });
+
+    expect(nextErr).toBeUndefined();
+    expect(mockFindMany.mock.calls[0][0].where).toEqual({
+      id: { in: ['invoice-1', 'invoice-2', 'invoice-3'] },
+    });
+  });
 });
 
 describe('downloadInvoicePDF', () => {

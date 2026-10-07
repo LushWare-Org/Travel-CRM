@@ -98,6 +98,27 @@ model InsightState {
   @@schema("crm_assistant")
 }
 
+// ─── BusinessNotificationState (site-wide notification lifecycle) ───
+// Unlike InsightState, this state is not page- or scope-keyed. The notification
+// is business-wide; actorId supplies the per-user read/dismiss lifecycle.
+model BusinessNotificationState {
+  id                String    @id @default(uuid())
+  actorId           String
+  notificationKey   String
+  firstSeenAt       DateTime  @default(now())
+  lastSeenAt        DateTime?
+  surfacedCount     Int       @default(0)
+  acknowledgedAt    DateTime?
+  dismissedAt       DateTime?
+  lastMaterialValue String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([actorId, notificationKey])
+  @@index([actorId])
+  @@schema("crm_assistant")
+}
+
 // ─── InsightDecision (why the panel shows what it shows) ───
 // One row per candidate that got past the structural layers. A dropped insight
 // is a recorded fact with a reason code, not a silent filter, which is what makes

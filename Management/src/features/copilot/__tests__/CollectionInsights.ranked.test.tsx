@@ -34,10 +34,33 @@ const renderInsights = (overrides = {}) => {
 };
 
 describe('ranked rendering', () => {
-  it('renders the server order verbatim, even when a lower band comes first', () => {
-    // Deliberately "wrong": an info above a critical. The client must NOT fix
-    // this — re-sorting replaces the server's ranking with the client's opinion,
-    // and the two would disagree in exactly the case the ranking exists for.
+  it('never re-sorts by score', () => {
+    // The client holds no opinion about scores. Two findings in one section keep
+    // the server's sequence even with the scores inverted, because reordering
+    // them would replace the server's ranking with the client's own.
+    renderInsights({
+      ranked: [
+        rankedClaim({ id: 'a', key: 'key-a', severity: 'warning', score: 10 }),
+        rankedClaim({ id: 'b', key: 'key-b', severity: 'warning', score: 90 }),
+      ],
+    });
+
+    expect(rows().map((row) => row.id)).toEqual(['key-a', 'key-b']);
+  });
+
+  it('hoists the server critical band above the sections', () => {
+    // REGRESSION (was: "renders the server order verbatim, even when a lower band
+    // comes first"). That fixture asserted the client renders an `info` above a
+    // `critical` untouched, and the band hoist deliberately breaks it.
+    //
+    // The contract it protected still holds — nothing here consults a score — and
+    // it is asserted above. What changed is the sequence, and the reason is that
+    // `rank.js` already returns `[...shownCriticals, ...withSpread.picked]` over
+    // disjoint sets: the band is the SERVER's structure, so re-deriving it is not
+    // the client disagreeing. A real ranked payload leads with its criticals; the
+    // old fixture described a payload the server cannot produce, and keeping it
+    // would have let a critical render under a lower-severity row from another
+    // section.
     renderInsights({
       ranked: [
         rankedClaim({ id: 'a', key: 'key-a', severity: 'info', score: 10 }),
@@ -45,8 +68,34 @@ describe('ranked rendering', () => {
       ],
     });
 
-    expect(rows().map((row) => row.id)).toEqual(['key-a', 'key-b']);
-    expect(rows().map((row) => row.band)).toEqual(['info', 'critical']);
+    expect(rows().map((row) => row.id)).toEqual(['key-b', 'key-a']);
+    expect(screen.getByText('Critical')).toBeInTheDocument();
+  });
+
+  it('names the rule engine for the ranked source', () => {
+    renderInsights({ ranked: [rankedClaim({ id: 'a', key: 'key-a' })] });
+
+    expect(screen.getByText('Rule engine')).toBeInTheDocument();
+  });
+
+  it('names the model as the producer when the model phase produced the list', () => {
+    renderInsights({ claims: [rankedClaim({ id: 'm', key: 'm-key' })], producer: 'model' });
+
+    expect(screen.getByText('AI briefing')).toBeInTheDocument();
+    expect(screen.getByText('Generated')).toBeInTheDocument();
+  });
+
+  it('never credits the model when the server reported a deterministic fallback', () => {
+    // `respondWithFallback` returns rule-computed claims through the insights
+    // response when generation fails, and the client presents that as a finished
+    // model phase. Reading the label off the phase would credit the model with
+    // the rules' arithmetic; reading it off `producer` cannot. This is the case
+    // the marker exists to get right, and the one the phase-based derivation
+    // silently got wrong.
+    renderInsights({ claims: [rankedClaim({ id: 'm', key: 'm-key' })], producer: 'rule' });
+
+    expect(screen.getByText('Rule engine')).toBeInTheDocument();
+    expect(screen.queryByText('AI briefing')).not.toBeInTheDocument();
   });
 
   it('carries the stable key, the band and the score on every row', () => {
@@ -176,8 +225,15 @@ describe('the fallback path', () => {
     });
 
     expect(screen.getByText('An unranked finding')).toBeInTheDocument();
-    expect(document.querySelector('[data-copilot-item]')).toBeNull();
     expect(screen.getByText('Needs attention')).toBeInTheDocument();
+
+    // REGRESSION (was: `[data-copilot-item]` must be null). One row component now
+    // serves both sources, so an unranked row IS a row and has to be findable as
+    // one. What it must NOT carry is ranking metadata — a band or a score here
+    // would assert a ranking this source never had.
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].band).toBeNull();
+    expect(rows()[0].score).toBeNull();
   });
 
   it('does not present model claims as ranked', () => {
@@ -191,6 +247,11 @@ describe('the fallback path', () => {
     });
 
     expect(screen.getByText('A model claim')).toBeInTheDocument();
-    expect(document.querySelector('[data-copilot-item]')).toBeNull();
+
+    // The same regression on the model source. A model claim carries no score,
+    // so emitting `0` would assert a ranking the server never produced.
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].band).toBeNull();
+    expect(rows()[0].score).toBeNull();
   });
 });

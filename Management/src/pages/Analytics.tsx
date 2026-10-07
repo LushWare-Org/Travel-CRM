@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   LeadAnalytics,
@@ -9,12 +9,14 @@ import {
   MyPerformanceAnalytics,
 } from '../features/analytics/components';
 import {
-  Users, DollarSign, Globe, BarChart3, Briefcase,
+  Users, DollarSign, Globe, Briefcase,
   TrendingUp, ArrowRight, Layers, Zap
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 
 import PageCopilot from '../features/copilot/PageCopilot';
+import PageHeader from '../components/PageHeader';
 
 // Package, Website, and User analytics are admin-only on the backend
 // (company-wide data with no per-rep ownership) — hide them from salesRep
@@ -41,8 +43,8 @@ interface AnalyticsTab {
  */
 const Analytics = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('leads');
-
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'leads');
   const allTabs: AnalyticsTab[] = [
     { id: 'leads', label: 'Lead Analytics', shortLabel: 'Leads', icon: TrendingUp, component: LeadAnalytics },
     { id: 'billing', label: 'Billing Analytics', shortLabel: 'Billing', icon: DollarSign, component: BillingAnalytics },
@@ -60,19 +62,26 @@ const Analytics = () => {
   const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
   const ActiveComponent = activeTabData?.component;
 
-  return (
-    <PageCopilot pageKey="analytics" scopeLabel="Analytics" scope={{ tab: activeTab }}>
-      <div className="h-full flex flex-col md:flex-row bg-background">
-        {/* Mobile Header + Horizontal Tabs */}
-        <div className="md:hidden bg-card border-b border-border sticky top-0 z-10">
-          {/* Mobile Header */}
-          <div className="px-4 pt-3 pb-2 flex items-center gap-3 pl-14">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <h1 className="font-heading font-bold text-foreground text-lg">Analytics</h1>
-          </div>
+  useEffect(() => {
+    const requested = searchParams.get('tab');
+    const next = tabs.some((tab) => tab.id === requested) ? requested! : tabs[0]?.id || 'leads';
+    if (next !== activeTab) setActiveTab(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tab availability changes only with the actor role
+  }, [searchParams, user?.role]);
 
+  const changeTab = (tab: string) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
+  return (
+    <PageCopilot pageKey="analytics" scopeLabel="Analytics" scope={{ tab: activeTabData?.id || 'leads' }}>
+      <PageHeader title="Analytics" subtitle={activeTabData?.label} />
+
+      <div className="h-full flex flex-col md:flex-row bg-background">
+        {/* Mobile: horizontal tabs. The title row moved into PageHeader, so this
+            block is no longer sticky — there is one sticky bar. */}
+        <div className="md:hidden bg-card border-b border-border">
           {/* Horizontal scrollable tabs */}
           <div className="flex overflow-x-auto px-3 pb-3 gap-2 scrollbar-hide">
             {tabs.map((tab) => {
@@ -81,7 +90,7 @@ const Analytics = () => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => changeTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                     isActive
                       ? 'bg-primary text-primary-foreground'
@@ -98,19 +107,6 @@ const Analytics = () => {
 
         {/* Desktop Left Sidebar Navigation */}
         <div className="hidden md:flex w-64 bg-card border-r border-border flex-shrink-0 flex-col">
-          {/* Header */}
-          <div className="p-6 border-b border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg bg-primary flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="font-heading font-bold text-foreground text-lg">Analytics</h1>
-                <p className="text-xs text-muted-foreground">Business Insights</p>
-              </div>
-            </div>
-          </div>
-
           {/* Navigation Items */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold px-3 mb-3">Reports</p>
@@ -121,7 +117,7 @@ const Analytics = () => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => changeTab(tab.id)}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-150 group ${isActive
                       ? 'bg-primary text-primary-foreground'
                       : 'hover:bg-muted text-foreground'
@@ -160,25 +156,6 @@ const Analytics = () => {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Desktop Top Bar with Active Tab Info */}
-          <div className="hidden md:block bg-card border-b border-border px-8 py-5 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {activeTabData && (
-                  <>
-                    <div className="w-11 h-11 rounded-lg bg-primary flex items-center justify-center">
-                      <activeTabData.icon className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <h2 className="font-heading text-xl font-bold text-foreground">{activeTabData.label}</h2>
-                      <p className="text-sm text-muted-foreground">Detailed analytics and performance metrics</p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 sm:p-6 lg:p-8">

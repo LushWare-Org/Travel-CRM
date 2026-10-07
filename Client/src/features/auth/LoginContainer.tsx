@@ -11,7 +11,7 @@ import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Form, FormField, FormFieldItem } from '../../components/ui/form';
-import BRANDING from '../../config/branding';
+import BrandLogo from '../../components/shared/BrandLogo';
 
 interface AuthFormValues {
   name: string;
@@ -490,12 +490,15 @@ export default function LoginContainer() {
             sidebar not a co-equal panel (plan Phase 5). Solid deep-green
             canvas: no gradient, no decorative blurred orbs, no ambient
             animation (DESIGN.md motion budget). */}
-        <aside className="hidden flex-col justify-between gap-10 bg-brand-dark-900 p-8 lg:flex">
-          <img
-            src={BRANDING.company.logoPath}
-            alt={`${BRANDING.company.name} Logo`}
-            className="h-10 w-auto object-contain"
-          />
+        <aside className="hidden flex-col bg-brand-dark-900 p-8 lg:flex">
+          {/* Centred in the space the bullets leave, not on the panel's own
+              axis: the bullets sit at the panel's foot, so centring against the
+              panel would leave a wide empty band above the mark and a narrow
+              one under it. The flex-1 row takes all the slack, which splits it
+              evenly either side of the mark. */}
+          <div className="flex flex-1 items-center justify-center">
+            <BrandLogo size="rail" />
+          </div>
           <div className="space-y-6">
             <div className="flex items-start gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10">

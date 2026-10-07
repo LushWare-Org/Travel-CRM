@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { useAssistantPageRegistration } from '../assistant/capabilities/AssistantCapabilityProvider';
+import { assistantFieldState, useAssistantWrittenFields } from '../assistant/actions/useAssistantFormPrefill';
+import { AssistantFilledBadge, assistantMarkedFieldClass } from '../assistant/components/AssistantFieldMarker';
 import {
   Mail,
   Phone,
@@ -116,9 +119,39 @@ export default function ContactContainer() {
     },
   ];
 
+  const { written, markWritten, clearWritten } = useAssistantWrittenFields();
+
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // A visitor's own keystroke takes the field back: the assistant's mark means
+    // "this value is still mine to explain", not "I once touched this form".
+    clearWritten(e.target.name);
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  useAssistantPageRegistration({
+    surface: 'contact',
+    revision: 'contact',
+    // `step` is a planner idea; a form has exactly one, so it reports 1.
+    pageContext: { surface: 'contact', revision: 'contact', step: 1 },
+    actions: ['prefill_form'],
+    prefill: {
+      form: 'contact',
+      fields: () => ({
+        name: assistantFieldState(formData.name, written.has('name')),
+        email: assistantFieldState(formData.email, written.has('email')),
+        phone: assistantFieldState(formData.phone, written.has('phone')),
+        subject: assistantFieldState(formData.subject, written.has('subject')),
+        message: assistantFieldState(formData.message, written.has('message')),
+        travelDate: assistantFieldState(formData.travelDate, written.has('travelDate')),
+      }),
+      write: (fields) => {
+        // Merged into the form's own state, so a filled field behaves exactly like
+        // a typed one from here on.
+        setFormData((prev) => ({ ...prev, ...fields }));
+        markWritten(Object.keys(fields));
+      },
+    },
+  });
 
   const handleDestinationChange = (destination: DestinationOption) => {
     setSelectedDest(destination);
@@ -276,9 +309,12 @@ export default function ContactContainer() {
                           value={formData.name}
                           onChange={handleChange}
                           required
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
+                          className={`w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900 ${assistantMarkedFieldClass(
+                            written.has('name'),
+                          )}`}
                           placeholder="John Doe"
                         />
+                        {written.has('name') && <AssistantFilledBadge />}
                       </div>
                     </div>
 
@@ -294,9 +330,12 @@ export default function ContactContainer() {
                           value={formData.email}
                           onChange={handleChange}
                           required
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
+                          className={`w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900 ${assistantMarkedFieldClass(
+                            written.has('email'),
+                          )}`}
                           placeholder="john@example.com"
                         />
+                        {written.has('email') && <AssistantFilledBadge />}
                       </div>
                     </div>
                   </div>
@@ -313,9 +352,12 @@ export default function ContactContainer() {
                           name="phone"
                           value={formData.phone}
                           onChange={handleChange}
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
+                          className={`w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900 ${assistantMarkedFieldClass(
+                            written.has('phone'),
+                          )}`}
                           placeholder="+1 (555) 123-4567"
                         />
+                        {written.has('phone') && <AssistantFilledBadge />}
                       </div>
                     </div>
 
@@ -330,8 +372,11 @@ export default function ContactContainer() {
                           name="travelDate"
                           value={formData.travelDate}
                           onChange={handleChange}
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
+                          className={`w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900 ${assistantMarkedFieldClass(
+                            written.has('travelDate'),
+                          )}`}
                         />
+                        {written.has('travelDate') && <AssistantFilledBadge />}
                       </div>
                     </div>
                   </div>
@@ -360,9 +405,12 @@ export default function ContactContainer() {
                           value={formData.subject}
                           onChange={handleChange}
                           required
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
+                          className={`w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900 ${assistantMarkedFieldClass(
+                            written.has('subject'),
+                          )}`}
                           placeholder="How can we help?"
                         />
+                        {written.has('subject') && <AssistantFilledBadge />}
                       </div>
                     </div>
                   </div>
@@ -404,9 +452,12 @@ export default function ContactContainer() {
                       onChange={handleChange}
                       required
                       rows={6}
-                      className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none resize-none text-gray-900"
+                      className={`w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none resize-none text-gray-900 ${assistantMarkedFieldClass(
+                        written.has('message'),
+                      )}`}
                       placeholder="Tell us about your dream vacation..."
                     ></textarea>
+                    {written.has('message') && <AssistantFilledBadge />}
                   </div>
 
                   <button

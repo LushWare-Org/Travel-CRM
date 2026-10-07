@@ -77,6 +77,10 @@ export function makeSession(overrides: Partial<CopilotSession> = {}): CopilotSes
       noAccess: false,
     },
     claims: [],
+    // Authorship is a first-class field, not an inference: a deterministic
+    // fallback arrives through the insights response, so the label cannot be read
+    // off which phase produced the list.
+    producer: 'rule',
     ranked: [],
     suppressedCount: 0,
     suppressedCriticals: [],
@@ -90,11 +94,15 @@ export function makeSession(overrides: Partial<CopilotSession> = {}): CopilotSes
     hasAttention: false,
     generatedWhileOpen: true,
     turns: [],
+    pendingContext: null,
     asking: false,
     input: '',
     canAsk: true,
     setInput: vi.fn(),
     submit: vi.fn(),
+    chatAbout: vi.fn(),
+    detachFinding: vi.fn(),
+    clearConversation: vi.fn(),
     retryTurn: vi.fn(),
     retryInsights: vi.fn(),
     retryDeterministic: vi.fn(),

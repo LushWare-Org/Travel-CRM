@@ -735,6 +735,15 @@ describe('getLeads / searchLeads — remarks reach the list UI', () => {
     expect(mockLeadFindMany.mock.calls[0][0].include.remarks).toEqual({ orderBy: { date: 'desc' } });
   });
 
+  it('restricts the paginated list to a bounded comma-separated id set', async () => {
+    const req = { query: { ids: 'lead-1,lead-2,,lead-3' }, user: adminUser };
+    await getLeads(req, { json: vi.fn() }, vi.fn());
+
+    expect(mockLeadFindMany.mock.calls[0][0].where.AND).toContainEqual({
+      id: { in: ['lead-1', 'lead-2', 'lead-3'] },
+    });
+  });
+
   it('includes each lead’s remarks in search results', async () => {
     const req = { query: { query: 'jane' }, user: adminUser };
     await searchLeads(req, { json: vi.fn() }, vi.fn());

@@ -137,7 +137,7 @@ export const createLead = asyncHandler(async (req, res) => {
 
 export const getLeads = asyncHandler(async (req, res) => {
   const { user } = req;
-  const { page = 1, limit = 10, search, status, lifecycleStatus, source, platform, sortBy = 'createdAt', order = 'desc' } = req.query;
+  const { page = 1, limit = 10, ids, search, status, lifecycleStatus, source, platform, sortBy = 'createdAt', order = 'desc' } = req.query;
 
   const where = { AND: [] };
   // The PENDING_VERIFICATION queue is visible to any salesRep regardless of
@@ -154,6 +154,7 @@ export const getLeads = asyncHandler(async (req, res) => {
   // are sent from Management's LeadFilters chips.
   if (source) where.AND.push({ source: { in: source.split(',') } });
   if (platform) where.AND.push({ platform: { in: platform.split(',') } });
+  if (ids) where.AND.push({ id: { in: ids.split(',').filter(Boolean).slice(0, 200) } });
 
   if (search) {
     where.AND.push({

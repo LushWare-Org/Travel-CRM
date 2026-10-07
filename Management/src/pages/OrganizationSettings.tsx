@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react';
-import { Building2, Save, Upload, Loader2 } from 'lucide-react';
+import { Save, Upload, Loader2 } from 'lucide-react';
 import toast from '@/lib/toast';
 import { adminAPI, uploadAPI } from '../services/api';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 import PageCopilot from '../features/copilot/PageCopilot';
+import PageHeader from '../components/PageHeader';
 
 interface SettingsForm {
   companyName: string;
@@ -273,26 +274,17 @@ const OrganizationSettings = () => {
   return (
     <PageCopilot pageKey="settings" scopeLabel="Settings">
       <div className="h-full overflow-auto bg-background">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary rounded-lg">
-              <Building2 className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="font-heading text-xl font-semibold text-foreground">
-                Organization Settings
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Company identity, branding, and quotation defaults used across the CRM
-              </p>
-            </div>
-          </div>
+      <PageHeader
+        title="Organization Settings"
+        subtitle="Company identity, branding, and quotation defaults used across the CRM"
+        actions={
           <Button onClick={handleSave} disabled={saving} className="gap-2 h-9">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saving...' : 'Save Changes'}
           </Button>
-        </div>
+        }
+      />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
         <Section
           title="Company Identity"

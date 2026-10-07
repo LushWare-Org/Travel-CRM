@@ -133,7 +133,7 @@ describe('Sidebar brand header', () => {
     expect(document.querySelector('img')).toHaveAttribute('src', FALLBACK.logoUrl);
   });
 
-  it('uses the org-configured name and logo once branding resolves', async () => {
+  it('uses the org-configured name but keeps the app-delivered icon once branding resolves', async () => {
     mockGetOrganizationBranding.mockResolvedValue({
       status: 'success',
       data: {
@@ -148,7 +148,9 @@ describe('Sidebar brand header', () => {
     const { container } = render(<Sidebar />);
 
     expect(await screen.findByRole('heading', { name: 'Acme Travel Group' })).toBeInTheDocument();
-    expect(container.querySelector('img')).toHaveAttribute('src', 'https://cdn.example.com/acme.png');
+    // The icon ships with the app: an org logo URL is never rendered, so the
+    // rail cannot break on a remote asset that is missing or unreachable.
+    expect(container.querySelector('img')).toHaveAttribute('src', FALLBACK.logoUrl);
     expect(container.querySelector('img')).toHaveAttribute('alt', 'Acme Travel Group');
   });
 

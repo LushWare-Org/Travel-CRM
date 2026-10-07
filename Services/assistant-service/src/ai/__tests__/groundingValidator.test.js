@@ -74,6 +74,17 @@ const secondToolItem = {
 };
 const withTool = { ...bundle, evidence: [...bundle.evidence, toolItem] };
 const withTwoTools = { ...bundle, evidence: [...bundle.evidence, toolItem, secondToolItem] };
+// A list tool that read its whole set carries `total` beside the rows. That number
+// is what makes a counting question answerable at all: without it there is nothing
+// for "26" to resolve against and the claim dies as an unsupported number.
+const listToolItem = {
+  id: 'tool:listInvoices:3',
+  type: 'computed',
+  label: 'Tool result listInvoices',
+  value: { data: [{ invoiceNumber: 'INV-1' }], total: 26, overdueTotal: 23 },
+  asOf: '2026-09-09T00:00:00Z',
+};
+const withListTool = { ...bundle, evidence: [...bundle.evidence, listToolItem] };
 
 describe('validateClaims', () => {
   it('accepts a claim grounded in a field-level evidence ID', () => {
@@ -239,7 +250,9 @@ describe('validateClaims', () => {
 
   it('still refuses unsafe prose, by name rather than silently', () => {
     const { claims, rejected } = validateClaims({
-      claims: [claim({ text: 'See LEAD-8F21 for the detail.' })],
+      // A raw record id — the internal shape this system actually mints, and the
+      // one thing here that must never reach operator prose.
+      claims: [claim({ text: 'See 2a000000-0000-4000-8000-000000000071 for the detail.' })],
       bundle,
       enableGuidance: false,
     });
@@ -442,5 +455,42 @@ describe('a computed answer', () => {
 
     expect(rejected).toEqual([]);
     expect(claims[0].facts).toHaveLength(1);
+  });
+  it('accepts a count the list tool reported as its own total', () => {
+    const { claims, rejected } = validateClaims({
+      claims: [claim({ evidenceIds: [], text: '26 invoices are overdue.' })],
+      bundle: withListTool,
+      enableGuidance: false,
+    });
+
+    expect(rejected).toEqual([]);
+    expect(claims).toHaveLength(1);
+  });
+
+  it('accepts the overdue count the list derived, which no single row carries', () => {
+    // The live case: every row carries an `overdue` flag, but "how many are overdue"
+    // is a property of the set. Counted by the model it was a guess (it said 24 when
+    // the answer was 23) and was refused; stated by the tool it resolves.
+    const { claims, rejected } = validateClaims({
+      claims: [claim({ evidenceIds: [], text: '23 invoices are overdue.' })],
+      bundle: withListTool,
+      enableGuidance: false,
+    });
+
+    expect(rejected).toEqual([]);
+    expect(claims).toHaveLength(1);
+  });
+
+  it('refuses a count when the list reported no total', () => {
+    // The same read, one row short of its envelope total: the tool withholds the
+    // count, so the claim is refused rather than stated from a page of rows.
+    const { claims, rejected } = validateClaims({
+      claims: [claim({ evidenceIds: [], text: '26 invoices are overdue.' })],
+      bundle: { ...bundle, evidence: [...bundle.evidence, { ...listToolItem, value: { data: [{ invoiceNumber: 'INV-1' }] } }] },
+      enableGuidance: false,
+    });
+
+    expect(claims).toHaveLength(0);
+    expect(rejected).toContainEqual({ id: 'c1', reason: 'unsupported-number' });
   });
 });

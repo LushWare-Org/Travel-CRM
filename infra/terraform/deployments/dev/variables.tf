@@ -389,3 +389,9 @@ variable "management_copilot_page_keys" {
   default     = ""
 }
 
+variable "management_notifications_enabled" {
+  description = "Business notification surface gate (plain env var MANAGEMENT_NOTIFICATIONS_ENABLED on assistant-service). \"true\" is required for the bell to list anything at all; anything else makes the feed route return an undisclosed 404."
+  type        = string
+  default     = "false"
+}
+

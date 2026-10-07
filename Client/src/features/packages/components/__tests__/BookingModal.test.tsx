@@ -1,6 +1,12 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { AssistantCapabilityProvider } from '../../../assistant/capabilities/AssistantCapabilityProvider';
+
+// The modal registers the form the assistant may fill while it is open, and that
+// registration requires the provider the app mounts at its root.
+const renderWithAssistant = (ui: Parameters<typeof render>[0]) =>
+  render(<AssistantCapabilityProvider>{ui}</AssistantCapabilityProvider>);
 import { useState } from 'react';
 import BookingModal from '../BookingModal';
 import type { BookingFormData } from '../BookingModal';
@@ -57,7 +63,7 @@ function renderModal(
     onClose: noop,
     ...overrides,
   };
-  render(<BookingModal {...props} />);
+  renderWithAssistant(<BookingModal {...props} />);
   return props;
 }
 
@@ -134,7 +140,7 @@ describe('BookingModal', () => {
       );
     };
 
-    render(<Harness />);
+    renderWithAssistant(<Harness />);
     const submitButton = screen.getByRole('button', { name: /Submit Booking Request/ });
 
     await user.click(submitButton);
@@ -189,7 +195,7 @@ describe('BookingModal', () => {
       );
     };
 
-    render(<Harness />);
+    renderWithAssistant(<Harness />);
     const submitButton = screen.getByRole('button', { name: /Submit Booking Request/ });
 
     // First submit starts the in-flight request and disables the button.
@@ -273,7 +279,7 @@ describe('BookingModal', () => {
       );
     };
 
-    render(<Harness />);
+    renderWithAssistant(<Harness />);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     await user.keyboard('{Escape}');

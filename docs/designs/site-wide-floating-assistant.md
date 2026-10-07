@@ -99,6 +99,41 @@ The new outcomes are controlled by `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED`, 
 
 Rationale for Approach B over A, net of the re-validation risk: the user's own stated scope (nav → search → lead-capture, explicitly future-proof) is the second-caller problem `wizard-turn`'s original design doc already flagged — package-service was never meant to be the AI-orchestration home for cross-service tools. Building the harness in its own service now avoids a second migration once phase 2/3 need to call both package-service and lead-service tools from the same conversation, at the accepted cost of a stranded deployable if phase 1 fails its own bar.
 
+### Page actions, planner/customize coverage, and the custom-trip routes (2026-09-13)
+
+Two later ships; both supersede the mount exclusions in Constraints and Target User
+above, which described the widget before it could touch a page.
+
+- **The widget mounts on `/planner` and `/package/:id/customize`, and the pages
+  execute actions.** `isAssistantExcludedPath` is now `/login` and `/my-account`
+  only. Both pages register what they can run (`set_destination`,
+  `set_travellers`, `set_preferences`, `set_contact_details`, `go_to_step`,
+  `generate_itinerary`, `regenerate_days`, `edit_day`) and report their state, so
+  the assistant changes the page it is on instead of only talking about it. The
+  in-tab planner chat stays as the slot-filling entry point to Step 1.
+- **The nav allowlist now holds one path-parameterized target:** `customize`
+  (`/package/:id/customize`). It does not reopen the phase-2 question the
+  Nav-allowlist decision left open — the id is server-resolved from a package the
+  server loaded (named in the conversation, or the last one shown), never
+  model-authored, and the model chooses only the route name. `/package/:id` (the
+  detail page) remains phase 2's `get_package_detail` target.
+- **The prompt states what the company sells.** An offering block (curated
+  packages, custom trips built with AI in the planner, per-package customization,
+  the human team) plus two decision steps route "build me a custom trip" / "can
+  you build one with AI" to `/planner` and "customize this package" to its
+  customization page, instead of `hand_off`-ing a visitor who asked for exactly
+  what the site builds. The `capability` copy names those routes only when the
+  turn offered them.
+- **A place the catalogue does not cover no longer degrades into a count.** The
+  model maps a city to its listed country (Tokyo → Japan) and says what we do not
+  have in one clause; when the destination it read is not one the page lists, the
+  server answers with reviewed copy instead of presenting the whole catalogue as
+  an answer, and the model's own clause is kept only while every number in it
+  resolves to a record.
+- **Local dev caveat:** the capability and social copy above need
+  `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED=true`, which the deployment sets and
+  `Services/assistant-service/.env.example` defaults to `false`.
+
 ## Eng Review Decisions (resolved 2026-09-05, `/plan-eng-review`)
 - **Persistence (REVERSED 2026-09-13):** ~~`assistant-service` is fully stateless for phase 1, matching `wizard-turn` — no Postgres schema. Client resends the sliding message window each turn; telemetry events go to the new ingest endpoint (below), never a conversation table.~~ The turn now keeps its conversation in `crm_assistant` (`AssistantSession` + `AssistantMessage`), and the client's resent window is a FALLBACK used only when the store cannot be read — an old cached bundle and an unreachable database both keep the original behaviour. Telemetry is still a separate sink, and `AssistantEvent` is still not a conversation.
   Why the reversal: booking capture arrived, and it needs three things a stateless turn cannot hold — a draft that survives between turns, a confirmation the visitor actually gave, and a record of whether we already wrote. A confirmation the client supplies is not a confirmation, and `shownPackageIds` was letting the browser decide what the visitor had already been shown. The session id stays the client-generated opaque value it always was; nothing else about the wire contract changed.

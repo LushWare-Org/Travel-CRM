@@ -53,6 +53,36 @@ describe('LocationAutocomplete', () => {
     expect(onSelect).toHaveBeenCalledWith('Colombo, Western Province, Sri Lanka');
   });
 
+  it('keeps the list hidden after a pick when a debounced search was still pending', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => nominatimResponse });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<LocationAutocomplete onChange={vi.fn()} />);
+
+    const input = screen.getByPlaceholderText('e.g., Colombo, Sri Lanka');
+    await user.type(input, 'Colombo');
+    const suggestion = await screen.findByRole('button', {
+      name: 'Colombo, Western Province, Sri Lanka',
+    });
+
+    // One more keystroke leaves the 500ms debounce pending while the earlier
+    // results are still on screen — the state a pick is normally made in.
+    await user.type(input, 'x');
+    await user.click(suggestion);
+
+    // Let the whole debounce window pass before asserting, so a search that was
+    // already scheduled has had every chance to put the list back.
+    const debounceWindowEnds = Date.now() + 700;
+    await vi.waitUntil(() => Date.now() >= debounceWindowEnds, { timeout: 3000, interval: 25 });
+
+    expect(
+      screen.queryByRole('button', { name: 'Colombo, Western Province, Sri Lanka' })
+    ).not.toBeInTheDocument();
+  });
+
   it('clears the value via the clear button', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

@@ -1,6 +1,6 @@
 import PageCopilot from '@/features/copilot/PageCopilot';
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '@/lib/toast';
 import {
   Search,
@@ -15,7 +15,6 @@ import {
   Calendar,
   Sparkles,
   Filter,
-  DollarSign,
   LayoutGrid,
   Table as TableIcon,
 } from 'lucide-react';
@@ -30,6 +29,7 @@ import DocumentCard from './DocumentCard';
 import DocumentDetailDialog from './DocumentDetailDialog';
 import { getDocumentNumber, getDocumentAmount, getDocumentDate, matchesSearch, formatDate } from './helpers';
 import type { BillingDocument, DocumentType, ViewMode, Quotation, Invoice, Receipt, Voucher, PaymentHistoryRecord } from './types';
+import PageHeader from '@/components/PageHeader';
 
 // api.js is untyped legacy JS - every one of these clients shares the same
 // ApiService.fetch() foundation (typed `Promise<any>` at the source, Phase
@@ -95,10 +95,16 @@ function EmptyState({ message }: { message: string }) {
 
 export default function BillingInvoicing() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [activeTab, setActiveTab] = useState<DocumentType>('quotation');
+  const [activeTab, setActiveTab] = useState<DocumentType>(() => {
+    const requested = searchParams.get('tab');
+    return TAB_META.some((tab) => tab.id === requested) ? requested as DocumentType : 'quotation';
+  });
   const [selected, setSelected] = useState<BillingDocument | null>(null);
+  const idsParam = searchParams.get('ids');
+  const documentId = searchParams.get('documentId') || searchParams.get('invoiceId');
 
   const [documents, setDocuments] = useState<Record<DocumentType, BillingDocument[]>>({
     quotation: [],
@@ -119,12 +125,18 @@ export default function BillingInvoicing() {
   const [endDate, setEndDate] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
 
+  const changeTab = (tab: DocumentType) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
   const fetchDocuments = async (type: DocumentType) => {
     try {
       setLoading((prev) => ({ ...prev, [type]: true }));
       const params: Record<string, string | number> = { limit: 100, page: 1 };
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
+      if (idsParam && type === activeTab) params.ids = idsParam;
       const response = await API_MAP[type].getAll(params);
       if (response.success || response.status === 'success') {
         setDocuments((prev) => ({ ...prev, [type]: response.data || [] }));
@@ -140,14 +152,29 @@ export default function BillingInvoicing() {
   };
 
   useEffect(() => {
-    TAB_META.forEach((tab) => fetchDocuments(tab.id));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only, mirrors the original's single empty-dep effect
-  }, []);
+    if (!idsParam) {
+      TAB_META.filter((tab) => tab.id !== activeTab).forEach((tab) => fetchDocuments(tab.id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- background fetches only change with the deep-link id set
+  }, [idsParam]);
 
   useEffect(() => {
     fetchDocuments(activeTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only the active tab on date/tab change, same as original
-  }, [startDate, endDate, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only the active tab on date/tab/id change
+  }, [startDate, endDate, activeTab, idsParam]);
+
+  useEffect(() => {
+    const requested = searchParams.get('tab');
+    if (requested && TAB_META.some((tab) => tab.id === requested) && requested !== activeTab) {
+      setActiveTab(requested as DocumentType);
+    }
+  }, [activeTab, searchParams]);
+
+  useEffect(() => {
+    if (!documentId) return;
+    const requested = documents[activeTab].find((document) => document.id === documentId);
+    if (requested) setSelected(requested);
+  }, [activeTab, documentId, documents]);
 
   const handleNavigateToLead = (leadId: string) => {
     if (!leadId) {
@@ -317,15 +344,19 @@ export default function BillingInvoicing() {
   return (
     <PageCopilot pageKey="billing" scopeLabel="Billing">
       <div className="min-h-screen bg-background">
-      {/* Mobile Header + Horizontal Tabs */}
-      <div className="sticky top-0 z-20 border-b border-border bg-card md:hidden">
-        <div className="flex items-center gap-3 px-4 pb-2 pt-3 pl-14">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <DollarSign className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <h1 className="text-lg font-bold text-foreground">Billing</h1>
-        </div>
-        <div className="flex gap-2 px-4 pb-2">
+      <PageHeader
+        title="Billing"
+        subtitle="Finance management"
+        actions={activeTab === 'payment-history' ? (
+          <Button onClick={handleDownloadPaymentHistoryList} disabled={loading['payment-history'] || filtered.length === 0}>
+            <Download className="h-4 w-4" /> Export All
+          </Button>
+        ) : undefined}
+      />
+      {/* Mobile figures + horizontal tabs. The title row moved into PageHeader,
+          so this block is no longer sticky — there is one sticky bar. */}
+      <div className="border-b border-border bg-card md:hidden">
+        <div className="flex gap-2 px-4 py-2">
           <div className="flex-1 rounded-lg border border-success/20 bg-success/10 px-3 py-1.5">
             <p className="font-mono text-sm font-bold tabular-nums text-success">{formatCurrency(totalRevenue)}</p>
             <p className="text-xs uppercase text-success/70">Revenue</p>
@@ -336,7 +367,7 @@ export default function BillingInvoicing() {
           </div>
         </div>
         <div className="scrollbar-hide overflow-x-auto px-3 pb-3">
-          <Tabs value={activeTab} onValueChange={(value) => value && setActiveTab(value as DocumentType)}>
+          <Tabs value={activeTab} onValueChange={(value) => value && changeTab(value as DocumentType)}>
             <TabsList className="w-max">
               {TAB_META.map((tab) => (
                 <TabsTrigger key={tab.id} value={tab.id} className="gap-1.5">
@@ -354,17 +385,7 @@ export default function BillingInvoicing() {
         {/* Left Sidebar - Desktop only */}
         <aside className="sticky top-0 hidden h-screen w-72 flex-col overflow-y-auto border-r border-border bg-card pb-4 md:flex">
           <div className="border-b border-border p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-                <DollarSign className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">Billing</h1>
-                <p className="text-xs text-muted-foreground">Finance Management</p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg border border-success/20 bg-success/10 p-3">
                 <p className="font-mono text-lg font-bold tabular-nums text-success">{formatCurrency(totalRevenue)}</p>
                 <p className="text-xs uppercase tracking-wider text-success/70">Revenue</p>
@@ -384,7 +405,7 @@ export default function BillingInvoicing() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => changeTab(tab.id)}
                   className={`flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors ${
                     isActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
                   }`}
@@ -416,33 +437,17 @@ export default function BillingInvoicing() {
 
         {/* Main Content */}
         <main className="min-w-0 flex-1">
-          <div className="sticky top-0 z-10 border-b border-border bg-card px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-            <div className="mb-4 hidden items-center justify-between md:flex">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-                  <currentTab.icon className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">{currentTab.label}</h2>
-                  <p className="text-sm text-muted-foreground">{documents[activeTab].length} documents found</p>
-                </div>
-              </div>
-
-              {activeTab === 'payment-history' && (
-                <Button onClick={handleDownloadPaymentHistoryList} disabled={loading['payment-history'] || filtered.length === 0}>
-                  <Download className="h-4 w-4" /> Export All
-                </Button>
-              )}
-            </div>
-
-            {activeTab === 'payment-history' && (
-              <div className="mb-3 md:hidden">
-                <Button onClick={handleDownloadPaymentHistoryList} disabled={loading['payment-history'] || filtered.length === 0} className="w-full">
-                  <Download className="h-4 w-4" /> Export All
+          <div className="border-b border-border bg-card px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+            {idsParam && (
+              <div className="mb-3 flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-sm text-foreground">
+                  Showing <span className="font-mono tabular-nums">{documents[activeTab].length}</span> selected documents
+                </p>
+                <Button variant="ghost" size="xs" onClick={() => setSearchParams({ tab: activeTab })}>
+                  Show all
                 </Button>
               </div>
             )}
-
             <div className="flex gap-2 sm:gap-3">
               <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

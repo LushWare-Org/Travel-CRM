@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AssistantCurrentView, AssistantPageCapabilities, AssistantPageContext } from '@travel-crm/contracts';
 import httpClient from '../http/client';
 import { parseEnvelope } from '../http/envelope';
 
@@ -15,6 +16,27 @@ export const AssistantTurnTool = z.enum([
   'request_booking',
   'respond_conversationally',
   'redirect_off_topic',
+  // Page-executed actions and the grounded travel answer. The server only ever
+  // returns them when this request offered them, so a name missing here fails the
+  // whole response parse — and the visitor sees "Failed to reach the assistant"
+  // for a turn that succeeded. `assistantTurnToolNames` in the test asserts this
+  // list against the shared contract for exactly that reason.
+  'set_destination',
+  'set_travellers',
+  'set_preferences',
+  'set_contact_details',
+  'go_to_step',
+  'generate_itinerary',
+  'regenerate_days',
+  'edit_day',
+  'search_travel_info',
+  // Server-composed, and the only outcome whose sentence the server writes from
+  // the request rather than from model args: the page reports what is on screen
+  // and the assistant relays its numbers.
+  'answer_current_view',
+  // The form-filling member: the page writes the values into the form it has on
+  // screen, and presses no button.
+  'prefill_form',
 ]);
 
 // Identical shape to WizardTurnMessage: `id`/`at` are required so the
@@ -61,6 +83,19 @@ export const AssistantTurnRequest = z.object({
         .optional(),
     }),
   ),
+  // What the mounted page can execute this turn, and what is on it. Both come
+  // from the page through the capability registry, both are omitted on pages
+  // that register nothing, and both are validated by the shared contract rather
+  // than by a second copy of its bounds here — this schema parses the OUTGOING
+  // payload and zod strips unknown keys, so an undeclared field would never
+  // leave the browser.
+  capabilities: AssistantPageCapabilities.optional(),
+  pageContext: AssistantPageContext.optional(),
+  // What the page says is on screen. Declared for the reason every field on this
+  // schema is: it parses the OUTGOING payload and zod strips unknown keys, so an
+  // undeclared field would never leave the browser and the assistant would keep
+  // answering about a page the visitor has left.
+  currentView: AssistantCurrentView.optional(),
 });
 
 export const AssistantTurnResult = z.object({

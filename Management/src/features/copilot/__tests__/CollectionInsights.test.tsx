@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import CollectionInsights from '../CollectionInsights';
 import { makeSession } from './copilotTestUtils';
 import type { CopilotSource } from '../types';
@@ -99,56 +98,5 @@ describe('CollectionInsights', () => {
     expect(screen.getByText('Success claim')).toBeInTheDocument();
     expect(screen.queryByText(/Partially loaded/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Some data is outside/)).not.toBeInTheDocument();
-  });
-});
-
-describe('CollectionInsights — suggested questions', () => {
-  const scopeLabel = 'Billing';
-
-  it('omits the block when the scope has no suggested questions', () => {
-    render(<CollectionInsights session={makeSession({ suggestedQuestions: [] })} scopeLabel={scopeLabel} />);
-
-    expect(screen.queryByRole('region', { name: 'Suggested questions' })).not.toBeInTheDocument();
-  });
-
-  it('renders and submits a single server-supplied question through the session action', async () => {
-    const user = userEvent.setup();
-    const submit = vi.fn();
-    render(
-      <CollectionInsights
-        session={makeSession({ suggestedQuestions: ['Who is the most overdue?'], submit })}
-        scopeLabel={scopeLabel}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Who is the most overdue?' }));
-    expect(submit).toHaveBeenCalledWith('Who is the most overdue?');
-  });
-
-  it('renders at most three questions', () => {
-    render(
-      <CollectionInsights
-        session={makeSession({
-          suggestedQuestions: ['One?', 'Two?', 'Three?', 'Four?'],
-        })}
-        scopeLabel={scopeLabel}
-      />
-    );
-
-    expect(screen.getByRole('button', { name: 'One?' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Three?' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Four?' })).not.toBeInTheDocument();
-  });
-});
-
-describe('CollectionInsights — heading focus target', () => {
-  it('marks the real heading as the programmatic focus target', () => {
-    render(<CollectionInsights session={makeSession({})} scopeLabel="Billing" />);
-
-    // ManagementContextCopilot moves focus to `#copilot-insights-heading` when
-    // the panel opens. That move silently no-ops if the real heading loses its
-    // tabIndex; the shell test renders its own heading stub, so only an
-    // assertion against the real insights can catch the regression.
-    expect(screen.getByRole('heading', { name: /insights/i })).toHaveAttribute('tabindex', '-1');
   });
 });

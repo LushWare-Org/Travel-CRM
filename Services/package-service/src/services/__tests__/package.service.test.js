@@ -9,7 +9,13 @@ import {
   buildInclude,
   buildListOrderBy,
   destinationSlugSet,
+  resolveDestinationRaws,
 } from '../package.service.js';
+import prisma from '../../db/client.js';
+
+vi.mock('../../db/client.js', () => ({
+  default: { package: { findMany: vi.fn() } },
+}));
 
 // Mock the shared pricing engine
 vi.mock('../../../../shared/pricing-engine/src/index.js', () => ({
@@ -427,9 +433,31 @@ describe('destinationSlugSet', () => {
     expect(destinationSlugSet('Dubai').has('dubai')).toBe(true);
   });
 
+  it('answers to a grouped destination by its name, not its country list', () => {
+    const slugs = destinationSlugSet('Europe (UK, France, Netherlands, Italy)');
+
+    expect(slugs.has('europe')).toBe(true);
+    // Legacy naive-split slugs still resolve.
+    expect(slugs.has('europe-uk')).toBe(true);
+    expect(slugs.has('italy')).toBe(true);
+  });
+
   it('returns nothing for an empty or whitespace value', () => {
     expect(destinationSlugSet('').size).toBe(0);
     expect(destinationSlugSet('   ').size).toBe(0);
+  });
+});
+
+describe('resolveDestinationRaws', () => {
+  it('resolves a grouped destination by the name slug the page links with', async () => {
+    prisma.package.findMany.mockResolvedValue([
+      { destination: 'Europe (UK, France, Netherlands, Italy)' },
+      { destination: 'Japan' },
+    ]);
+
+    await expect(resolveDestinationRaws('europe')).resolves.toEqual([
+      'Europe (UK, France, Netherlands, Italy)',
+    ]);
   });
 });
 

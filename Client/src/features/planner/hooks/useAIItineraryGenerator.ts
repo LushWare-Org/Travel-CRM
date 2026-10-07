@@ -20,7 +20,10 @@ export function useAIItineraryGenerator<TDay>({ hasExistingDays, mapDay, onGener
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
 
-  const generate = async (params: GenerateParams) => {
+  /** Resolves to what happened, so a caller that is not a button — the
+   * assistant's page action — can say which of the three it was. `error` still
+   * carries the message for the page's own banner. */
+  const generate = async (params: GenerateParams): Promise<'generated' | 'cancelled' | 'failed'> => {
     if (hasExistingDays()) {
       const confirmed = await Swal.fire({
         icon: 'warning',
@@ -30,15 +33,17 @@ export function useAIItineraryGenerator<TDay>({ hasExistingDays, mapDay, onGener
         confirmButtonText: 'Replace',
         cancelButtonText: 'Cancel',
       });
-      if (!confirmed.isConfirmed) return;
+      if (!confirmed.isConfirmed) return 'cancelled';
     }
     setError('');
     setIsGenerating(true);
     try {
       const { days } = await generateItineraryPreview(params);
       onGenerated(days.map(mapDay));
+      return 'generated';
     } catch (err) {
       setError(apiErrorMessage(err));
+      return 'failed';
     } finally {
       setIsGenerating(false);
     }

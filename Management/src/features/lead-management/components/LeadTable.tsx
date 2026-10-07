@@ -22,6 +22,7 @@ import {
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import { repLabelFor, repOptionId, type SalesRepOption } from '../utils/salesRepLabel';
 
 interface LeadTableProps {
   leads: any[];
@@ -57,30 +58,8 @@ interface LeadTableProps {
 const docActionClass = 'p-2 transition-colors bg-muted rounded-lg hover:bg-accent';
 const docIconClass = 'w-4 h-4 text-muted-foreground';
 
-interface SalesRepOption {
-  id: string;
-  _id?: string;
-  name: string;
-}
-
 const menuItemClass =
   'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted';
-
-const repOptionId = (rep: SalesRepOption) => rep.id || rep._id || '';
-
-const findAssignedRep = (lead: { assignedToId?: string }, salesReps?: SalesRepOption[]) =>
-  salesReps?.find((rep) => repOptionId(rep) === lead.assignedToId);
-
-/**
- * The assignee's name. A lead can point at a rep who is no longer in the active
- * list, and showing "Unassigned" for one of those would invite a second
- * assignment, so the id stands in for the name instead.
- */
-const repLabelFor = (lead: { assignedToId?: string }, salesReps?: SalesRepOption[]) => {
-  const rep = findAssignedRep(lead, salesReps);
-  if (rep) return rep.name;
-  return lead.assignedToId ? String(lead.assignedToId).substring(0, 8) : 'Unassigned';
-};
 
 /**
  * In-cell assignment control, deliberately one 32px trigger so the Sales Rep
@@ -406,7 +385,7 @@ const LeadTable = ({
                     <div className="flex items-center gap-2 text-sm">
                       <User className="w-4 h-4 text-muted-foreground shrink-0" />
                       <span className={`truncate ${lead.assignedToId ? 'text-muted-foreground' : 'text-warning font-medium'}`}>
-                        {repLabelFor(lead, salesReps)}
+                        {repLabelFor(lead.assignedToId, salesReps)}
                       </span>
                     </div>
                   </div>
@@ -601,7 +580,7 @@ const LeadTable = ({
               const displayStatus = lead.lifecycleStatus;
               const statusColor = (statusColors && statusColors[displayStatus]) || 'bg-muted text-muted-foreground';
               const leadId = (lead._id || lead.id)?.toString();
-              const repLabel = repLabelFor(lead, salesReps);
+              const repLabel = repLabelFor(lead.assignedToId, salesReps);
               const isHighlighted = highlightedLeadId && leadId === highlightedLeadId.toString();
 
               return (

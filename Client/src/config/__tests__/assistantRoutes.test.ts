@@ -15,6 +15,7 @@ const EXPECTED_TARGETS = [
   { name: 'contact', path: '/contact' },
   { name: 'career', path: '/career' },
   { name: 'planner', path: '/planner' },
+  { name: 'customize', path: '/package/:id/customize' },
 ];
 
 // The filter keys /packages honours. Only that route declares any — a route
@@ -45,7 +46,7 @@ afterEach(() => {
 });
 
 describe('ASSISTANT_ROUTES', () => {
-  it('exposes exactly the seven Phase 1 navigable targets with their resolved paths', async () => {
+  it('exposes exactly the eight navigable targets with their resolved paths', async () => {
     const routes = await importAssistantRoutes();
     expect(routes.map(({ name, path }) => ({ name, path }))).toEqual(EXPECTED_TARGETS);
   });
@@ -55,9 +56,15 @@ describe('ASSISTANT_ROUTES', () => {
     expect(routes.every((route) => route.enabled)).toBe(true);
   });
 
-  it('does not include parameterized package routes (phase 2 targets)', async () => {
+  it('lists only the one parameterized target whose id the server resolves', async () => {
     const routes = await importAssistantRoutes();
-    expect(routes.some((route) => route.path.includes(':id'))).toBe(false);
+    const parameterized = routes.filter((route) => route.path.includes(':id'));
+    expect(parameterized.map(({ name, path }) => ({ name, path }))).toEqual([
+      { name: 'customize', path: '/package/:id/customize' },
+    ]);
+    // The package detail page itself is still phase 2's get_package_detail
+    // target: nothing in a conversation resolves which package it would show.
+    expect(routes.some((route) => route.path === '/package/:id')).toBe(false);
   });
 });
 
@@ -91,19 +98,23 @@ describe('getEnabledAssistantRoutes', () => {
 });
 
 describe('isAssistantExcludedPath', () => {
-  it('excludes exactly the four assistant-free routes, tolerating a trailing slash', async () => {
+  it('excludes exactly the auth-adjacent routes, tolerating a trailing slash', async () => {
     const isAssistantExcludedPath = await loadExcludedPath();
 
-    expect(isAssistantExcludedPath('/planner')).toBe(true);
-    expect(isAssistantExcludedPath('/planner/')).toBe(true);
-    expect(isAssistantExcludedPath('/package/123/customize')).toBe(true);
     expect(isAssistantExcludedPath('/login')).toBe(true);
+    expect(isAssistantExcludedPath('/login/')).toBe(true);
     expect(isAssistantExcludedPath('/my-account')).toBe(true);
+    expect(isAssistantExcludedPath('/my-account/')).toBe(true);
 
     expect(isAssistantExcludedPath('/')).toBe(false);
     expect(isAssistantExcludedPath('/about')).toBe(false);
     expect(isAssistantExcludedPath('/packages')).toBe(false);
     expect(isAssistantExcludedPath('/package/123')).toBe(false);
     expect(isAssistantExcludedPath('/package/123/customize/extra')).toBe(false);
+    // The two routes this change opened up. Both pages register what they can
+    // execute, which is what the exclusion was standing in for.
+    expect(isAssistantExcludedPath('/planner')).toBe(false);
+    expect(isAssistantExcludedPath('/planner/')).toBe(false);
+    expect(isAssistantExcludedPath('/package/123/customize')).toBe(false);
   });
 });

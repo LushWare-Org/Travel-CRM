@@ -88,8 +88,35 @@ export function canonicalizeBriefingResponse(raw, BriefingClaimSchema) {
   const claims = Array.isArray(raw?.claims) ? raw.claims : [];
   const out = [];
   for (const c of claims) {
-    const parsed = BriefingClaimSchema.safeParse(c);
+    const parsed = BriefingClaimSchema.safeParse(dropUncitableFacts(c));
     if (parsed.success) out.push(parsed.data);
   }
   return out;
+}
+
+/**
+ * A fact with no usable `evidenceId` can never be grounded: `validateClaims`
+ * discards exactly those, one at a time —
+ * `if (!fact?.evidenceId || !support.has(fact.evidenceId)) continue`.
+ *
+ * The shared contract is stricter than that validator — `evidenceId` must be a
+ * non-empty string — so ONE unusable fact failed the WHOLE claim, which was then
+ * dropped here in silence and surfaced to the operator as "I could not ground an
+ * answer" while the answer itself was correct. Live, that is how a right count
+ * died: the model read `total: 26` and `overdueTotal: 23` off the tool result, both
+ * correct, and emitted them as facts with `evidenceId: ""` — the shape the prompt
+ * explicitly forbids, and the one the validator is already willing to ignore.
+ *
+ * Dropping the fact is therefore not a loosening. It is what the downstream
+ * validator does anyway, applied one step earlier so the claim survives with the
+ * meaning it would have had. The contract stays strict and untouched, so nothing
+ * else that parses claims is affected.
+ */
+function dropUncitableFacts(claim) {
+  if (!Array.isArray(claim?.facts) || claim.facts.length === 0) return claim;
+  const facts = claim.facts.filter(
+    (fact) => typeof fact?.evidenceId === 'string' && fact.evidenceId.trim() !== '',
+  );
+  if (facts.length === claim.facts.length) return claim;
+  return { ...claim, facts };
 }

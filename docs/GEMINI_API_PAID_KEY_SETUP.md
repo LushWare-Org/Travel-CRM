@@ -272,7 +272,7 @@ gcloud billing budgets create \
   --filter-projects=projects/travelcrm-506818
 ```
 
-At current traffic the model is pinned to `gemini-3.5-flash` (`GEMINI_MODEL` overrides it), and
+At current traffic the model is pinned to `gemini-3.5-flash-lite` (`GEMINI_MODEL` overrides it), and
 Flash-tier token pricing is low — $5 of Prepay covers a large number of generations.
 
 ---

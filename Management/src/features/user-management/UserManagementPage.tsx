@@ -6,6 +6,7 @@ import { SalesRepManagement } from './components/SalesRepManagement';
 import { VendorManagement } from './components/VendorManagement';
 import { WebsiteUsersManagement } from './components/WebsiteUsersManagement';
 import { usePermission } from '../../contexts/PermissionContext';
+import PageHeader from '@/components/PageHeader';
 
 interface ManagementTab {
   id: string;
@@ -110,13 +111,11 @@ const UserManagementPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile Header + Horizontal Tabs */}
-      <div className="sticky top-0 z-20 border-b border-border bg-card md:hidden">
-        <div className="flex items-center gap-3 px-4 pt-3 pb-2 pl-14">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-primary">
-            <Users className="size-4 text-primary-foreground" />
-          </div>
-          <h1 className="font-heading text-lg font-bold text-foreground">User Management</h1>
-        </div>
+      <PageHeader title="User Management" subtitle={currentTab?.description} />
+
+      {/* Mobile sections. The title row moved into PageHeader, so this block is
+          no longer sticky — there is one sticky bar. */}
+      <div className="border-b border-border bg-card md:hidden">
         {accessibleTabs.length > 0 ? (
           <Tabs value={currentActiveTab ?? undefined} onValueChange={(v) => handleTabChange(v as string)} className="px-3 pb-3">
             <TabsList className="w-full overflow-x-auto scrollbar-hide">
@@ -141,18 +140,8 @@ const UserManagementPage = () => {
         <aside className="sticky top-0 hidden h-screen w-72 flex-col overflow-y-auto border-r border-border bg-card pb-4 md:flex">
           {/* Sidebar Header */}
           <div className="border-b border-border p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-12 items-center justify-center rounded-lg bg-primary">
-                <Users className="size-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="font-heading text-lg font-bold text-foreground">User Management</h1>
-                <p className="text-xs text-muted-foreground">Manage all users</p>
-              </div>
-            </div>
-
             {/* Quick Stats Row */}
-            <div className="mt-4 flex gap-2">
+            <div className="flex gap-2">
               <div className="flex-1 rounded-lg bg-muted p-2 text-center">
                 <p className="font-mono text-lg font-bold tabular-nums text-foreground">{accessibleTabs.length}</p>
                 <p className="text-xs tracking-wider text-muted-foreground uppercase">Sections</p>
@@ -222,21 +211,6 @@ const UserManagementPage = () => {
 
         {/* Main Content Area */}
         <main className="min-w-0 flex-1">
-          {/* Content Header - Desktop only */}
-          {currentTab && (
-            <div className="sticky top-0 z-10 hidden border-b border-border bg-card px-8 py-6 md:block">
-              <div className="flex items-center gap-4">
-                <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10">
-                  <currentTab.icon className="size-6 text-primary" />
-                </div>
-                <div>
-                  <h2 className="font-heading text-xl font-bold text-foreground">{currentTab.label}</h2>
-                  <p className="text-sm text-muted-foreground">{currentTab.description}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Content Body */}
           <div className="p-4 sm:p-6 lg:p-8">{renderContent()}</div>
 

@@ -98,7 +98,13 @@ export default function Login() {
           <p className="text-sm text-muted-foreground">{getLoginBranding().subtitle}</p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-8 shadow-[var(--shadow-modal)]">
+        {/*
+          The page's own surface plus a hairline, not a `bg-card` slab. On the
+          light theme that slab was pure white on a near-white page, which is the
+          white box this screen should not have. No shadow either: a surface with
+          no fill of its own has no elevation to cast.
+        */}
+        <div className="border border-border rounded-xl p-8">
           <div className="text-center mb-6">
             <h2 className="font-heading text-xl font-semibold text-foreground">Welcome Back</h2>
             <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>

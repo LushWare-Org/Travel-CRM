@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AssistantCapabilityProvider } from '../../assistant/capabilities/AssistantCapabilityProvider';
+
+// The container registers what the assistant may fill, and that registration
+// requires the provider the app mounts at its root.
+const renderWithAssistant = (ui: Parameters<typeof render>[0]) =>
+  render(<AssistantCapabilityProvider>{ui}</AssistantCapabilityProvider>);
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ContactContainer from '../ContactContainer';
@@ -36,7 +42,7 @@ describe('ContactContainer', () => {
   });
 
   it('renders the contact form and office hours card', () => {
-    render(<ContactContainer />);
+    renderWithAssistant(<ContactContainer />);
     expect(screen.getByRole('heading', { name: /Send Us a Message/ })).toBeInTheDocument();
     expect(screen.getByText('Office Hours')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Send Message/ })).toBeInTheDocument();
@@ -44,7 +50,7 @@ describe('ContactContainer', () => {
 
   it('submits the exact expected payload when the form is filled and submitted', async () => {
     const user = userEvent.setup();
-    const { container } = render(<ContactContainer />);
+    const { container } = renderWithAssistant(<ContactContainer />);
 
     await fillRequiredFields(user);
     await user.type(screen.getByPlaceholderText('+1 (555) 123-4567'), '  +1 555 123 4567  ');
@@ -79,7 +85,7 @@ describe('ContactContainer', () => {
 
   it('shows a validation error and does not call the API when required fields are missing', async () => {
     const user = userEvent.setup();
-    render(<ContactContainer />);
+    renderWithAssistant(<ContactContainer />);
 
     // Whitespace-only Name/Subject/Message pass the browser's native
     // `required` check (value is non-empty) while a real email keeps native
@@ -101,7 +107,7 @@ describe('ContactContainer', () => {
   it('shows the API error message when submission fails', async () => {
     const user = userEvent.setup();
     submitContactFormMock.mockRejectedValue(new Error('Server unreachable'));
-    render(<ContactContainer />);
+    renderWithAssistant(<ContactContainer />);
 
     await fillRequiredFields(user);
     await user.click(screen.getByRole('button', { name: /Send Message/ }));
@@ -112,7 +118,7 @@ describe('ContactContainer', () => {
 
   it('shows the success state after a successful submission', async () => {
     const user = userEvent.setup();
-    render(<ContactContainer />);
+    renderWithAssistant(<ContactContainer />);
 
     await fillRequiredFields(user);
     await user.click(screen.getByRole('button', { name: /Send Message/ }));

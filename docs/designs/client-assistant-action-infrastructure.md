@@ -29,11 +29,11 @@ The assistant stops being a help widget that describes the site and becomes a co
 - The model never authors an executed action. It names one action from a fixed union, supplies arguments, and both the server and the client validate before anything runs.
 - **The client-sent manifest is untrusted input, not just a validation input.** `/api/v1/assistant/turn` is public and unauthenticated. `capabilities` and `currentView` are strings written by the caller and pasted into the model's prompt, so the server must treat them as data throughout: strict patterns on every identifier, a hard size cap, and the same explicit data-not-instructions labelling (spotlighting) the phase-1 doc already requires for package descriptions. Schema validation constrains what the model may say back; it does not constrain what an attacker may put into the prompt.
 - The assistant never dispatches a form submit. Not on contact, not on review, not on booking.
-- Inherited exclusions: the widget does not mount on `/planner`, `/package/:id/customize`, `/login`, `/my-account` (`Client/src/config/assistantRoutes.ts`). This design adds `/reset-password/:token`, since a prefilled credential field is a path it deliberately does not open.
+- Inherited exclusions: the widget does not mount on `/login` or `/my-account` (`Client/src/config/assistantRoutes.ts`). `/planner` and `/package/:id/customize` were on that list when this document was written and are not any more — both register what they can execute, which is this design's own premise. This design adds `/reset-password/:token`, since a prefilled credential field is a path it deliberately does not open.
 - Gateway stays the single public entry point. `/api/v1/assistant/turn` continues to reuse `itineraryChatLimiter`.
-- **The rollout flag must not gate the new actions.** `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED` is hard-set to `"false"` for deployment (`infra/terraform/modules/deployment/locals.tf:172`), and `canonicalizeAssistantTurnResponse` rewrites any tool outside `LEGACY_ASSISTANT_TOOLS` into an `answer_faq_policy` fallback when it is off (`assistantTurn.v1.js:70-76`). Client actions go on an always-enabled core set; the conversational pair stays behind the flag.
+- **The rollout flag must not gate the new actions — and no longer does.** `canonicalizeAssistantTurnResponse` admits everything in `CORE_ASSISTANT_TOOLS` whether or not the flag is on, and the client-executed page actions and `search_travel_info` already live there; only the conversational pair is behind `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED`, which the deployment sets to `"true"` (`infra/terraform/modules/deployment/locals.tf:176`). A new outcome joins the core set for the same reason. What is left is deleting the flag once its rollback window is done, not threading new work around it.
 - **The controller dispatch must learn the new outcomes.** `assistant.controller.js:212-213` ends its switch with `default: throw new AppError('AI returned an unrecognized tool', BAD_GATEWAY)`, so a turn resolving to a new action returns 502 until explicit cases exist.
-- **The turn envelope is not shared today.** `Client/src/services/api/assistantTurn.ts` is a hand-maintained mirror, it parses the outgoing payload before posting, zod strips unknown keys, and its tool enum is a closed four-value list. Any new request field or outcome must be added here or it dies silently in either direction.
+- **The turn envelope is not shared today.** `Client/src/services/api/assistantTurn.ts` is a hand-maintained mirror, it parses the outgoing payload before posting, zod strips unknown keys, and its tool enum is a hand-copied list of the sixteen shipped outcomes. The request already carries `capabilities` and `pageContext`, and any new request field (`currentView` below) or outcome must be added here or it dies silently in either direction.
 - **Compatibility is additive in both directions.** The client is a static bundle and a browser can hold an old one across a deploy or a rollback. Every new request field is optional with a default; every new response field is optional on the client with a safe default (`params` defaults to `{}`); an unrecognised outcome renders the existing generic bubble rather than failing the parse. Deploy order: server first, then client. A new server with an old client is inert; a new client against an old server must still navigate.
 - Gemini flat-schema constraint. `assistantTurn.v1.js` records that nested and conditional object schemas produced `args: {}` in live structured-output calls. Every argument travels as a flat optional scalar key, and per-action narrowing happens after generation.
 - **Price is a numeric budget, not a bucket identity.** `priceMax` is a number in the deployment's display currency, and the sidebar's bucket buttons write their own bounds into the same parameter. Bucket ids are removed entirely: a thousand-wide bucket cannot express "under $1500", and a bucket id derived from a label reintroduces the currency coupling the encoding exists to avoid.
@@ -141,6 +141,65 @@ From `/plan-design-review` (seven passes; text-based, because the designer binar
 9. **Page-state channel.** The page reports `currentView`; step 4's `answer_current_view` consumes it; the prompt is instructed never to state a count it was not given.
 10. **Failure semantics and telemetry.** Server-side rejection degrades to the existing repair copy and records a rejection event. Client-side rejection shows an inline message and records the same. Needs an event type that does not exist, plus `action` and `reason` carried in `metadata`: `AssistantEvent` already has a `metadata Json?` column (`prisma/schema.prisma:33`), but `recordEventSchema` is strict and has no `metadata` field and `events.controller.js:12-14` hardcodes `metadata: null`. No migration needed.
 11. **CI coverage.** Add a Client unit-test job and a `Services/e2e-tests` job to `microservices-ci.yml`. Today the four `npm test` invocations cover shared/contracts, the backend service matrix, Management and package-service; Client is only built in `deploy.yml`, and neither `Services/e2e-tests/` nor Management's Playwright suite is referenced by any workflow. Roughly two thirds of this branch's diff is Client.
+
+**Built as (step 9 and the view answer, 2026-09-13).** The page-state channel ships
+on its own, ahead of the action members it shares plumbing with, because the
+stale-context bug it fixes needs none of them. `currentView` rides every turn
+(`{ path, params, filteredCount, renderedCount, catalogueTotal }`, bounded in
+`Services/shared/contracts/src/assistantActions.js`); the packages page reports its
+own filtered total and its rendered count through the capability registry, and
+every other page contributes the baseline path and query parameters; and
+`answer_current_view` is a core outcome — offered with the flag on or off, and
+declaring no arguments — whose sentence the server composes from that report.
+
+Three things differ from the sketch above, all deliberately. The view is sent
+every turn rather than only when it changes (the server is stateless, the report
+is bounded, and "on change" needs client state the server must still tolerate
+missing). The model supplies nothing at all for the answer, so the strict union
+admits `args: {}` and any number it writes is dropped before dispatch — the
+sentence is the server's, from the page's numbers. And the filter chips are
+rendered client-side from `params` through the site's own currency formatter,
+rather than by a second copy of the page's label logic.
+
+Still unbuilt from this document: `open_panel`, the wire module extraction
+(step 2), the per-route param schemas for the actions (step 3's remainder), the
+telemetry `metadata` plumbing (step 10) and the CI jobs (step 11). Step 8's form
+filling landed after this note — see below.
+
+**Built as (step 8, 2026-09-13).** Form filling ships for the four forms the
+design names — contact, the booking dialog, the review dialog, the job
+application — as a protocol rather than four tools. A form declares its fields and
+the TYPE of each, and the type is what makes the refusals structural: only text,
+email, tel, textarea, date, number and select are writable, so a resume file, a
+consent checkbox and a credential cannot be named in a fill at all. The page
+reports what each field holds and who put it there, which is how a write that
+would replace the visitor's own text is held back and offered as a confirm chip in
+the bubble — client-side, not another turn. The marker is the two-signal one
+DESIGN.md specifies, and it clears on the visitor's first keystroke.
+
+Two deliberate differences from the sketch above. The form schemas are keyed by
+form id and the form id IS the capability surface, rather than living in the
+contract keyed by route with forms carried beside the actions: one route hosts two
+forms (the package page's booking and review dialogs) and a modal is not a route,
+so a route-keyed table could not say which form was on screen. And a page with a
+form on screen registers no `runAction` at all — the runner handles the fill
+itself, against the live form, because the collision decision needs the values as
+they are at that moment rather than as they were when the page last rendered.
+
+`z-floating-assistant` (110) is now defined in `index.css`, and `/reset-password/:token`
+joined the excluded paths, because a reset link carries a credential. Escape is
+implemented in the capture phase on the panel: it closes the assistant and stops
+the key before the dialog underneath sees it, which is the design's ordering.
+
+**The layer itself is wired but NOT working, and the browser says so.** The
+registration carries `hostedInDialog`, the provider holds it as state, the panel
+switches class on it — and with the booking dialog genuinely open
+(`/package/<id>?book=1` renders its contact step) the panel still computes
+`z-index: 70`, the layer below the dialog. So a modal-hosted form is registered and
+fillable *if* the visitor can reach the panel, and the booking and review dialogs
+are the two forms whose browser pass is therefore still missing. Focus moving into
+the panel and back on close is likewise unverified. This needs one debugging pass
+with the layer inspected from inside an open dialog.
 
 ### Deferred, not in this branch
 

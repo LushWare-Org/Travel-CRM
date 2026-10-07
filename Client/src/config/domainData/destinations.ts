@@ -81,6 +81,9 @@ export const ALL_DESTINATIONS = [
 // normalization lookup) — co-located here since both are per-client
 // reference data to replace before shipping a new deployment.
 export const COUNTRY_REGION_MAP: Record<string, string> = {
+  // Region-level names, so a destination that is itself a region ("Europe",
+  // or the "Europe (UK, France, …)" group) buckets with its own countries.
+  europe: 'Europe',
   indonesia: 'Asia',
   maldives: 'Asia',
   thailand: 'Asia',
@@ -113,6 +116,7 @@ export const COUNTRY_REGION_MAP: Record<string, string> = {
   germany: 'Europe',
   netherlands: 'Europe',
   'united kingdom': 'Europe',
+  uk: 'Europe',
   england: 'Europe',
   scotland: 'Europe',
   ireland: 'Europe',

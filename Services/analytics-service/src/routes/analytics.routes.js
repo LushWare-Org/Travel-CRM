@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth, authorize } from '../middleware/auth.js';
 import { validateQuery, overviewQuerySchema } from '../validators/analytics.validators.js';
 import * as analyticsController from '../controllers/analytics.controller.js';
+import { getBusinessSignals } from '../controllers/business.controller.js';
 
 const router = Router();
 const validateOverviewQuery = validateQuery(overviewQuerySchema);
@@ -23,5 +24,7 @@ router.post('/website/export-pdf', requireAuth, authorize('admin'), (req, res) =
 
 router.get('/salesreps/me/performance', requireAuth, authorize('salesRep'), validateOverviewQuery, analyticsController.getSalesRepPersonalPerformance);
 router.get('/salesreps/performance', requireAuth, authorize('admin'), validateOverviewQuery, analyticsController.getAllSalesRepsPerformance);
+
+router.get('/business/signals', requireAuth, authorize('admin', 'salesRep'), getBusinessSignals);
 
 export default router;

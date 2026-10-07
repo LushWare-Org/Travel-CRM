@@ -116,6 +116,14 @@ export async function generateStructured({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxAttempts = MAX_ATTEMPTS,
   deadlineMs,
+  // Truncation is fatal by default, and rightly so: a cut-off itinerary that
+  // still parses "successfully" is worse than no itinerary. A caller whose
+  // result is validated downstream can opt out — the assistant turn's resolver
+  // does, because its answer is re-checked against the strict per-tool union and
+  // every value it names is resolved against real records. Without this, the
+  // model's occasional runaway answer (see the resolver call site) reached the
+  // visitor as a 502.
+  allowTruncated = false,
 }) {
   const ai = getClient();
   let lastError;
@@ -167,8 +175,15 @@ export async function generateStructured({
       // Structured-output decoding still closes the JSON validly when cut off
       // mid-generation, so a truncated response can otherwise sail through
       // JSON.parse looking "successful" but missing most of its content.
-      if (response.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
-        throw Object.assign(new Error('Gemini response truncated at maxOutputTokens'), { isTruncated: true });
+      const truncated = response.candidates?.[0]?.finishReason === 'MAX_TOKENS';
+      if (truncated) {
+        if (!allowTruncated) {
+          throw Object.assign(new Error('Gemini response truncated at maxOutputTokens'), { isTruncated: true });
+        }
+        logger.warn(
+          { model, attempt, maxOutputTokens: currentMaxOutputTokens },
+          'Gemini response truncated; the caller accepts a partial response and validates it',
+        );
       }
 
       const text = response.text;
@@ -178,7 +193,13 @@ export async function generateStructured({
         return JSON.parse(text);
       } catch (parseErr) {
         logger.error({ err: parseErr, model, attempt }, 'Failed to parse Gemini structured response as JSON');
-        throw Object.assign(new AppError('AI did not return valid JSON', BAD_GATEWAY), { aiFailureCategory: 'schema' });
+        throw Object.assign(new AppError('AI did not return valid JSON', BAD_GATEWAY), {
+          aiFailureCategory: 'schema',
+          // A cut-off response the decoder could not close is worth another draw
+          // rather than a failed turn: the caller opted into partial answers, and
+          // the retry is what makes that option worth taking.
+          ...(truncated ? { isTruncated: true } : {}),
+        });
       }
     } catch (err) {
       lastError = err;

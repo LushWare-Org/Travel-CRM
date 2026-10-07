@@ -74,6 +74,7 @@ vi.mock('../../../../features/lead-management/components/EditLeadDialog', () => 
 import { AuthProvider } from '../../../../contexts/AuthContext';
 import LeadManagement from '../../../../pages/LeadManagement';
 import { setViewport } from '../../../copilot/__tests__/copilotTestUtils';
+import { visibilityKey } from '../../../copilot/useCopilotVisibility';
 
 const lead = {
   _id: 'lead-a',
@@ -89,6 +90,9 @@ const lead = {
 function renderPage() {
   localStorage.setItem('token', 'test-token');
   localStorage.setItem('user', JSON.stringify({ _id: 'actor-1', name: 'Ops' }));
+  // The panel is closed by default; these tests exercise the record-scope
+  // insights, so mount with the operator's stored preference already open.
+  localStorage.setItem(visibilityKey('actor-1', 'leads'), 'open');
   return render(
     <AuthProvider>
       <LeadManagement />
@@ -103,7 +107,7 @@ beforeEach(() => {
 
   mockGetAllLeads.mockResolvedValue({ success: true, data: [lead], pagination: { pages: 1, total: 1 } });
   mockGetLeadStats.mockResolvedValue({ success: true, summary: { total: 1 }, data: [] });
-  mockGetSalesReps.mockResolvedValue({ success: true, data: [] });
+  mockGetSalesReps.mockResolvedValue({ success: true, data: [{ id: 'rep-1', name: 'Rita Rep' }] });
   mockGetAssignmentSettings.mockResolvedValue({ success: true, data: {} });
   mockGetStoredUser.mockReturnValue({ role: 'admin' });
 
@@ -171,6 +175,18 @@ describe('LeadDetailPane', () => {
 
     expect(pane).toHaveTextContent('Lisbon');
     expect(pane).toHaveTextContent('2,500');
+    expect(pane).toHaveTextContent('Rita Rep');
+    expect(pane).not.toHaveTextContent('rep-1');
+  });
+
+  it('falls back to the assignee id prefix when the rep is not in the active list', async () => {
+    mockGetSalesReps.mockResolvedValue({ success: true, data: [] });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByText('Alice Traveller'));
+    const pane = screen.getByRole('complementary', { name: 'Lead detail' });
+    await waitFor(() => expect(pane).toHaveTextContent('rep-1'));
   });
 
   it('binds the copilot scope to the row selected in the pane, not to the documents dialog', async () => {

@@ -23,7 +23,7 @@
 {"id":"social-thanks","workflow":"social","turns":[{"say":"hi","expect":{"tool":"respond_conversationally"}},{"say":"thanks!","expect":{"tool":"respond_conversationally","result":{"mode":"social"},"messageMatches":["welcome"]}}]}
 {"id":"social-farewell","workflow":"social","turns":[{"say":"bye","expect":{"tool":"respond_conversationally","result":{"mode":"social"},"messageMatches":["Safe travels"]}}]}
 {"id":"social-capability","workflow":"social","turns":[{"say":"what can you do","expect":{"tool":"respond_conversationally","result":{"mode":"capability"},"messageContains":["take you to any page"]}}]}
-{"id":"social-travel-general","workflow":"social","turns":[{"say":"tell me what are the trending locations","expect":{"tool":["respond_conversationally","navigate"],"messageNotContains":["what you're trying to do"],"messageNotMatches":["\\bvisa\\b|\\bpassport\\b"]}}]}
+{"id":"social-travel-general","workflow":"social","turns":[{"say":"tell me what are the trending locations","expect":{"tool":["search_travel_info","navigate"],"messageNotContains":["what you're trying to do"],"messageNotMatches":["\\bvisa\\b|\\bpassport\\b"]}}]}
 {"id":"social-mixed","workflow":"social","turns":[{"say":"hi, how much is the japan trip?","expect":{"tool":"answer_packages","messageMatches":["4,?485"]}}]}
 {"id":"offtopic","workflow":"offtopic","turns":[{"say":"write me a poem about spreadsheets","expect":{"tool":"redirect_off_topic","messageContains":["travel"]}}]}
 {"id":"offtopic-then-travel","workflow":"offtopic","turns":[{"say":"write me a poem","expect":{"tool":["redirect_off_topic","respond_conversationally"]}},{"say":"ok what about bali","expect":{"tool":["navigate","answer_packages"],"messageNotContains":["travel and LushWare trips"]}}]}

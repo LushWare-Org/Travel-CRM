@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import { AuthProvider } from './contexts/AuthContext';
 import { PAGE_CONFIG } from './config/pages';
 import AssistantWidget from './features/assistant/components/AssistantWidget';
+import { AssistantCapabilityProvider } from './features/assistant/capabilities/AssistantCapabilityProvider';
 
 const DestinationsInternational = lazy(() => import('./pages/DestinationsPage'));
 const PackageDetails = lazy(() => import('./pages/PackageDetailsPage'));
@@ -54,7 +55,10 @@ function AppContent() {
   };
 
   return (
-    <>
+    // The provider wraps both the routes and the widget: a page registers what
+    // it can execute, and the widget is the only reader of that registration, so
+    // they have to share one instance.
+    <AssistantCapabilityProvider>
       <Suspense fallback={<div className="min-h-screen" />}>
         <Routes>
           {/* Dev-only style guide (Phase 0): mounted OUTSIDE MainLayout so it
@@ -83,7 +87,7 @@ function AppContent() {
           OUTSIDE the Suspense boundary so lazy route loads never unmount/remount
           it and re-fire impression telemetry. */}
       <AssistantWidget />
-    </>
+    </AssistantCapabilityProvider>
   );
 }
 

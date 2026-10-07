@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type ChangeEvent, type KeyboardEvent } from 'react';
 import { MapPin, Loader2, X } from 'lucide-react';
 import BRANDING from '../../config/branding';
 
@@ -55,6 +55,25 @@ const LocationAutocomplete = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Id of the newest accepted search: a response whose id is no longer current
+   * is dropped, so a result arriving after the list was closed cannot put it back.
+   */
+  const searchSeqRef = useRef(0);
+
+  /**
+   * Abandons whatever the field was about to show — the debounce timer left by
+   * the last keystroke and any search already in flight. Every path that hides
+   * the list calls this: a keystroke made a moment before the list closed would
+   * otherwise re-open it (the list reappearing right after a pick).
+   */
+  const cancelPendingSearch = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    searchSeqRef.current += 1;
+  }, []);
 
   // Sync with external value changes
   useEffect(() => {
@@ -69,6 +88,7 @@ const LocationAutocomplete = ({
       return;
     }
 
+    const searchId = ++searchSeqRef.current;
     setIsLoading(true);
     
     try {
@@ -129,12 +149,15 @@ const LocationAutocomplete = ({
         };
       });
 
+      if (searchId !== searchSeqRef.current) return;
+
       setSuggestions(formattedSuggestions);
     } catch (error) {
+      if (searchId !== searchSeqRef.current) return;
       console.error('Error searching locations:', error);
       setSuggestions([]);
     } finally {
-      setIsLoading(false);
+      if (searchId === searchSeqRef.current) setIsLoading(false);
     }
   };
 
@@ -161,6 +184,7 @@ const LocationAutocomplete = ({
 
   // Handle selection
   const handleSelect = (suggestion: LocationSuggestion) => {
+    cancelPendingSearch();
     setQuery(suggestion.displayName);
     setSuggestions([]);
     setShowSuggestions(false);
@@ -176,6 +200,7 @@ const LocationAutocomplete = ({
     if (!showSuggestions || suggestions.length === 0) {
       if (e.key === 'Enter') {
         e.preventDefault();
+        cancelPendingSearch();
         onChange(query);
         setShowSuggestions(false);
       }
@@ -198,12 +223,14 @@ const LocationAutocomplete = ({
         if (selectedIndex >= 0 && suggestions[selectedIndex]) {
           handleSelect(suggestions[selectedIndex]);
         } else {
+          cancelPendingSearch();
           onChange(query);
           setShowSuggestions(false);
         }
         break;
       case 'Escape':
         e.preventDefault();
+        cancelPendingSearch();
         setShowSuggestions(false);
         setSelectedIndex(-1);
         break;
@@ -214,6 +241,7 @@ const LocationAutocomplete = ({
 
   // Clear input
   const handleClear = () => {
+    cancelPendingSearch();
     setQuery('');
     setSuggestions([]);
     setShowSuggestions(false);
@@ -230,6 +258,7 @@ const LocationAutocomplete = ({
         inputRef.current &&
         !inputRef.current.contains(event.target as Node)
       ) {
+        cancelPendingSearch();
         setShowSuggestions(false);
       }
     };
@@ -238,7 +267,11 @@ const LocationAutocomplete = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [cancelPendingSearch]);
+
+  // The forms that host this field unmount it wholesale; drop any pending search
+  // so nothing lands after the field is gone.
+  useEffect(() => () => cancelPendingSearch(), [cancelPendingSearch]);
 
   return (
     <div className="relative">

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useOptionalAuth } from "@/contexts/AuthContext";
-import { useCopilotSession } from "./useCopilotSession";
+import { useRegisterCopilotControl } from "@/contexts/CopilotControlContext";
+import { deriveScopeKey, useCopilotSession } from "./useCopilotSession";
 import { useCopilotVisibility } from "./useCopilotVisibility";
 import { useIsDesktopDock } from "./useMediaQuery";
 import CopilotDock from "./CopilotDock";
@@ -8,9 +9,8 @@ import CopilotDrawer from "./CopilotDrawer";
 import CopilotRail from "./CopilotRail";
 import CopilotTrigger from "./CopilotTrigger";
 import CopilotConversation from "./CopilotConversation";
+import CopilotTabs, { COPILOT_TAB_IDS, type CopilotTab } from "./CopilotTabs";
 import type { CopilotSession, CopilotScope, SinceWindow } from "./types";
-
-const INSIGHTS_HEADING_ID = "copilot-insights-heading";
 
 export type CopilotSectionApi = {
   session: CopilotSession;
@@ -19,6 +19,14 @@ export type CopilotSectionApi = {
   scopeLabel: string;
   /** Collapse the persistent dock. Undefined below `xl`, where the drawer closes instead. */
   collapse?: () => void;
+  /**
+   * Bring the conversation forward.
+   *
+   * Threaded to each panel so attaching a finding raises the conversation. The
+   * findings list owns the reading; the tab that answers questions owns the
+   * asking, so nothing is submitted from a tab the operator is not looking at.
+   */
+  showConversation: () => void;
 };
 
 type ManagementContextCopilotProps = {
@@ -77,24 +85,40 @@ export default function ManagementContextCopilot({
   const dockOpen = isDesktop && ready && visibility === "open";
   const surfaceOpen = isDesktop ? dockOpen : drawerOpen;
 
-  const session = useCopilotSession(scope, since, { pageKey, open: surfaceOpen });
+  const [activeTab, setActiveTab] = useState<CopilotTab>("insights");
+  const showConversation = useCallback(() => setActiveTab("conversation"), []);
 
-  // Discovery: the first valid lead opens the dock once, only at `xl` and wider.
-  // No-lead visits do not count, and a stored choice is never overridden.
+  // Acknowledgement follows PRESENTATION, not the surface merely being open. With
+  // the Copilot tab active a result would otherwise be marked seen while hidden,
+  // and the next visit's "since you were here" would silently lose it.
+  const insightsPresented = surfaceOpen && activeTab === "insights";
+
+  const session = useCopilotSession(scope, since, { pageKey, open: surfaceOpen, insightsPresented });
+
+  // A scope change resets the view. The transcript is already cleared by the
+  // scope key, so a kept tab would land the operator on an empty conversation
+  // and hide the new lead's findings — the same rule first-open already follows
+  // at `xl`. Keyed on the derived scope rather than on the session object so the
+  // reset cannot fire on an unrelated session identity change.
+  const activeScopeKey = deriveScopeKey(scope);
   useEffect(() => {
-    if (!isDesktop || !ready || visibility !== null) return;
-    if (!session.hasScope) return;
-    setVisibility("open");
-  }, [isDesktop, ready, visibility, session.hasScope, setVisibility]);
+    setActiveTab("insights");
+  }, [activeScopeKey]);
 
+  // Closed until the operator opens it. There is no first-visit auto-open: the
+  // rail and the floating trigger are the only things that expand the dock, and
+  // a stored preference is the only thing that keeps it open across visits.
   const collapse = useCallback(() => setVisibility("collapsed"), [setVisibility]);
 
   // Opening the panel from either desktop control lands focus on the element
-  // that names the region, exactly as the drawer's `initialFocus` does. Without
-  // the rule a keyboard operator presses the trigger, the panel appears
+  // that names the region, exactly as the drawer's `initialFocus` does. The tab
+  // names the panel now that no heading sits inside it, and it is the ACTIVE tab
+  // that names what is on screen — so the target is derived, not a fixed id.
+  // Without the rule a keyboard operator presses the trigger, the panel appears
   // elsewhere in the tab order, and they must traverse the page to reach what
   // they just opened. The dock is not a dialog, so the move is explicit and
-  // runs on the commit that mounts it — never before the heading exists.
+  // runs on the commit that mounts it — never before the tab exists.
+  const activeTabId = COPILOT_TAB_IDS[activeTab];
   const focusOnExpandRef = useRef(false);
   const expand = useCallback(() => {
     focusOnExpandRef.current = true;
@@ -104,8 +128,8 @@ export default function ManagementContextCopilot({
   useEffect(() => {
     if (!dockOpen || !focusOnExpandRef.current) return;
     focusOnExpandRef.current = false;
-    document.getElementById(INSIGHTS_HEADING_ID)?.focus();
-  }, [dockOpen]);
+    document.getElementById(activeTabId)?.focus();
+  }, [dockOpen, activeTabId]);
 
   const handleDrawerOpenChange = useCallback(
     (next: boolean) => {
@@ -120,26 +144,46 @@ export default function ManagementContextCopilot({
 
   const showCue = !isDesktop && ready && !cueDismissed && session.ready;
 
+  // The one seam the site-wide notification surface uses. Order matters:
+  // attach, switch tab, then open — `expand` lands focus through the effect
+  // above, which only runs once `dockOpen` commits.
+  const { chatAbout } = session;
+  const askAbout = useCallback(
+    (claim: Parameters<CopilotSession["chatAbout"]>[0]) => {
+      chatAbout(claim);
+      showConversation();
+      if (isDesktop) expand();
+      else handleDrawerOpenChange(true);
+    },
+    [chatAbout, showConversation, isDesktop, expand, handleDrawerOpenChange]
+  );
+  const control = useMemo(() => ({ askAbout }), [askAbout]);
+  useRegisterCopilotControl(control);
+
   const content = children({
     session,
     open: surfaceOpen,
     scopeLabel,
     collapse: isDesktop && dockOpen ? collapse : undefined,
+    showConversation,
   });
 
-  // The panel's two children, in reading order: the page-owned insights first,
-  // then one hairline, then the shell's conversation, whose composer sticks to
-  // `CopilotSurface`'s scrollport.
+  // Findings and conversation stop competing for one scroll column. Each tab
+  // panel owns its own `CopilotSurface`, so the two keep independent scroll
+  // positions across a switch.
   const body = (
-    <>
-      {content}
-      <CopilotConversation session={session} scopeLabel={scopeLabel} />
-    </>
+    <CopilotTabs
+      insights={content}
+      conversation={<CopilotConversation session={session} />}
+      active={activeTab}
+      onActiveChange={setActiveTab}
+      pending={session.asking}
+    />
   );
 
   return (
     <>
-      {dockOpen && <CopilotDock labelledBy={INSIGHTS_HEADING_ID}>{body}</CopilotDock>}
+      {dockOpen && <CopilotDock>{body}</CopilotDock>}
 
       {isDesktop && !dockOpen && (
         <>
@@ -162,6 +206,7 @@ export default function ManagementContextCopilot({
         <CopilotDrawer
           open={drawerOpen}
           onOpenChange={handleDrawerOpenChange}
+          initialFocusId={activeTabId}
           hasAttention={session.hasAttention}
           showCue={showCue}
           onDismissCue={dismissCue}

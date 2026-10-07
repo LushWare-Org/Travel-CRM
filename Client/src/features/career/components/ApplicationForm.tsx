@@ -1,4 +1,5 @@
 import type { ChangeEvent, FormEvent } from 'react';
+import { AssistantFilledBadge, assistantMarkedFieldClass } from '../../assistant/components/AssistantFieldMarker';
 import {
   CheckCircle,
   AlertCircle,
@@ -13,6 +14,8 @@ import type { ApplicationFormData, FormErrors, SubmitStatus, Vacancy } from '../
 interface ApplicationFormProps {
   formData: ApplicationFormData;
   errors: FormErrors;
+  /** Fields the assistant wrote, so the marker can say so until the visitor edits. */
+  assistantWritten?: Set<string>;
   vacancies: Vacancy[];
   submitStatus: SubmitStatus;
   isSubmitting: boolean;
@@ -28,6 +31,7 @@ interface ApplicationFormProps {
 const ApplicationForm = ({
   formData,
   errors,
+  assistantWritten,
   vacancies,
   submitStatus,
   isSubmitting,
@@ -73,10 +77,11 @@ const ApplicationForm = ({
             onChange={onChange}
             className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.fullName
                 ? 'border-red-400 bg-red-50'
-                : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
+                : `border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 ${assistantMarkedFieldClass(assistantWritten?.has('fullName'))}`
               }`}
             placeholder="John Doe"
           />
+          {assistantWritten?.has('fullName') && <AssistantFilledBadge />}
           {errors.fullName && <p className="text-red-600 text-sm mt-1">{errors.fullName}</p>}
         </div>
 
@@ -93,10 +98,11 @@ const ApplicationForm = ({
               onChange={onChange}
               className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.email
                   ? 'border-red-400 bg-red-50'
-                  : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
+                  : `border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 ${assistantMarkedFieldClass(assistantWritten?.has('email'))}`
                 }`}
               placeholder="john@example.com"
             />
+            {assistantWritten?.has('email') && <AssistantFilledBadge />}
             {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
           </div>
           <div>
@@ -110,10 +116,11 @@ const ApplicationForm = ({
               onChange={onChange}
               className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.phone
                   ? 'border-red-400 bg-red-50'
-                  : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
+                  : `border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 ${assistantMarkedFieldClass(assistantWritten?.has('phone'))}`
                 }`}
               placeholder="Your phone number"
             />
+            {assistantWritten?.has('phone') && <AssistantFilledBadge />}
             {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
           </div>
         </div>
@@ -129,7 +136,7 @@ const ApplicationForm = ({
             onChange={onChange}
             className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.position
                 ? 'border-red-400 bg-red-50'
-                : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
+                : `border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 ${assistantMarkedFieldClass(assistantWritten?.has('position'))}`
               }`}
           >
             <option value="">-- Choose a position --</option>
@@ -139,6 +146,7 @@ const ApplicationForm = ({
               </option>
             ))}
           </select>
+          {assistantWritten?.has('position') && <AssistantFilledBadge />}
           {errors.position && <p className="text-red-600 text-sm mt-1">{errors.position}</p>}
         </div>
 
@@ -154,10 +162,11 @@ const ApplicationForm = ({
             rows={6}
             className={`w-full px-4 py-3 rounded-lg border-2 transition resize-none ${errors.coverLetter
                 ? 'border-red-400 bg-red-50'
-                : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
+                : `border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 ${assistantMarkedFieldClass(assistantWritten?.has('coverLetter'))}`
               }`}
             placeholder="Tell us why you'd be a great fit for this position..."
           />
+          {assistantWritten?.has('coverLetter') && <AssistantFilledBadge />}
           {errors.coverLetter && <p className="text-red-600 text-sm mt-1">{errors.coverLetter}</p>}
         </div>
 
